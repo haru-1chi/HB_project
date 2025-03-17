@@ -18,6 +18,8 @@ const formatWaitTime = (minutes) => {
 function Home() {
   const [summary, setSummary] = useState(null);
   const [data, setData] = useState(null);
+  const [sortField, setSortField] = useState("ALL_USER");
+  const [sortOrder, setSortOrder] = useState("desc");
 
   const fetchDepartmentState = () => {
     axios
@@ -58,6 +60,18 @@ function Home() {
     // Cleanup interval on unmount
     return () => clearInterval(interval);
   }, []);
+
+  const sortedData = data ? [...data].sort((a, b) => {
+    const fieldA = a[sortField];
+    const fieldB = b[sortField];
+
+    if (sortOrder === "asc") {
+      return fieldA < fieldB ? -1 : 1;
+    } else {
+      return fieldA > fieldB ? -1 : 1;
+    }
+  }) : [];
+
   return (
     <div className="Home-page flex">
       <div className="w-95">
@@ -75,14 +89,37 @@ function Home() {
           )}
         </div>
         <div className="bg-white p-4 my-8 w-full rounded-xl shadow-md h-[500px] border-1 border-gray-200">
-          {data?.length > 0 ? (
-            <OpdBarChart data={data} />
+          {sortedData?.length > 0 ? (
+            <OpdBarChart data={sortedData} />
           ) : (
             <p>Loading chart...</p>
           )}
         </div>
+
+        <div className="my-4">
+          <select
+            className="border p-2 mr-4"
+            value={sortField}
+            onChange={(e) => setSortField(e.target.value)}
+          >
+            <option value="ALL_USER">ผู้เข้าใช้บริการ</option>
+            <option value="PENDING">กำลังรอ</option>
+            <option value="COMPLETED">เสร็จสิ้น</option>
+            <option value="AVG_WAIT_TIME">เวลารอเฉลี่ย</option>
+          </select>
+
+          <select
+            className="border p-2"
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+          >
+            <option value="asc">น้อยไปมาก</option>
+            <option value="desc">มากไปน้อย</option>
+          </select>
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
-          {data?.map((item, index) => (
+          {sortedData?.map((item, index) => (
             <DetailCard
               key={index}
               OPD_name={item.OPD_NAME}
