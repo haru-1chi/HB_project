@@ -75,7 +75,8 @@ FROM OPDS o
 JOIN PLACES pl ON pl.PLACECODE = o.PLA_PLACECODE
 WHERE o.opd_date = TRUNC(SYSDATE)
 
-GROUP BY o.PLA_PLACECODE, pl.fullplace`
+GROUP BY o.PLA_PLACECODE, pl.fullplace
+ORDER BY all_user DESC`
     );
 
     res.json(result.rows);
