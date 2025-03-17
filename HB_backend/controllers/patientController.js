@@ -42,7 +42,14 @@ async function summary(req, res) {
       `SELECT 
     COUNT(o.OPD_NO) AS all_user,
     SUM(CASE WHEN o.FINISH_OPD_DATETIME IS NULL THEN 1 ELSE 0 END) AS pending,
-    SUM(CASE WHEN o.FINISH_OPD_DATETIME IS NOT NULL THEN 1 ELSE 0 END) AS completed
+    SUM(CASE WHEN o.FINISH_OPD_DATETIME IS NOT NULL THEN 1 ELSE 0 END) AS completed,
+    ROUND(AVG(
+        CASE 
+            WHEN o.FINISH_OPD_DATETIME IS NOT NULL 
+            THEN (o.FINISH_OPD_DATETIME - o.REACH_OPD_DATETIME) * 24 * 60 
+            ELSE NULL 
+        END
+    ), 2) AS avg_wait_time
 FROM OPDS o
 JOIN PLACES pl ON pl.PLACECODE = o.PLA_PLACECODE
 WHERE o.opd_date = TRUNC(SYSDATE)
@@ -70,11 +77,17 @@ async function stateOPDS(req, res) {
     pl.fullplace AS OPD_name,
     COUNT(o.OPD_NO) AS all_user,
     SUM(CASE WHEN o.FINISH_OPD_DATETIME IS NULL THEN 1 ELSE 0 END) AS pending,
-    SUM(CASE WHEN o.FINISH_OPD_DATETIME IS NOT NULL THEN 1 ELSE 0 END) AS completed
+    SUM(CASE WHEN o.FINISH_OPD_DATETIME IS NOT NULL THEN 1 ELSE 0 END) AS completed,
+    ROUND(AVG(
+        CASE 
+            WHEN o.FINISH_OPD_DATETIME IS NOT NULL 
+            THEN (o.FINISH_OPD_DATETIME - o.REACH_OPD_DATETIME) * 24 * 60 
+            ELSE NULL 
+        END
+    ), 2) AS avg_wait_time
 FROM OPDS o
 JOIN PLACES pl ON pl.PLACECODE = o.PLA_PLACECODE
 WHERE o.opd_date = TRUNC(SYSDATE)
-
 GROUP BY o.PLA_PLACECODE, pl.fullplace
 ORDER BY all_user DESC`
     );

@@ -1,26 +1,28 @@
 import React, { useEffect, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUser, faHourglassHalf, faCheck } from "@fortawesome/free-solid-svg-icons";
-function DetailCard({ OPD_name, all_user, pending, completed }) {
 
-  const [prevData, setPrevData] = useState({ all_user, pending, completed });
-  const [updatedFields, setUpdatedFields] = useState({ all_user: false, pending: false, completed: false });
+function DetailCard({ OPD_name, all_user, pending, completed, avg_wait_time }) {
+
+  const [prevData, setPrevData] = useState({ all_user, pending, completed, avg_wait_time  });
+  const [updatedFields, setUpdatedFields] = useState({ all_user: false, pending: false, completed: false, avg_wait_time: false });
 
   useEffect(() => {
     const changes = {
       all_user: all_user !== prevData.all_user,
       pending: pending !== prevData.pending,
       completed: completed !== prevData.completed,
+      avg_wait_time: avg_wait_time !== prevData.avg_wait_time,
     };
 
     setUpdatedFields(changes);
 
     setTimeout(() => {
-      setUpdatedFields({ all_user: false, pending: false, completed: false });
+      setUpdatedFields({ all_user: false, pending: false, completed: false, avg_wait_time: false });
     }, 2000); // Reset after 2 seconds
 
-    setPrevData({ all_user, pending, completed });
-  }, [all_user, pending, completed]);
+    setPrevData({ all_user, pending, completed, avg_wait_time });
+  }, [all_user, pending, completed, avg_wait_time]);
 
   return (
     <div className="bg-white shadow-md border-1 border-gray-200 w-[400px] h-[275px] p-5 rounded-xl flex flex-col justify-between">
@@ -59,6 +61,18 @@ function DetailCard({ OPD_name, all_user, pending, completed }) {
         </div>
         <p className={`text-2xl ${updatedFields.completed ? "text-red-500" : "text-green-500"}`}>
           <span className="text-3xl font-bold">{completed}</span> คน
+        </p>
+      </div>
+      <div className="flex items-center justify-between ">
+        <div className="flex items-center">
+        <FontAwesomeIcon
+            icon={faHourglassHalf}
+            className="text-3xl mb-1 text-orange-500 mr-2"
+          />
+          <p className="text-2xl">เวลารอเฉลี่ย</p>
+        </div>
+        <p className={`text-2xl ${updatedFields.avg_wait_time ? "text-red-500" : "text-orange-500"}`}>
+          <span className="text-3xl font-bold">{avg_wait_time}</span>
         </p>
       </div>
     </div>

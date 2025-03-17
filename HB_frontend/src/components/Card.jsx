@@ -22,6 +22,7 @@ function Card({ count, keyword }) {
     ผู้ใช้บริการทั้งหมด: { icon: faUser, bgColor: "bg-blue-500" },
     กำลังรอ: { icon: faHourglassHalf, bgColor: "bg-orange-500" },
     เสร็จสิ้น: { icon: faCheck, bgColor: "bg-green-500" },
+    เวลารอเฉลี่ย: { icon: faHourglassHalf, bgColor: "bg-orange-500" },
   };
 
   return (
