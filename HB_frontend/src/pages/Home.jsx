@@ -12,7 +12,7 @@ function Home() {
 
   const fetchDepartmentState = () => {
     axios
-      .get("http://localhost:3000/api/departments/state")
+      .get("http://172.16.190.17:3000/api/departments/state")
       .then((response) => setData(response.data))
       .catch((error) =>
         console.error("Error fetching department data:", error)
@@ -22,7 +22,7 @@ function Home() {
   // Function to fetch summary data
   const fetchSummary = () => {
     axios
-      .get("http://localhost:3000/api/summary")
+      .get("http://172.16.190.17:3000/api/summary")
       .then((response) => {
         if (response.data.length > 0) {
           setSummary(response.data[0]); // Assuming one object is returned

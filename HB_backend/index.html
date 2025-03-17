@@ -73,7 +73,7 @@
       messages.innerHTML = ""; // Clear previous data
       data.forEach((patient) => {
         const item = document.createElement("li");
-        item.textContent = `${patient.OPD_name}: ${patient.all_user}, ${patient.pending}, ${patient.completed},`;
+        item.textContent = `${patient.OPD_NAME}: ${patient.ALL_USER}, ${patient.PENDING}, ${patient.COMPLETED},`;
         messages.appendChild(item);
       });
     });
