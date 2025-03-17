@@ -9,7 +9,7 @@ import OpdBarChart from "../components/OpdBarChart";
 //เอาใส่ util ภายหลัง
 const formatWaitTime = (minutes) => {
   if (!minutes) return "0 นาที";
-  
+
   const hrs = Math.floor(minutes / 60);
   const mins = Math.round(minutes % 60);
   return hrs > 0 ? `${hrs} ชม. ${mins} นาที` : `${mins} นาที`;
@@ -21,7 +21,7 @@ function Home() {
 
   const fetchDepartmentState = () => {
     axios
-      .get("http://172.16.39.6:3000/api/departments/state")
+      .get("http://172.16.190.17:3000/api/departments/state")
       .then((response) => setData(response.data))
       .catch((error) =>
         console.error("Error fetching department data:", error)
@@ -31,7 +31,7 @@ function Home() {
   // Function to fetch summary data
   const fetchSummary = () => {
     axios
-      .get("http://172.16.39.6:3000/api/summary")
+      .get("http://172.16.190.17:3000/api/summary")
       .then((response) => {
         if (response.data.length > 0) {
           const formattedSummary = {
