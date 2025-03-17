@@ -25,7 +25,7 @@ function Card({ count, keyword }) {
   };
 
   return (
-    <div className="bg-white shadow-md border-1 border-gray-200 w-[555px] h-[136px] p-5 rounded-xl flex flex-col justify-between">
+    <div className="bg-white shadow-md border-1 border-gray-200 w-[540px] h-[136px] p-5 rounded-xl flex flex-col justify-between">
       <div className="flex justify-between items-center">
         <div
           className={`${iconMap[keyword]?.bgColor} px-5 py-4 rounded-full text-3xl text-white mr-2`}

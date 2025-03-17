@@ -23,7 +23,7 @@ function DetailCard({ OPD_name, all_user, pending, completed }) {
   }, [all_user, pending, completed]);
 
   return (
-    <div className="bg-white shadow-md border-1 border-gray-200 w-[410px] h-[275px] p-5 rounded-xl flex flex-col justify-between">
+    <div className="bg-white shadow-md border-1 border-gray-200 w-[400px] h-[275px] p-5 rounded-xl flex flex-col justify-between">
       <h1 className="text-3xl font-semibold">{OPD_name}</h1>
       <div className="flex items-center justify-between">
         <div className="flex items-center">

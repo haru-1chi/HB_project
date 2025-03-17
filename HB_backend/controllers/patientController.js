@@ -45,7 +45,7 @@ async function summary(req, res) {
     SUM(CASE WHEN o.FINISH_OPD_DATETIME IS NOT NULL THEN 1 ELSE 0 END) AS completed
 FROM OPDS o
 JOIN PLACES pl ON pl.PLACECODE = o.PLA_PLACECODE
-WHERE TO_DATE(TO_CHAR(o.opd_date, 'DDMMYYYY'), 'DDMMYYYY') = TRUNC(SYSDATE)
+WHERE o.opd_date = TRUNC(SYSDATE)
 `
     );
 
@@ -73,7 +73,7 @@ async function stateOPDS(req, res) {
     SUM(CASE WHEN o.FINISH_OPD_DATETIME IS NOT NULL THEN 1 ELSE 0 END) AS completed
 FROM OPDS o
 JOIN PLACES pl ON pl.PLACECODE = o.PLA_PLACECODE
-WHERE TO_DATE(TO_CHAR(o.opd_date, 'DDMMYYYY'), 'DDMMYYYY') = TRUNC(SYSDATE)
+WHERE o.opd_date = TRUNC(SYSDATE)
 
 GROUP BY o.PLA_PLACECODE, pl.fullplace`
     );
