@@ -25,7 +25,7 @@ function DetailCard({ OPD_name, all_user, pending, completed, avg_wait_time }) {
   }, [all_user, pending, completed, avg_wait_time]);
 
   return (
-    <div className="bg-white shadow-md border-1 border-gray-200 w-[400px] h-[275px] p-5 rounded-xl flex flex-col justify-between">
+    <div className="bg-white shadow-md border-1 border-gray-200 h-[275px] p-5 rounded-xl flex flex-col justify-between">
       <h1 className="text-3xl font-semibold">{OPD_name}</h1>
       <div className="flex items-center justify-between">
         <div className="flex items-center">
@@ -72,7 +72,7 @@ function DetailCard({ OPD_name, all_user, pending, completed, avg_wait_time }) {
           <p className="text-2xl">เวลารอเฉลี่ย</p>
         </div>
         <p className={`text-2xl ${updatedFields.avg_wait_time ? "text-red-500" : "text-orange-500"}`}>
-          <span className="text-3xl font-bold">{avg_wait_time}</span>
+          <span className="text-2xl font-bold">{avg_wait_time}</span>
         </p>
       </div>
     </div>
