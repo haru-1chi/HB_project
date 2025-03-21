@@ -58,7 +58,7 @@ function SideBarMenu({
               }
               onClick={() => setSelectedOpdNames([])}
               text
-              className=""
+              className="text-blue-500 hover:bg-blue-50 cursor-pointer px-3 py-1 rounded-md"
               unstyled
             />
           </div>
