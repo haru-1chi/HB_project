@@ -1,8 +1,8 @@
 import axios from "axios";
 import React, { useState, useEffect } from "react";
 import { Button } from "primereact/button";
-
-import SideBarMenu from "../components/Sidebar";
+import { Dropdown } from "primereact/dropdown";
+import SideBarMenu from "../components/SideBarMenu";
 import Card from "../components/Card";
 import DetailCard from "../components/DetailCard";
 import OpdBarChart from "../components/OpdBarChart";
@@ -21,23 +21,31 @@ function Home() {
 
   const [summary, setSummary] = useState(null);
   const [data, setData] = useState(null);
+  const [allOpdChoices, setAllOpdChoices] = useState([]);
   const [sortField, setSortField] = useState("ALL_USER");
   const [sortOrder, setSortOrder] = useState("desc");
   const [selectedOpdNames, setSelectedOpdNames] = useState([]);
 
-  const fetchDepartmentState = () => {
-    axios
-      .get("http://172.16.190.17:3000/api/departments/state")
-      .then((response) => setData(response.data))
-      .catch((error) =>
-        console.error("Error fetching department data:", error)
-      );
-  };
+  const sortFieldOptions = [
+    { label: "ผู้เข้าใช้บริการ", value: "ALL_USER" },
+    { label: "กำลังรอ", value: "PENDING" },
+    { label: "เสร็จสิ้น", value: "COMPLETED" },
+    { label: "เวลารอเฉลี่ย", value: "AVG_WAIT_TIME" },
+  ];
+
+  const sortOrderOptions = [
+    { label: "น้อยไปมาก", value: "asc" },
+    { label: "มากไปน้อย", value: "desc" },
+  ];
 
   // Function to fetch summary data
   const fetchSummary = () => {
+    const queryParams = new URLSearchParams({
+      opdNames: selectedOpdNames.join(","),
+    }).toString();
+
     axios
-      .get("http://172.16.190.17:3000/api/summary")
+      .get(`http://172.16.39.6:3000/api/summary?${queryParams}`)
       .then((response) => {
         if (response.data.length > 0) {
           const formattedSummary = {
@@ -50,10 +58,38 @@ function Home() {
       .catch((error) => console.error("Error fetching summary data:", error));
   };
 
+  const fetchAllOpdChoices = () => {
+    axios
+      .get(`http://172.16.39.6:3000/api/departments/state`)
+      .then((response) => {
+        // Extract unique OPD_NAME values from the response
+        const opdNames = response.data.map((item) => item.OPD_NAME);
+        setAllOpdChoices(opdNames);
+      })
+      .catch((error) => console.error("Error fetching OPD names:", error));
+  };
+
+  const fetchDepartmentState = () => {
+    const queryParams = new URLSearchParams({
+      sortField,
+      sortOrder,
+      opdNames: selectedOpdNames.join(","),
+    }).toString();
+
+    axios
+      .get(`http://172.16.39.6:3000/api/departments/state?${queryParams}`)
+      .then((response) => setData(response.data))
+      .catch((error) =>
+        console.error("Error fetching department data:", error)
+      );
+  };
+
+  console.log(allOpdChoices);
   useEffect(() => {
     // Initial fetch
     fetchDepartmentState();
     fetchSummary();
+    fetchAllOpdChoices();
 
     // Set interval to fetch data every 1 minute (60,000ms)
     const interval = setInterval(() => {
@@ -63,20 +99,7 @@ function Home() {
 
     // Cleanup interval on unmount
     return () => clearInterval(interval);
-  }, []);
-
-  const sortedData = data
-    ? [...data].sort((a, b) => {
-        const fieldA = a[sortField];
-        const fieldB = b[sortField];
-
-        if (sortOrder === "asc") {
-          return fieldA < fieldB ? -1 : 1;
-        } else {
-          return fieldA > fieldB ? -1 : 1;
-        }
-      })
-    : [];
+  }, [sortField, sortOrder, selectedOpdNames]);
 
   const handleCheckboxChange = (opdName) => {
     setSelectedOpdNames((prevSelected) =>
@@ -86,48 +109,46 @@ function Home() {
     );
   };
 
-  // Filter data based on selected OPD Names
-  const filteredData =
-    selectedOpdNames.length > 0
-      ? sortedData.filter((item) => selectedOpdNames.includes(item.OPD_NAME))
-      : sortedData;
-
   return (
     <div className="Home-page flex">
       <SideBarMenu
         visible={visible}
         setVisible={setVisible}
-        data={data}
+        allOpdChoices={allOpdChoices}
         selectedOpdNames={selectedOpdNames}
         handleCheckboxChange={handleCheckboxChange}
+        setSelectedOpdNames={setSelectedOpdNames}
       />
       <div className="w-full p-8">
-        <div className="flex justify-between">
+        <div className="fixed z-10">
           <Button
             label={<FontAwesomeIcon icon={faSliders} />}
             onClick={() => setVisible(true)}
             rounded
           />
-          <div className="">
-            <select
-              className="border p-2 mr-4"
+        </div>
+        <div className="flex justify-end mb-3">
+          <div>
+            <Dropdown
               value={sortField}
-              onChange={(e) => setSortField(e.target.value)}
-            >
-              <option value="ALL_USER">ผู้เข้าใช้บริการ</option>
-              <option value="PENDING">กำลังรอ</option>
-              <option value="COMPLETED">เสร็จสิ้น</option>
-              <option value="AVG_WAIT_TIME">เวลารอเฉลี่ย</option>
-            </select>
+              onChange={(e) => setSortField(e.value)}
+              options={sortFieldOptions}
+              optionLabel="label"
+              placeholder="เลือกประเภทการจัดเรียง"
+              checkmark={true}
+              highlightOnSelect={false}
+              className="mr-5"
+            />
 
-            <select
-              className="border p-2"
+            <Dropdown
               value={sortOrder}
-              onChange={(e) => setSortOrder(e.target.value)}
-            >
-              <option value="asc">น้อยไปมาก</option>
-              <option value="desc">มากไปน้อย</option>
-            </select>
+              onChange={(e) => setSortOrder(e.value)}
+              options={sortOrderOptions}
+              optionLabel="label"
+              placeholder="เลือกเรียงลำดับ"
+              checkmark={true}
+              highlightOnSelect={false}
+            />
           </div>
         </div>
 
@@ -143,15 +164,15 @@ function Home() {
         </div>
 
         <div className="bg-white p-4 my-8 w-full rounded-xl shadow-md h-[500px] border-1 border-gray-200">
-          {sortedData?.length > 0 ? (
-            <OpdBarChart data={sortedData} />
+          {data?.length > 0 ? (
+            <OpdBarChart data={data} />
           ) : (
             <p>Loading chart...</p>
           )}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-8">
-          {filteredData?.map((item, index) => (
+          {data?.map((item, index) => (
             <DetailCard
               key={index}
               OPD_name={item.OPD_NAME}

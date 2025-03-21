@@ -38,8 +38,19 @@ async function summary(req, res) {
   let connection;
   try {
     connection = await getConnection();
-    const result = await connection.execute(
-      `SELECT 
+
+    const { opdNames } = req.query;
+
+    let opdFilter = "";
+    let queryParams = [];
+
+    if (opdNames) {
+      const namesArray = opdNames.split(",").map(name => name.trim());
+      opdFilter = `AND pl.fullplace IN (${namesArray.map(() => ":name").join(", ")})`;
+      queryParams = namesArray; // Bind each value separately
+    }
+
+    const query = `SELECT 
     COUNT(o.OPD_NO) AS all_user,
     SUM(CASE WHEN o.FINISH_OPD_DATETIME IS NULL THEN 1 ELSE 0 END) AS pending,
     SUM(CASE WHEN o.FINISH_OPD_DATETIME IS NOT NULL THEN 1 ELSE 0 END) AS completed,
@@ -52,10 +63,9 @@ async function summary(req, res) {
     ), 2) AS avg_wait_time
 FROM OPDS o
 JOIN PLACES pl ON pl.PLACECODE = o.PLA_PLACECODE
-WHERE o.opd_date = TRUNC(SYSDATE)
-`
-    );
-
+WHERE o.opd_date = TRUNC(SYSDATE) ${opdFilter}
+`;
+    const result = await connection.execute(query, queryParams, { autoCommit: true });
     res.json(result.rows);
   } catch (err) {
     console.error('Database error:', err);
@@ -71,31 +81,45 @@ async function stateOPDS(req, res) {
   let connection;
   try {
     connection = await getConnection();
-    const result = await connection.execute(
-      `SELECT 
-    o.PLA_PLACECODE,
-    pl.fullplace AS OPD_name,
-    COUNT(o.OPD_NO) AS all_user,
-    SUM(CASE WHEN o.FINISH_OPD_DATETIME IS NULL THEN 1 ELSE 0 END) AS pending,
-    SUM(CASE WHEN o.FINISH_OPD_DATETIME IS NOT NULL THEN 1 ELSE 0 END) AS completed,
-    ROUND(AVG(
-        CASE 
-            WHEN o.FINISH_OPD_DATETIME IS NOT NULL 
-            THEN (o.FINISH_OPD_DATETIME - o.REACH_OPD_DATETIME) * 24 * 60 
-            ELSE NULL 
-        END
-    ), 2) AS avg_wait_time
-FROM OPDS o
-JOIN PLACES pl ON pl.PLACECODE = o.PLA_PLACECODE
-WHERE o.opd_date = TRUNC(SYSDATE)
-GROUP BY o.PLA_PLACECODE, pl.fullplace
-ORDER BY all_user DESC`
-    );
+
+    const { sortField = "all_user", sortOrder = "DESC", opdNames } = req.query;
+
+    let opdFilter = "";
+    let queryParams = [];
+
+    if (opdNames) {
+      const namesArray = opdNames.split(",").map(name => name.trim());
+      opdFilter = `AND pl.fullplace IN (${namesArray.map(() => ":name").join(", ")})`;
+      queryParams = namesArray; // Bind each value separately
+    }
+
+    const query = `
+      SELECT 
+        o.PLA_PLACECODE,
+        pl.fullplace AS OPD_name,
+        COUNT(o.OPD_NO) AS all_user,
+        SUM(CASE WHEN o.FINISH_OPD_DATETIME IS NULL THEN 1 ELSE 0 END) AS pending,
+        SUM(CASE WHEN o.FINISH_OPD_DATETIME IS NOT NULL THEN 1 ELSE 0 END) AS completed,
+        ROUND(AVG(
+            CASE 
+                WHEN o.FINISH_OPD_DATETIME IS NOT NULL 
+                THEN (o.FINISH_OPD_DATETIME - o.REACH_OPD_DATETIME) * 24 * 60 
+                ELSE NULL 
+            END
+        ), 2) AS avg_wait_time
+      FROM OPDS o
+      JOIN PLACES pl ON pl.PLACECODE = o.PLA_PLACECODE
+      WHERE o.opd_date = TRUNC(SYSDATE) ${opdFilter}
+      GROUP BY o.PLA_PLACECODE, pl.fullplace
+      ORDER BY ${sortField} ${sortOrder}`;
+
+    // Use executeMany() for correct binding
+    const result = await connection.execute(query, queryParams, { autoCommit: true });
 
     res.json(result.rows);
   } catch (err) {
-    console.error('Database error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error("Database error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
   } finally {
     if (connection) {
       await connection.close();
