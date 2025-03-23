@@ -123,7 +123,7 @@ async function stateOPDS(req, res) {
         ), 2) AS avg_wait_all
       FROM OPDS o
       JOIN PLACES pl ON pl.PLACECODE = o.PLA_PLACECODE
-      JOIN OPD_FINANCE_HEADERS od ON od.opd_no = o.opd_no
+      LEFT JOIN OPD_FINANCE_HEADERS od ON od.opd_no = o.opd_no
       WHERE o.opd_date = TRUNC(SYSDATE) ${opdFilter}
       GROUP BY o.PLA_PLACECODE, pl.fullplace
       ORDER BY ${sortField} ${sortOrder}`;
