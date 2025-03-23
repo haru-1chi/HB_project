@@ -30,7 +30,9 @@ function Home() {
     { label: "ผู้เข้าใช้บริการ", value: "ALL_USER" },
     { label: "กำลังรอ", value: "PENDING" },
     { label: "เสร็จสิ้น", value: "COMPLETED" },
-    { label: "เวลารอเฉลี่ย", value: "AVG_WAIT_TIME" },
+    { label: "เวลารอตรวจเฉลี่ย", value: "avg_wait_screen" },
+    { label: "เวลารอยาเฉลี่ย", value: "avg_wait_drug" },
+    { label: "เวลาที่ใช้เฉลี่ย", value: "avg_wait_all" },
   ];
 
   const sortOrderOptions = [
@@ -45,7 +47,7 @@ function Home() {
     }).toString();
 
     axios
-      .get(`http://172.16.39.6:3000/api/summary?${queryParams}`)
+      .get(`http://172.16.190.17:3000/api/summary?${queryParams}`)
       .then((response) => {
         if (response.data.length > 0) {
           const formattedSummary = {
@@ -60,7 +62,7 @@ function Home() {
 
   const fetchAllOpdChoices = () => {
     axios
-      .get(`http://172.16.39.6:3000/api/departments/state`)
+      .get(`http://172.16.190.17:3000/api/departments/state`)
       .then((response) => {
         // Extract unique OPD_NAME values from the response
         const opdNames = response.data.map((item) => item.OPD_NAME);
@@ -77,7 +79,7 @@ function Home() {
     }).toString();
 
     axios
-      .get(`http://172.16.39.6:3000/api/departments/state?${queryParams}`)
+      .get(`http://172.16.190.17:3000/api/departments/state?${queryParams}`)
       .then((response) => setData(response.data))
       .catch((error) =>
         console.error("Error fetching department data:", error)
@@ -179,7 +181,9 @@ function Home() {
               all_user={item.ALL_USER}
               pending={item.PENDING}
               completed={item.COMPLETED}
-              avg_wait_time={formatWaitTime(parseFloat(item.AVG_WAIT_TIME))}
+              avg_wait_screen={formatWaitTime(parseFloat(item.AVG_WAIT_SCREEN))}
+              avg_wait_drug={formatWaitTime(parseFloat(item.AVG_WAIT_DRUG))}
+              avg_wait_all={formatWaitTime(parseFloat(item.AVG_WAIT_ALL))}
             />
           ))}
         </div>

@@ -2,30 +2,32 @@ import React, { useEffect, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUser, faHourglassHalf, faCheck } from "@fortawesome/free-solid-svg-icons";
 
-function DetailCard({ OPD_name, all_user, pending, completed, avg_wait_time }) {
+function DetailCard({ OPD_name, all_user, pending, completed, avg_wait_screen, avg_wait_drug, avg_wait_all }) {
 
-  const [prevData, setPrevData] = useState({ all_user, pending, completed, avg_wait_time  });
-  const [updatedFields, setUpdatedFields] = useState({ all_user: false, pending: false, completed: false, avg_wait_time: false });
+  const [prevData, setPrevData] = useState({ all_user, pending, completed, avg_wait_screen, avg_wait_drug, avg_wait_all  });
+  const [updatedFields, setUpdatedFields] = useState({ all_user: false, pending: false, completed: false, avg_wait_screen: false, avg_wait_drug: false, avg_wait_all: false });
 
   useEffect(() => {
     const changes = {
       all_user: all_user !== prevData.all_user,
       pending: pending !== prevData.pending,
       completed: completed !== prevData.completed,
-      avg_wait_time: avg_wait_time !== prevData.avg_wait_time,
+      avg_wait_screen: avg_wait_screen !== prevData.avg_wait_screen,
+      avg_wait_drug: avg_wait_drug !== prevData.avg_wait_drug,
+      avg_wait_all: avg_wait_all !== prevData.avg_wait_all,
     };
 
     setUpdatedFields(changes);
 
     setTimeout(() => {
-      setUpdatedFields({ all_user: false, pending: false, completed: false, avg_wait_time: false });
+      setUpdatedFields({ all_user: false, pending: false, completed: false, avg_wait_screen: false, avg_wait_drug: false, avg_wait_all: false });
     }, 2000); // Reset after 2 seconds
 
-    setPrevData({ all_user, pending, completed, avg_wait_time });
-  }, [all_user, pending, completed, avg_wait_time]);
+    setPrevData({ all_user, pending, completed, avg_wait_screen, avg_wait_drug, avg_wait_all });
+  }, [all_user, pending, completed, avg_wait_screen, avg_wait_drug, avg_wait_all]);
 
   return (
-    <div className="bg-white shadow-md border-1 border-gray-200 h-[275px] p-5 rounded-xl flex flex-col justify-between">
+    <div className="bg-white shadow-md border-1 border-gray-200 h-[330px] p-5 rounded-xl flex flex-col justify-between">
       <h1 className="text-3xl font-semibold">{OPD_name}</h1>
       <div className="flex items-center justify-between">
         <div className="flex items-center">
@@ -69,10 +71,34 @@ function DetailCard({ OPD_name, all_user, pending, completed, avg_wait_time }) {
             icon={faHourglassHalf}
             className="text-3xl mb-1 text-orange-500 mr-2"
           />
-          <p className="text-2xl">เวลารอเฉลี่ย</p>
+          <p className="text-xl">เวลารอตรวจเฉลี่ย</p>
         </div>
-        <p className={`text-2xl ${updatedFields.avg_wait_time ? "text-red-500" : "text-orange-500"}`}>
-          <span className="text-2xl font-bold">{avg_wait_time}</span>
+        <p className={`text-xl ${updatedFields.avg_wait_screen ? "text-red-500" : "text-orange-500"}`}>
+          <span className="text-xl font-bold">{avg_wait_screen}</span>
+        </p>
+      </div>
+      <div className="flex items-center justify-between ">
+        <div className="flex items-center">
+        <FontAwesomeIcon
+            icon={faHourglassHalf}
+            className="text-3xl mb-1 text-orange-500 mr-2"
+          />
+          <p className="text-xl">เวลารอยาเฉลี่ย</p>
+        </div>
+        <p className={`text-xl ${updatedFields.avg_wait_drug ? "text-red-500" : "text-orange-500"}`}>
+          <span className="text-xl font-bold">{avg_wait_drug}</span>
+        </p>
+      </div>
+      <div className="flex items-center justify-between ">
+        <div className="flex items-center">
+        <FontAwesomeIcon
+            icon={faHourglassHalf}
+            className="text-3xl mb-1 text-orange-500 mr-2"
+          />
+          <p className="text-xl">เวลาที่ใช้เฉลี่ย</p>
+        </div>
+        <p className={`text-xl ${updatedFields.avg_wait_all ? "text-red-500" : "text-orange-500"}`}>
+          <span className="text-xl font-bold">{avg_wait_all}</span>
         </p>
       </div>
     </div>

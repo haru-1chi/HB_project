@@ -102,13 +102,28 @@ async function stateOPDS(req, res) {
         SUM(CASE WHEN o.FINISH_OPD_DATETIME IS NOT NULL THEN 1 ELSE 0 END) AS completed,
         ROUND(AVG(
             CASE 
+                WHEN o.RX_OPD_DATETIME IS NOT NULL 
+                THEN (o.RX_OPD_DATETIME - o.REACH_OPD_DATETIME) * 24 * 60 
+                ELSE NULL 
+            END
+        ), 2) AS avg_wait_screen,
+				ROUND(AVG(
+            CASE 
+                WHEN od.ALREADY_RECEIVE_DRUG_DATE IS NOT NULL 
+                THEN (od.ALREADY_RECEIVE_DRUG_DATE - od.DATETIME_IN_SECOND) * 24 * 60 
+                ELSE NULL 
+            END
+        ), 2) AS avg_wait_drug,
+				ROUND(AVG(
+            CASE 
                 WHEN o.FINISH_OPD_DATETIME IS NOT NULL 
                 THEN (o.FINISH_OPD_DATETIME - o.REACH_OPD_DATETIME) * 24 * 60 
                 ELSE NULL 
             END
-        ), 2) AS avg_wait_time
+        ), 2) AS avg_wait_all
       FROM OPDS o
       JOIN PLACES pl ON pl.PLACECODE = o.PLA_PLACECODE
+      JOIN OPD_FINANCE_HEADERS od ON od.opd_no = o.opd_no
       WHERE o.opd_date = TRUNC(SYSDATE) ${opdFilter}
       GROUP BY o.PLA_PLACECODE, pl.fullplace
       ORDER BY ${sortField} ${sortOrder}`;
