@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faUser, faHourglassHalf, faCheck } from "@fortawesome/free-solid-svg-icons";
-
+import { faUser, faHourglassHalf, faCheck, faPills,faClock, faChair } from "@fortawesome/free-solid-svg-icons";
 function DetailCard({ OPD_name, all_user, pending, completed, avg_wait_screen, avg_wait_drug, avg_wait_all }) {
 
   const [prevData, setPrevData] = useState({ all_user, pending, completed, avg_wait_screen, avg_wait_drug, avg_wait_all  });
@@ -33,11 +32,11 @@ function DetailCard({ OPD_name, all_user, pending, completed, avg_wait_screen, a
         <div className="flex items-center">
           <FontAwesomeIcon
             icon={faUser}
-            className="text-3xl mb-1 text-blue-500 mr-2"
+            className="text-3xl mb-1 text-blue-400 mr-2"
           />
           <p className="text-2xl">ผู้เข้าใช้บริการ</p>
         </div>
-        <p className={`text-2xl ${updatedFields.all_user ? "text-red-500" : "text-blue-500"}`}>
+        <p className={`text-2xl ${updatedFields.all_user ? "text-red-500" : "text-blue-400"}`}>
           <span className="text-3xl font-bold">{all_user}</span> คน
         </p>
       </div>
@@ -45,11 +44,11 @@ function DetailCard({ OPD_name, all_user, pending, completed, avg_wait_screen, a
         <div className="flex items-center">
         <FontAwesomeIcon
             icon={faHourglassHalf}
-            className="text-3xl mb-1 text-orange-500 mr-2"
+            className="text-3xl mb-1 text-orange-400 mr-2"
           />
           <p className="text-2xl">กำลังรอรับบริการ</p>
         </div>
-        <p className={`text-2xl ${updatedFields.pending ? "text-red-500" : "text-orange-500"}`}>
+        <p className={`text-2xl ${updatedFields.pending ? "text-red-500" : "text-orange-400"}`}>
           <span className="text-3xl font-bold">{pending}</span> คน
         </p>
       </div>
@@ -68,36 +67,36 @@ function DetailCard({ OPD_name, all_user, pending, completed, avg_wait_screen, a
       <div className="flex items-center justify-between ">
         <div className="flex items-center">
         <FontAwesomeIcon
-            icon={faHourglassHalf}
-            className="text-3xl mb-1 text-orange-500 mr-2"
+            icon={faChair}
+            className="text-3xl mb-1 text-cyan-500 mr-2"
           />
           <p className="text-xl">เวลารอตรวจเฉลี่ย</p>
         </div>
-        <p className={`text-xl ${updatedFields.avg_wait_screen ? "text-red-500" : "text-orange-500"}`}>
+        <p className={`text-xl ${updatedFields.avg_wait_screen ? "text-red-500" : "text-cyan-500"}`}>
           <span className="text-xl font-bold">{avg_wait_screen}</span>
         </p>
       </div>
       <div className="flex items-center justify-between ">
         <div className="flex items-center">
         <FontAwesomeIcon
-            icon={faHourglassHalf}
-            className="text-3xl mb-1 text-orange-500 mr-2"
+            icon={faPills}
+            className="text-3xl mb-1 text-pink-400 mr-2"
           />
           <p className="text-xl">เวลารอยาเฉลี่ย</p>
         </div>
-        <p className={`text-xl ${updatedFields.avg_wait_drug ? "text-red-500" : "text-orange-500"}`}>
+        <p className={`text-xl ${updatedFields.avg_wait_drug ? "text-red-500" : "text-pink-400"}`}>
           <span className="text-xl font-bold">{avg_wait_drug}</span>
         </p>
       </div>
       <div className="flex items-center justify-between ">
         <div className="flex items-center">
         <FontAwesomeIcon
-            icon={faHourglassHalf}
-            className="text-3xl mb-1 text-orange-500 mr-2"
+            icon={faClock}
+            className="text-3xl mb-1 text-indigo-400 mr-2"
           />
           <p className="text-xl">เวลาที่ใช้เฉลี่ย</p>
         </div>
-        <p className={`text-xl ${updatedFields.avg_wait_all ? "text-red-500" : "text-orange-500"}`}>
+        <p className={`text-xl ${updatedFields.avg_wait_all ? "text-red-500" : "text-indigo-400"}`}>
           <span className="text-xl font-bold">{avg_wait_all}</span>
         </p>
       </div>

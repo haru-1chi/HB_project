@@ -4,6 +4,7 @@ import {
   faUser,
   faHourglassHalf,
   faCheck,
+  faClock
 } from "@fortawesome/free-solid-svg-icons";
 
 function Card({ count, keyword }) {
@@ -22,7 +23,7 @@ function Card({ count, keyword }) {
     ผู้ใช้บริการทั้งหมด: { icon: faUser, bgColor: "bg-blue-500" },
     กำลังรอ: { icon: faHourglassHalf, bgColor: "bg-orange-500" },
     เสร็จสิ้น: { icon: faCheck, bgColor: "bg-green-500" },
-    เวลาที่ใช้เฉลี่ย: { icon: faHourglassHalf, bgColor: "bg-orange-500" },
+    เวลาที่ใช้เฉลี่ย: { icon: faClock, bgColor: "bg-indigo-400" },
   };
 
   return (

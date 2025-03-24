@@ -129,7 +129,7 @@ function Home() {
                 MaeSot Hospital
               </h5>
               <p className="font-semibold text-[#5a6f80]">
-                แผงผังแสดงข้อมูลผู้ใช้บริการโรงพยาบาลแม่สอด
+                แผนผังแสดงข้อมูลผู้ใช้บริการโรงพยาบาลแม่สอด
               </p>
             </div>
           </div>

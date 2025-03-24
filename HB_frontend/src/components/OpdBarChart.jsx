@@ -1,9 +1,24 @@
 import React from "react";
 import { Bar } from "react-chartjs-2";
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from "chart.js";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+} from "chart.js";
 
 // Register necessary components
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 const OpdBarChart = ({ data }) => {
   // Extract labels and values from the data
@@ -16,21 +31,21 @@ const OpdBarChart = ({ data }) => {
     labels,
     datasets: [
       {
-        label: "All Users",
+        label: "ผู้เข้าใช้บริการ",
         data: allUsers,
         backgroundColor: "rgba(54, 162, 235, 0.6)",
         borderColor: "rgba(54, 162, 235, 1)",
         borderWidth: 1,
       },
       {
-        label: "Pending",
+        label: "กำลังรอ",
         data: pendingUsers,
         backgroundColor: "rgba(255, 206, 86, 0.6)",
         borderColor: "rgba(255, 206, 86, 1)",
         borderWidth: 1,
       },
       {
-        label: "Completed",
+        label: "เสร็จสิ้น",
         data: completedUsers,
         backgroundColor: "rgba(75, 192, 192, 0.6)",
         borderColor: "rgba(75, 192, 192, 1)",
@@ -44,7 +59,21 @@ const OpdBarChart = ({ data }) => {
     maintainAspectRatio: false,
     plugins: {
       legend: { position: "top" },
-      title: { display: true, text: "OPD Users Summary" },
+      tooltip: {
+        callbacks: {
+          label: function (tooltipItem) {
+            let label = tooltipItem.dataset.label || "";
+            if (label) {
+              label += ": ";
+            }
+            label += tooltipItem.raw + " คน";
+            return label;
+          },
+          title: function (tooltipItems) {
+            return tooltipItems[0].label;
+          },
+        },
+      },
     },
     scales: {
       y: { beginAtZero: true },
