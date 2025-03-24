@@ -8,6 +8,7 @@ import DetailCard from "../components/DetailCard";
 import OpdBarChart from "../components/OpdBarChart";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSliders } from "@fortawesome/free-solid-svg-icons";
+import Logo from "../assets/logo.png";
 //เอาใส่ util ภายหลัง
 const formatWaitTime = (minutes) => {
   if (!minutes) return "0 นาที";
@@ -121,15 +122,26 @@ function Home() {
         handleCheckboxChange={handleCheckboxChange}
         setSelectedOpdNames={setSelectedOpdNames}
       />
-      <div className="w-full p-8">
-        <div className="fixed z-10">
+      <div className="w-full p-8 pt-5">
+        <div className="bottom-10 right-10 fixed z-10">
           <Button
             label={<FontAwesomeIcon icon={faSliders} />}
             onClick={() => setVisible(true)}
             rounded
           />
         </div>
-        <div className="flex justify-end mb-3">
+        <div className="flex justify-between items-center mb-3">
+          <div className="flex items-center">
+            <img className="w-17" src={Logo} alt="" />
+            <div className="ml-2">
+              <h5 className="text-2xl font-semibold text-[#5bc1ac]">
+                MaeSot Hospital
+              </h5>
+              <p className="font-semibold text-[#5a6f80]">
+                แผงผังแสดงข้อมูลผู้ใช้บริการโรงพยาบาลแม่สอด
+              </p>
+            </div>
+          </div>
           <div>
             <Dropdown
               value={sortField}
