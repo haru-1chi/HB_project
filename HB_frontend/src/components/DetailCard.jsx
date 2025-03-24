@@ -32,43 +32,43 @@ function DetailCard({ OPD_name, all_user, pending, completed, avg_wait_screen, a
         <div className="flex items-center">
           <FontAwesomeIcon
             icon={faUser}
-            className="text-3xl mb-1 text-blue-400 mr-2"
+            className="text-3xl mb-1 text-blue-400 mr-4"
           />
-          <p className="text-2xl">ผู้เข้าใช้บริการ</p>
+          <p className="text-xl">ผู้เข้าใช้บริการ</p>
         </div>
         <p className={`text-2xl ${updatedFields.all_user ? "text-red-500" : "text-blue-400"}`}>
-          <span className="text-3xl font-bold">{all_user}</span> คน
+          <span className="text-2xl font-bold">{all_user}</span> คน
         </p>
       </div>
       <div className="flex items-center justify-between ">
         <div className="flex items-center">
         <FontAwesomeIcon
             icon={faHourglassHalf}
-            className="text-3xl mb-1 text-orange-400 mr-2"
+            className="text-3xl mb-1 text-orange-400 mr-5"
           />
-          <p className="text-2xl">กำลังรอรับบริการ</p>
+          <p className="text-xl">กำลังรอรับบริการ</p>
         </div>
         <p className={`text-2xl ${updatedFields.pending ? "text-red-500" : "text-orange-400"}`}>
-          <span className="text-3xl font-bold">{pending}</span> คน
+          <span className="text-2xl font-bold">{pending}</span> คน
         </p>
       </div>
-      <div className="flex items-center justify-between ">
+      <div className="flex items-center justify-between">
         <div className="flex items-center">
         <FontAwesomeIcon
             icon={faCheck}
-            className="text-3xl mb-1 text-green-500 mr-2"
+            className="text-3xl mb-1 text-green-500 mr-4"
           />
-          <p className="text-2xl">เสร็จสิ้น</p>
+          <p className="text-xl">เสร็จสิ้น</p>
         </div>
         <p className={`text-2xl ${updatedFields.completed ? "text-red-500" : "text-green-500"}`}>
-          <span className="text-3xl font-bold">{completed}</span> คน
+          <span className="text-2xl font-bold">{completed}</span> คน
         </p>
       </div>
       <div className="flex items-center justify-between ">
         <div className="flex items-center">
         <FontAwesomeIcon
             icon={faChair}
-            className="text-3xl mb-1 text-cyan-500 mr-2"
+            className="text-3xl mb-1 text-cyan-500 mr-4"
           />
           <p className="text-xl">เวลารอตรวจเฉลี่ย</p>
         </div>
@@ -92,7 +92,7 @@ function DetailCard({ OPD_name, all_user, pending, completed, avg_wait_screen, a
         <div className="flex items-center">
         <FontAwesomeIcon
             icon={faClock}
-            className="text-3xl mb-1 text-indigo-400 mr-2"
+            className="text-3xl mb-1 text-indigo-400 mr-3"
           />
           <p className="text-xl">เวลาที่ใช้เฉลี่ย</p>
         </div>

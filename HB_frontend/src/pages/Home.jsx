@@ -134,6 +134,17 @@ function Home() {
             </div>
           </div>
           <div>
+          <Dropdown
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.value)}
+              options={sortOrderOptions}
+              optionLabel="label"
+              placeholder="เลือกเรียงลำดับ"
+              checkmark={true}
+              highlightOnSelect={false}
+              className="mr-5"
+            />
+            
             <Dropdown
               value={sortField}
               onChange={(e) => setSortField(e.value)}
@@ -145,16 +156,7 @@ function Home() {
               className="mr-5"
             />
 
-            <Dropdown
-              value={sortOrder}
-              onChange={(e) => setSortOrder(e.value)}
-              options={sortOrderOptions}
-              optionLabel="label"
-              placeholder="เลือกเรียงลำดับ"
-              checkmark={true}
-              highlightOnSelect={false}
-              className="mr-5"
-            />
+            
 
             <Button
               label={<FontAwesomeIcon icon={faSliders} />}
