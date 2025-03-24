@@ -103,21 +103,21 @@ async function stateOPDS(req, res) {
         ROUND(AVG(
             CASE 
                 WHEN o.RX_OPD_DATETIME IS NOT NULL 
-                THEN (o.RX_OPD_DATETIME - o.REACH_OPD_DATETIME) * 24 * 60 
+                THEN ABS((o.RX_OPD_DATETIME - o.SCREENING_OPD_DATETIME) * 24 * 60) 
                 ELSE NULL 
             END
         ), 2) AS avg_wait_screen,
-				ROUND(AVG(
+        ROUND(AVG(
             CASE 
                 WHEN od.ALREADY_RECEIVE_DRUG_DATE IS NOT NULL 
-                THEN (od.ALREADY_RECEIVE_DRUG_DATE - od.DATETIME_IN_SECOND) * 24 * 60 
+                THEN ABS((od.ALREADY_RECEIVE_DRUG_DATE - o.AFTER_DOC_DATETIME) * 24 * 60) 
                 ELSE NULL 
             END
         ), 2) AS avg_wait_drug,
-				ROUND(AVG(
+        ROUND(AVG(
             CASE 
                 WHEN o.FINISH_OPD_DATETIME IS NOT NULL 
-                THEN (o.FINISH_OPD_DATETIME - o.REACH_OPD_DATETIME) * 24 * 60 
+                THEN ABS((o.FINISH_OPD_DATETIME - o.REACH_OPD_DATETIME) * 24 * 60) 
                 ELSE NULL 
             END
         ), 2) AS avg_wait_all

@@ -35,6 +35,7 @@ function SideBarMenu({
       <Sidebar
         header={customHeader}
         visible={visible}
+        position="right"
         onHide={() => setVisible(false)}
       >
         <div>

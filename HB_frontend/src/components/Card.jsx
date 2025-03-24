@@ -22,7 +22,7 @@ function Card({ count, keyword }) {
     ผู้ใช้บริการทั้งหมด: { icon: faUser, bgColor: "bg-blue-500" },
     กำลังรอ: { icon: faHourglassHalf, bgColor: "bg-orange-500" },
     เสร็จสิ้น: { icon: faCheck, bgColor: "bg-green-500" },
-    เวลารอเฉลี่ย: { icon: faHourglassHalf, bgColor: "bg-orange-500" },
+    เวลาที่ใช้เฉลี่ย: { icon: faHourglassHalf, bgColor: "bg-orange-500" },
   };
 
   return (
@@ -33,7 +33,7 @@ function Card({ count, keyword }) {
         >
           <FontAwesomeIcon icon={iconMap[keyword]?.icon}/>
         </div>
-        <h1 className={`${keyword == 'เวลารอเฉลี่ย' ? "text-5xl" : "text-6xl"}  font-medium text-right ${isUpdated ? "text-red-500" : ""}`}>
+        <h1 className={`${keyword == 'เวลาที่ใช้เฉลี่ย' ? "text-5xl" : "text-6xl"}  font-medium text-right ${isUpdated ? "text-red-500" : ""}`}>
           {count}</h1>
       </div>
       <p className="text-right text-xl">{keyword}</p>

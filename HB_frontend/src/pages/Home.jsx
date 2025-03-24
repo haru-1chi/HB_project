@@ -19,13 +19,12 @@ const formatWaitTime = (minutes) => {
 
 function Home() {
   const [visible, setVisible] = useState(false);
-
   const [summary, setSummary] = useState(null);
   const [data, setData] = useState(null);
   const [allOpdChoices, setAllOpdChoices] = useState([]);
   const [sortField, setSortField] = useState("ALL_USER");
   const [sortOrder, setSortOrder] = useState("desc");
-  const [selectedOpdNames, setSelectedOpdNames] = useState([]);
+  const [selectedOpdNames, setSelectedOpdNames] = useState(['Napha Clinic', 'อายุรกรรมชั้น2', 'กุมารเวชกรรมชั้น4', 'โรคทั่วไป', 'ทันตกรรม', 'ตา', 'แม่สอดพัฒน์ ชั้น 6', 'ศัลยกรรมกระดูก', 'หู คอ จมูก', 'อุบัติเหตุและฉุกเฉิน']);
 
   const sortFieldOptions = [
     { label: "ผู้เข้าใช้บริการ", value: "ALL_USER" },
@@ -87,7 +86,6 @@ function Home() {
       );
   };
 
-  console.log(allOpdChoices);
   useEffect(() => {
     // Initial fetch
     fetchDepartmentState();
@@ -123,13 +121,6 @@ function Home() {
         setSelectedOpdNames={setSelectedOpdNames}
       />
       <div className="w-full p-8 pt-5">
-        <div className="bottom-10 right-10 fixed z-10">
-          <Button
-            label={<FontAwesomeIcon icon={faSliders} />}
-            onClick={() => setVisible(true)}
-            rounded
-          />
-        </div>
         <div className="flex justify-between items-center mb-3">
           <div className="flex items-center">
             <img className="w-17" src={Logo} alt="" />
@@ -162,6 +153,12 @@ function Home() {
               placeholder="เลือกเรียงลำดับ"
               checkmark={true}
               highlightOnSelect={false}
+              className="mr-5"
+            />
+
+            <Button
+              label={<FontAwesomeIcon icon={faSliders} />}
+              onClick={() => setVisible(true)}
             />
           </div>
         </div>
@@ -172,12 +169,12 @@ function Home() {
               <Card count={summary.ALL_USER} keyword="ผู้ใช้บริการทั้งหมด" />
               <Card count={summary.PENDING} keyword="กำลังรอ" />
               <Card count={summary.COMPLETED} keyword="เสร็จสิ้น" />
-              <Card count={summary.AVG_WAIT_TIME} keyword="เวลารอเฉลี่ย" />
+              <Card count={summary.AVG_WAIT_TIME} keyword="เวลาที่ใช้เฉลี่ย" />
             </>
           )}
         </div>
 
-        <div className="bg-white p-4 my-8 w-full rounded-xl shadow-md h-[500px] border-1 border-gray-200">
+        <div className="bg-white p-4 my-7 w-full rounded-xl shadow-md h-[500px] border-1 border-gray-200">
           {data?.length > 0 ? (
             <OpdBarChart data={data} />
           ) : (
@@ -185,7 +182,7 @@ function Home() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-7">
           {data?.map((item, index) => (
             <DetailCard
               key={index}
