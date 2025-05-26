@@ -17,10 +17,6 @@ const io = new Server(server);
 app.use(cors());
 app.use(express.json());
 
-app.get('/', (req, res) => {
-  res.sendFile(join(__dirname, 'index.html'));
-});
-
 app.use('/api', patientRoutes);
 
 io.on('connection', (socket) => {
