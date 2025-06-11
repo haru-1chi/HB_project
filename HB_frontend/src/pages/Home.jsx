@@ -47,7 +47,7 @@ function Home() {
     }).toString();
 
     axios
-      .get(`http://172.16.39.6:3000/api/summary?${queryParams}`)
+      .get(`http://172.16.190.17:3000/api/summary?${queryParams}`)
       .then((response) => {
         if (response.data.length > 0) {
           const formattedSummary = {
@@ -62,7 +62,7 @@ function Home() {
 
   const fetchAllOpdChoices = () => {
     axios
-      .get(`http://172.16.39.6:3000/api/departments/state`)
+      .get(`http://172.16.190.17:3000/api/departments/state`)
       .then((response) => {
         // Extract unique OPD_NAME values from the response
         const opdNames = response.data.map((item) => item.OPD_NAME);
@@ -79,7 +79,7 @@ function Home() {
     }).toString();
 
     axios
-      .get(`http://172.16.39.6:3000/api/departments/state?${queryParams}`)
+      .get(`http://172.16.190.17:3000/api/departments/state?${queryParams}`)
       .then((response) => setData(response.data))
       .catch((error) =>
         console.error("Error fetching department data:", error)
