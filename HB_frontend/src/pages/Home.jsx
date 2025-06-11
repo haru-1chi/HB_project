@@ -165,10 +165,12 @@ function Home() {
           </div>
         </div>
 
-        <div className="card-board grid grid-cols-4 gap-8">
+        <div className="card-board grid grid-cols-3 gap-8">
           {summary && (
             <>
-              <Card count={summary.ALL_USER} keyword="ผู้ใช้บริการทั้งหมด" />
+              <Card count={summary.ALL_USER} keyword="ผู้ป่วยที่ลงทะเบียน" />
+              <Card count={summary.WAIR_PTS} keyword="ผู้ป่วยรอรับบริการ" />
+              <Card count={summary.NOSHOW_PTS} keyword="ผู้ป่วยที่ยังไม่มาตามนัด" />
               <Card count={summary.PENDING} keyword="กำลังรอ" />
               <Card count={summary.COMPLETED} keyword="เสร็จสิ้น" />
               <Card count={summary.AVG_WAIT_TIME} keyword="เวลาที่ใช้เฉลี่ย" />
