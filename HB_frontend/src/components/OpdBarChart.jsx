@@ -24,9 +24,9 @@ const OpdBarChart = ({ data }) => {
   // Extract labels and values from the data
   const labels = data.map((item) => item.OPD_NAME);
   const allUsers = data.map((item) => item.ALL_USER);
-  const pendingUsers = data.map((item) => item.PENDING);
+  const pendingUsers = data.map((item) => item.WAIT_PTS);
   const completedUsers = data.map((item) => item.COMPLETED);
-
+  const noShow = data.map((item) => item.NOSHOW_PTS);
   const chartData = {
     labels,
     datasets: [
@@ -49,6 +49,13 @@ const OpdBarChart = ({ data }) => {
         data: completedUsers,
         backgroundColor: "rgba(75, 192, 192, 0.6)",
         borderColor: "rgba(75, 192, 192, 1)",
+        borderWidth: 1,
+      },
+      {
+        label: "ยังไม่มาตามนัด",
+        data: noShow,
+        backgroundColor: "rgba(128, 128, 128, 0.6)", // light gray with transparency
+        borderColor: "rgba(128, 128, 128, 1)",
         borderWidth: 1,
       },
     ],

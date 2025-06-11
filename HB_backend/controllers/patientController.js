@@ -58,7 +58,7 @@ async function summary(req, res) {
     THEN 1 
     ELSE 0 
   END
-) AS WAIR_PTS,
+) AS WAIT_PTS,
     SUM(CASE WHEN o.OPD_TIME = TO_DATE('00:00:00', 'HH24:MI:SS') THEN 1 ELSE 0 END) AS NOSHOW_PTS,
     SUM(CASE WHEN o.FINISH_OPD_DATETIME IS NULL THEN 1 ELSE 0 END) AS pending,
     SUM(CASE WHEN o.FINISH_OPD_DATETIME IS NOT NULL THEN 1 ELSE 0 END) AS completed,
@@ -106,6 +106,14 @@ async function stateOPDS(req, res) {
         o.PLA_PLACECODE,
         pl.fullplace AS OPD_name,
         COUNT(o.OPD_NO) AS all_user,
+              SUM(
+  CASE 
+    WHEN TO_CHAR(o.OPD_TIME, 'HH24:MI:SS') != '00:00:00' AND o.FINISH_OPD_DATETIME IS NULL 
+    THEN 1 
+    ELSE 0 
+  END
+) AS WAIT_PTS,
+    SUM(CASE WHEN o.OPD_TIME = TO_DATE('00:00:00', 'HH24:MI:SS') THEN 1 ELSE 0 END) AS NOSHOW_PTS,
         SUM(CASE WHEN o.FINISH_OPD_DATETIME IS NULL THEN 1 ELSE 0 END) AS pending,
         SUM(CASE WHEN o.FINISH_OPD_DATETIME IS NOT NULL THEN 1 ELSE 0 END) AS completed,
         ROUND(AVG(

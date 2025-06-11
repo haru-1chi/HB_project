@@ -40,6 +40,8 @@ function Home() {
   const sortFieldOptions = [
     { label: "ผู้เข้าใช้บริการ", value: "ALL_USER" },
     { label: "กำลังรอ", value: "PENDING" },
+      { label: "กำลังรอ", value: "WAIT_PTS" },
+        { label: "กำลังรอ", value: "NOSHOW_PTS" },
     { label: "เสร็จสิ้น", value: "COMPLETED" },
     { label: "เวลารอตรวจเฉลี่ย", value: "avg_wait_screen" },
     { label: "เวลารอยาเฉลี่ย", value: "avg_wait_drug" },
@@ -176,16 +178,15 @@ function Home() {
 
         {summary && (
           <>
-            <div className="card-board grid grid-cols-3 gap-8">
+            <div className="card-board grid grid-cols-5 gap-8">
               <Card count={summary.ALL_USER} keyword="ผู้ป่วยที่ลงทะเบียน" />
-              <Card count={summary.WAIR_PTS} keyword="ผู้ป่วยรอรับบริการ" />
+              <Card count={summary.WAIT_PTS} keyword="ผู้ป่วยรอรับบริการ" />
+               <Card count={summary.COMPLETED} keyword="เสร็จสิ้น" />
               <Card
                 count={summary.NOSHOW_PTS}
                 keyword="ผู้ป่วยที่ยังไม่มาตามนัด"
               />
-            </div>
-            <div className="card-board grid grid-cols-2 gap-8 mt-5">
-              <Card count={summary.COMPLETED} keyword="เสร็จสิ้น" />
+             
               <Card count={summary.AVG_WAIT_TIME} keyword="เวลาที่ใช้เฉลี่ย" />
             </div>
           </>
@@ -205,6 +206,8 @@ function Home() {
               key={index}
               OPD_name={item.OPD_NAME}
               all_user={item.ALL_USER}
+              NOSHOW_PTS={item.NOSHOW_PTS}
+              WAIT_PTS={item.WAIT_PTS}
               pending={item.PENDING}
               completed={item.COMPLETED}
               avg_wait_screen={formatWaitTime(parseFloat(item.AVG_WAIT_SCREEN))}

@@ -39,7 +39,7 @@ function Card({ count, keyword }) {
         </div>
         <h1
           className={`${
-            keyword == "เวลาที่ใช้เฉลี่ย" ? "text-5xl" : "text-6xl"
+            keyword == "เวลาที่ใช้เฉลี่ย" ? "text-4xl" : "text-6xl"
           }  font-medium text-right ${isUpdated ? "text-red-500" : ""}`}
         >
           {count}
