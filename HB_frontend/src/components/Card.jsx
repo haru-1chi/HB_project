@@ -22,8 +22,8 @@ function Card({ count, keyword }) {
 
   const iconMap = {
     ผู้ป่วยที่ลงทะเบียน: { icon: faUser, bgColor: "bg-blue-500" },
-    ผู้ป่วยรอรับบริการ: { icon: faHourglassHalf, bgColor: "bg-blue-500" },
-    ผู้ป่วยที่ยังไม่มาตามนัด: { icon: faPersonCircleQuestion, bgColor: "bg-blue-500" },
+    ผู้ป่วยรอรับบริการ: { icon: faHourglassHalf, bgColor: "bg-orange-500" },
+    ผู้ป่วยที่ยังไม่มาตามนัด: { icon: faPersonCircleQuestion, bgColor: "bg-gray-400" },
     กำลังรอ: { icon: faHourglassHalf, bgColor: "bg-orange-500" },
     เสร็จสิ้น: { icon: faCheck, bgColor: "bg-green-500" },
     เวลาที่ใช้เฉลี่ย: { icon: faClock, bgColor: "bg-indigo-400" },

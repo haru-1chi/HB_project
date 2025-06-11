@@ -24,7 +24,18 @@ function Home() {
   const [allOpdChoices, setAllOpdChoices] = useState([]);
   const [sortField, setSortField] = useState("ALL_USER");
   const [sortOrder, setSortOrder] = useState("desc");
-  const [selectedOpdNames, setSelectedOpdNames] = useState(['Napha Clinic', 'อายุรกรรมชั้น2', 'กุมารเวชกรรมชั้น4', 'โรคทั่วไป', 'ทันตกรรม', 'ตา', 'แม่สอดพัฒน์ ชั้น 6', 'ศัลยกรรมกระดูก', 'หู คอ จมูก', 'อุบัติเหตุและฉุกเฉิน']);
+  const [selectedOpdNames, setSelectedOpdNames] = useState([
+    "Napha Clinic",
+    "อายุรกรรมชั้น2",
+    "กุมารเวชกรรมชั้น4",
+    "โรคทั่วไป",
+    "ทันตกรรม",
+    "ตา",
+    "แม่สอดพัฒน์ ชั้น 6",
+    "ศัลยกรรมกระดูก",
+    "หู คอ จมูก",
+    "อุบัติเหตุและฉุกเฉิน",
+  ]);
 
   const sortFieldOptions = [
     { label: "ผู้เข้าใช้บริการ", value: "ALL_USER" },
@@ -134,7 +145,7 @@ function Home() {
             </div>
           </div>
           <div>
-          <Dropdown
+            <Dropdown
               value={sortOrder}
               onChange={(e) => setSortOrder(e.value)}
               options={sortOrderOptions}
@@ -156,8 +167,6 @@ function Home() {
               className="mr-5"
             />
 
-            
-
             <Button
               label={<FontAwesomeIcon icon={faSliders} />}
               onClick={() => setVisible(true)}
@@ -165,18 +174,22 @@ function Home() {
           </div>
         </div>
 
-        <div className="card-board grid grid-cols-3 gap-8">
-          {summary && (
-            <>
+        {summary && (
+          <>
+            <div className="card-board grid grid-cols-3 gap-8">
               <Card count={summary.ALL_USER} keyword="ผู้ป่วยที่ลงทะเบียน" />
               <Card count={summary.WAIR_PTS} keyword="ผู้ป่วยรอรับบริการ" />
-              <Card count={summary.NOSHOW_PTS} keyword="ผู้ป่วยที่ยังไม่มาตามนัด" />
-              <Card count={summary.PENDING} keyword="กำลังรอ" />
+              <Card
+                count={summary.NOSHOW_PTS}
+                keyword="ผู้ป่วยที่ยังไม่มาตามนัด"
+              />
+            </div>
+            <div className="card-board grid grid-cols-2 gap-8 mt-5">
               <Card count={summary.COMPLETED} keyword="เสร็จสิ้น" />
               <Card count={summary.AVG_WAIT_TIME} keyword="เวลาที่ใช้เฉลี่ย" />
-            </>
-          )}
-        </div>
+            </div>
+          </>
+        )}
 
         <div className="bg-white p-4 my-7 w-full rounded-xl shadow-md h-[500px] border-1 border-gray-200">
           {data?.length > 0 ? (
