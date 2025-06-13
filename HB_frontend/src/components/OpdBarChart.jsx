@@ -45,7 +45,7 @@ const OpdBarChart = ({ data }) => {
         borderWidth: 1,
       },
       {
-        label: "เสร็จสิ้น",
+        label: "ตรวจเสร็จ",
         data: completedUsers,
         backgroundColor: "rgba(75, 192, 192, 0.6)",
         borderColor: "rgba(75, 192, 192, 1)",

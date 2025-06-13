@@ -98,7 +98,7 @@ function DetailCard({
             icon={faUser}
             className="text-3xl mb-1 text-blue-400 mr-4"
           />
-          <p className="text-xl">ผู้ป่วยที่ลงทะเบียน</p>
+          <p className="text-xl">ผู้ป่วยลงทะเบียน</p>
         </div>
         <p
           className={`text-2xl ${
@@ -130,7 +130,7 @@ function DetailCard({
             icon={faCheck}
             className="text-3xl mb-1 text-green-500 mr-4"
           />
-          <p className="text-xl">เสร็จสิ้น</p>
+          <p className="text-xl">ตรวจเสร็จ</p>
         </div>
         <p
           className={`text-2xl ${
@@ -144,9 +144,9 @@ function DetailCard({
         <div className="flex items-center">
           <FontAwesomeIcon
             icon={faPersonCircleQuestion}
-            className="text-3xl mb-1 text-gray-400 mr-5"
+            className="text-3xl mb-1 text-gray-400 mr-2"
           />
-          <p className="text-xl">ผู้ป่วยที่ยังไม่มาตามนัด</p>
+          <p className="text-xl">ผู้ป่วยผิดนัด</p>
         </div>
         <p
           className={`text-2xl ${
@@ -194,7 +194,7 @@ function DetailCard({
             icon={faClock}
             className="text-3xl mb-1 text-indigo-400 mr-3"
           />
-          <p className="text-xl">เวลาที่ใช้เฉลี่ย</p>
+          <p className="text-xl">เวลารวมเฉลี่ย</p>
         </div>
         <p
           className={`text-xl ${

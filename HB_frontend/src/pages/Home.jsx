@@ -35,17 +35,17 @@ function Home() {
     "ศัลยกรรมกระดูก",
     "หู คอ จมูก",
     "อุบัติเหตุและฉุกเฉิน",
+    "TSET",
   ]);
 
   const sortFieldOptions = [
     { label: "ผู้เข้าใช้บริการ", value: "ALL_USER" },
-    { label: "กำลังรอ", value: "PENDING" },
-      { label: "กำลังรอ", value: "WAIT_PTS" },
-        { label: "กำลังรอ", value: "NOSHOW_PTS" },
-    { label: "เสร็จสิ้น", value: "COMPLETED" },
+    { label: "กำลังรอ", value: "WAIT_PTS" },
+    { label: "ตรวจเสร็จ", value: "COMPLETED" },
+    { label: "ผู้ป่วยผิดนัด", value: "NOSHOW_PTS" },
     { label: "เวลารอตรวจเฉลี่ย", value: "avg_wait_screen" },
     { label: "เวลารอยาเฉลี่ย", value: "avg_wait_drug" },
-    { label: "เวลาที่ใช้เฉลี่ย", value: "avg_wait_all" },
+    { label: "เวลารวมเฉลี่ย", value: "avg_wait_all" },
   ];
 
   const sortOrderOptions = [
@@ -179,15 +179,15 @@ function Home() {
         {summary && (
           <>
             <div className="card-board grid grid-cols-5 gap-8">
-              <Card count={summary.ALL_USER} keyword="ผู้ป่วยที่ลงทะเบียน" />
+              <Card count={summary.ALL_USER} keyword="ผู้ป่วยลงทะเบียน" />
               <Card count={summary.WAIT_PTS} keyword="ผู้ป่วยรอรับบริการ" />
-               <Card count={summary.COMPLETED} keyword="เสร็จสิ้น" />
+              <Card count={summary.COMPLETED} keyword="ตรวจเสร็จ" />
               <Card
                 count={summary.NOSHOW_PTS}
-                keyword="ผู้ป่วยที่ยังไม่มาตามนัด"
+                keyword="ผู้ป่วยผิดนัด"
               />
-             
-              <Card count={summary.AVG_WAIT_TIME} keyword="เวลาที่ใช้เฉลี่ย" />
+
+              <Card count={summary.AVG_WAIT_TIME} keyword="เวลารวมเฉลี่ย" />
             </div>
           </>
         )}

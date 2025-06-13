@@ -21,12 +21,12 @@ function Card({ count, keyword }) {
   }, [count, prevCount]);
 
   const iconMap = {
-    ผู้ป่วยที่ลงทะเบียน: { icon: faUser, bgColor: "bg-blue-500" },
+    ผู้ป่วยลงทะเบียน: { icon: faUser, bgColor: "bg-blue-500" },
     ผู้ป่วยรอรับบริการ: { icon: faHourglassHalf, bgColor: "bg-orange-500" },
-    ผู้ป่วยที่ยังไม่มาตามนัด: { icon: faPersonCircleQuestion, bgColor: "bg-gray-400" },
+    ผู้ป่วยผิดนัด: { icon: faPersonCircleQuestion, bgColor: "bg-gray-400" },
     กำลังรอ: { icon: faHourglassHalf, bgColor: "bg-orange-500" },
-    เสร็จสิ้น: { icon: faCheck, bgColor: "bg-green-500" },
-    เวลาที่ใช้เฉลี่ย: { icon: faClock, bgColor: "bg-indigo-400" },
+    ตรวจเสร็จ: { icon: faCheck, bgColor: "bg-green-500" },
+    เวลารวมเฉลี่ย: { icon: faClock, bgColor: "bg-indigo-400" },
   };
 
   return (
@@ -39,7 +39,7 @@ function Card({ count, keyword }) {
         </div>
         <h1
           className={`${
-            keyword == "เวลาที่ใช้เฉลี่ย" ? "text-4xl" : "text-6xl"
+            keyword == "เวลารวมเฉลี่ย" ? "text-4xl" : "text-6xl"
           }  font-medium text-right ${isUpdated ? "text-red-500" : ""}`}
         >
           {count}
