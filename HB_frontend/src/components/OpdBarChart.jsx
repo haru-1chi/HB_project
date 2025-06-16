@@ -31,14 +31,14 @@ const OpdBarChart = ({ data }) => {
     labels,
     datasets: [
       {
-        label: "ผู้เข้าใช้บริการ",
+        label: "ผู้ป่วยลงทะเบียน",
         data: allUsers,
         backgroundColor: "rgba(54, 162, 235, 0.6)",
         borderColor: "rgba(54, 162, 235, 1)",
         borderWidth: 1,
       },
       {
-        label: "กำลังรอ",
+        label: "ผู้ป่วยรอรับบริการ",
         data: pendingUsers,
         backgroundColor: "rgba(255, 206, 86, 0.6)",
         borderColor: "rgba(255, 206, 86, 1)",
@@ -52,7 +52,7 @@ const OpdBarChart = ({ data }) => {
         borderWidth: 1,
       },
       {
-        label: "ยังไม่มาตามนัด",
+        label: "ผู้ป่วยผิดนัด",
         data: noShow,
         backgroundColor: "rgba(128, 128, 128, 0.6)", // light gray with transparency
         borderColor: "rgba(128, 128, 128, 1)",

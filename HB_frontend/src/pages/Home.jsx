@@ -39,8 +39,8 @@ function Home() {
   ]);
 
   const sortFieldOptions = [
-    { label: "ผู้เข้าใช้บริการ", value: "ALL_USER" },
-    { label: "กำลังรอ", value: "WAIT_PTS" },
+    { label: "ผู้ป่วยลงทะเบียน", value: "ALL_USER" },
+    { label: "ผู้ป่วยรอรับบริการ", value: "WAIT_PTS" },
     { label: "ตรวจเสร็จ", value: "COMPLETED" },
     { label: "ผู้ป่วยผิดนัด", value: "NOSHOW_PTS" },
     { label: "เวลารอตรวจเฉลี่ย", value: "avg_wait_screen" },
