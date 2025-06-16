@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Bar } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -21,6 +21,16 @@ ChartJS.register(
 );
 
 const OpdBarChart = ({ data }) => {
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect screen width
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768); // Tailwind md breakpoint
+
+    handleResize(); // Initial check
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
   // Extract labels and values from the data
   const labels = data.map((item) => item.OPD_NAME);
   const allUsers = data.map((item) => item.ALL_USER);
@@ -62,6 +72,7 @@ const OpdBarChart = ({ data }) => {
   };
 
   const options = {
+    indexAxis: isMobile ? "y" : "x",
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -87,7 +98,13 @@ const OpdBarChart = ({ data }) => {
     },
   };
 
-  return <Bar data={chartData} options={options} />;
+  const chartHeight = isMobile ? data.length * 60 : 400;
+
+   return (
+    <div style={{ height: chartHeight }}>
+      <Bar data={chartData} options={options} />
+    </div>
+  );
 };
 
 export default OpdBarChart;

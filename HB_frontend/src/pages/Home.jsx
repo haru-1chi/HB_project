@@ -4,10 +4,15 @@ import { Button } from "primereact/button";
 import { Dropdown } from "primereact/dropdown";
 import SideBarMenu from "../components/SideBarMenu";
 import Card from "../components/Card";
+import { ToggleButton } from "primereact/togglebutton";
 import DetailCard from "../components/DetailCard";
 import OpdBarChart from "../components/OpdBarChart";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faSliders } from "@fortawesome/free-solid-svg-icons";
+import {
+  faSliders,
+  faArrowUpWideShort,
+  faArrowDownWideShort,
+} from "@fortawesome/free-solid-svg-icons";
 import Logo from "../assets/logo.png";
 //เอาใส่ util ภายหลัง
 const formatWaitTime = (minutes) => {
@@ -133,8 +138,8 @@ function Home() {
         handleCheckboxChange={handleCheckboxChange}
         setSelectedOpdNames={setSelectedOpdNames}
       />
-      <div className="w-full p-8 pt-5">
-        <div className="flex justify-between items-center mb-4">
+      <div className="w-full p-4 sm:p-8 pt-5">
+        <div className="sm lg:flex justify-between items-center mb-4">
           <div className="flex items-center">
             <img className="w-17" src={Logo} alt="" />
             <div className="ml-2">
@@ -146,18 +151,19 @@ function Home() {
               </p>
             </div>
           </div>
-          <div>
-            <Dropdown
-              value={sortOrder}
-              onChange={(e) => setSortOrder(e.value)}
-              options={sortOrderOptions}
-              optionLabel="label"
-              placeholder="เลือกเรียงลำดับ"
-              checkmark={true}
-              highlightOnSelect={false}
-              className="mr-5"
-            />
-
+          <div className="flex justify-end">
+            <div className="hidden sm:block">
+              <Dropdown
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.value)}
+                options={sortOrderOptions}
+                optionLabel="label"
+                placeholder="เลือกเรียงลำดับ"
+                checkmark={true}
+                highlightOnSelect={false}
+                className="mr-5"
+              />
+            </div>
             <Dropdown
               value={sortField}
               onChange={(e) => setSortField(e.value)}
@@ -168,7 +174,17 @@ function Home() {
               highlightOnSelect={false}
               className="mr-5"
             />
-
+            <div className="block sm:hidden">
+              <ToggleButton
+                checked={sortOrder === "asc"}
+                onChange={(e) => setSortOrder(e.value ? "asc" : "desc")}
+                onLabel=""
+                offLabel=""
+                onIcon={<FontAwesomeIcon icon={faArrowUpWideShort} />}
+                offIcon={<FontAwesomeIcon icon={faArrowDownWideShort} />}
+                className="mr-5"
+              />
+            </div>
             <Button
               label={<FontAwesomeIcon icon={faSliders} />}
               onClick={() => setVisible(true)}
@@ -178,7 +194,7 @@ function Home() {
 
         {summary && (
           <>
-            <div className="card-board grid grid-cols-5 gap-8">
+            <div className="card-board grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 md:gap-8">
               <Card count={summary.ALL_USER} keyword="ผู้ป่วยลงทะเบียน" />
               <Card count={summary.WAIT_PTS} keyword="ผู้ป่วยรอรับบริการ" />
               <Card count={summary.COMPLETED} keyword="ตรวจเสร็จ" />
@@ -192,7 +208,7 @@ function Home() {
           </>
         )}
 
-        <div className="bg-white p-4 my-7 w-full rounded-xl shadow-md h-[500px] border-1 border-gray-200">
+        <div className="bg-white p-4 my-7 w-full rounded-xl shadow-md h-auto border-1 border-gray-200">
           {data?.length > 0 ? (
             <OpdBarChart data={data} />
           ) : (
@@ -200,7 +216,7 @@ function Home() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5">
           {data?.map((item, index) => (
             <DetailCard
               key={index}
