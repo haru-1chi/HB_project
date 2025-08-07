@@ -1,9 +1,10 @@
 const express = require('express');
-const { PORT } = require('./config/index');
-
-//* newer setup
-const { createServer } = require('node:http');
+const cookieParser = require('cookie-parser');
 const cors = require("cors");
+const helmet = require('helmet');
+const db = require('./mysql.js');
+const { PORT } = require('./config/index');
+const { createServer } = require('node:http');
 const { join } = require('node:path');
 const { Server } = require('socket.io');
 const patientRoutes = require('./routes/patientRoutes');
