@@ -8,6 +8,7 @@ const { createServer } = require('node:http');
 const { join } = require('node:path');
 const { Server } = require('socket.io');
 const patientRoutes = require('./routes/patientRoutes');
+const kpiRoutes = require('./routes/kpiRoutes');
 const { stateOPDS } = require('./controllers/patientController');
 //* newer setup
 
@@ -19,6 +20,7 @@ app.use(cors());
 app.use(express.json());
 
 app.use('/api', patientRoutes);
+app.use('/api', kpiRoutes);
 
 io.on('connection', (socket) => {
   console.log('A user connected');
@@ -37,6 +39,8 @@ io.on('connection', (socket) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`server running at http://localhost:${PORT}`);
+const HOST = '0.0.0.0';
+
+server.listen(PORT, HOST, () => {
+  console.log(`Server running at http://${HOST}:${PORT}`);
 });

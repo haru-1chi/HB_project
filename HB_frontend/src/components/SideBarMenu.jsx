@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import { Sidebar } from "primereact/sidebar";
 import { Checkbox } from "primereact/checkbox";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSliders } from "@fortawesome/free-solid-svg-icons";
 import { Button } from "primereact/button";
+import { Link, useLocation } from "react-router-dom";
+import Logo from "../assets/logo.png";
+
 function SideBarMenu({
   visible,
   setVisible,
@@ -12,8 +15,13 @@ function SideBarMenu({
   handleCheckboxChange,
   setSelectedOpdNames,
 }) {
+  const location = useLocation();
+
+  const isActive = (path) => location.pathname === path;
+
   const isAllChecked =
-  allOpdChoices?.length > 0 && selectedOpdNames.length === allOpdChoices.length;
+    allOpdChoices?.length > 0 &&
+    selectedOpdNames.length === allOpdChoices.length;
 
   const toggleCheckAll = () => {
     if (isAllChecked) {
@@ -26,58 +34,56 @@ function SideBarMenu({
   const customHeader = (
     <div className="flex items-center gap-2 text-xl">
       <FontAwesomeIcon icon={faSliders} />
-      <span className="font-bold">กรอง</span>
+      <span className="font-bold">Maesot Hospital</span>
     </div>
   );
 
   return (
-    <div className="card h-dvh bg-white">
-      <Sidebar
+    <div className="card h-dvh bg-white w-75 p-4">
+      {/* <Sidebar
         header={customHeader}
         visible={visible}
-        position="right"
+        position="left"
         onHide={() => setVisible(false)}
-      >
-        <div>
-          <div className="flex justify-between mb-3 items-center">
-            <div className="flex items-center">
-              <Checkbox
-                inputId="check-all"
-                checked={isAllChecked}
-                onChange={toggleCheckAll}
-              />
-              <label htmlFor="check-all" className="ml-2">
-                ทั้งหมด
-              </label>
-            </div>
-            <Button
-              label={
-                <>
-                  <FontAwesomeIcon icon={faSliders} className="mr-2" />
-                  ล้างตัวกรอง
-                </>
-              }
-              onClick={() => setSelectedOpdNames([])}
-              text
-              className="text-blue-500 hover:bg-blue-50 cursor-pointer px-3 py-1 rounded-md"
-              unstyled
-            />
-          </div>
+      > */}
+      <div className="flex items-center mb-4">
+        <img className="w-15 mr-3" src={Logo} alt="" />
+        <h5 className="text-lg font-bold text-green-900">MaeSot Hospital</h5>
+      </div>
+      <div>
+        <Link
+          to="/"
+          className={`p-3 rounded-lg block mb-3 ${
+            isActive("/")
+              ? "text-white font-bold bg-green-900"
+              : "text-gray-700 hover:text-green-900"
+          }`}
+        >
+          <p>สถิติทั่วไป</p>
+        </Link>
+        <Link
+          to="/kpi"
+          className={`p-3 rounded-lg block mb-3 ${
+            isActive("/kpi")
+              ? "text-white font-bold bg-green-900"
+              : "text-gray-700 hover:text-green-900"
+          }`}
+        >
+          <p>ตัวชี้วัดอัตราการเสียชีวิต</p>
+        </Link>
 
-          {allOpdChoices?.map((opd, index) => (
-          <div key={index} className="mb-3 items-center">
-            <Checkbox
-              inputId={`cb-${index}`}
-              checked={selectedOpdNames.includes(opd)}
-              onChange={() => handleCheckboxChange(opd)}
-            />
-            <label htmlFor={`cb-${index}`} className="ml-2">
-              {opd}
-            </label>
-          </div>
-        ))}
-        </div>
-      </Sidebar>
+        <Link
+          to="/lookup"
+          className={`p-3 rounded-lg block mb-3 ${
+            isActive("/lookup")
+              ? "text-white font-bold bg-green-900"
+              : "text-gray-700 hover:text-green-900"
+          }`}
+        >
+          <p>จัดการตัวชี้วัด</p>
+        </Link>
+      </div>
+      {/* </Sidebar> */}
     </div>
   );
 }

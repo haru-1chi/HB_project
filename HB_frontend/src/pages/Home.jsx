@@ -2,11 +2,11 @@ import axios from "axios";
 import React, { useState, useEffect } from "react";
 import { Button } from "primereact/button";
 import { Dropdown } from "primereact/dropdown";
-import SideBarMenu from "../components/SideBarMenu";
+import SideBarFilter from "../components/SideBarFilter";
 import Card from "../components/Card";
 import { ToggleButton } from "primereact/togglebutton";
 import DetailCard from "../components/DetailCard";
-import OpdBarChart from "../components/OpdBarChart";
+import BarChart from "../components/BarChart";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faSliders,
@@ -130,7 +130,7 @@ function Home() {
 
   return (
     <div className="Home-page flex">
-      <SideBarMenu
+      <SideBarFilter
         visible={visible}
         setVisible={setVisible}
         allOpdChoices={allOpdChoices}
@@ -210,7 +210,7 @@ function Home() {
 
         <div className="bg-white p-4 my-7 w-full rounded-xl shadow-md h-auto border-1 border-gray-200">
           {data?.length > 0 ? (
-            <OpdBarChart data={data} />
+            <BarChart data={data}  type="opd"/>
           ) : (
             <p>Loading chart...</p>
           )}
