@@ -1,18 +1,5 @@
 const db = require('../mysql.js'); // ⬅️ Import MySQL connection
 
-// exports.createdata = (req, res) => {
-//     const { kpi_name, a_name, b_name, username, a_value, b_value, type, timestamp } = req.body;
-//     db.query("INSERT INTO kpi_data (kpi_name, a_name, b_name, username, a_value, b_value, type, timestamp) VALUES(?, ?, ?, ?, ?, ?, ?,?)",
-//         [kpi_name, a_name, b_name, username, a_value, b_value, type, timestamp],
-//         (err, result) => {
-//             if (err) {
-//                 res.status(400).send(err);
-//             } else {
-//                 res.send("data inserted")
-//             }
-//         })
-// }
-
 exports.createdata = (req, res) => {
     const dataArray = req.body; // Expecting an array of objects
     if (!Array.isArray(dataArray)) {
@@ -114,6 +101,11 @@ exports.deleteKPIName = (req, res) => {
     });
 };
 
+const monthTH = [
+    "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.",
+    "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.",
+    "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."
+];
 
 exports.getData = (req, res) => {
     const kpi_name = req.query.kpi_name || "1";
@@ -131,7 +123,7 @@ exports.getData = (req, res) => {
         params.push(kpi_name);
     }
 
-    if (type) {
+    if (type && chart !== "percent") {
         whereClause.push("type = ?");
         params.push(type);
     }
@@ -181,7 +173,17 @@ exports.getData = (req, res) => {
         if (err) {
             res.status(400).send({ error: 'Database query failed', details: err });
         } else {
-            res.send(result);
+            const formatted = result.map(item => {
+                const [mon, yr] = item.month.split("-");
+                const monthsEN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                const monthIndex = monthsEN.indexOf(mon);
+                const year = yr;
+                return {
+                    ...item,
+                    month: monthTH[monthIndex] + " " + year
+                };
+            });
+            res.send(formatted);
         }
     });
 };
@@ -189,7 +191,6 @@ exports.getData = (req, res) => {
 exports.getDetail = (req, res) => {
     const kpi_name = req.query.kpi_name || "1";
     const type = req.query.type || "รวม";
-    const chart = req.query.chart || "percent";
     const since = req.query.since;
     const until = req.query.until;
 
@@ -249,10 +250,84 @@ exports.getDetail = (req, res) => {
         if (err) {
             res.status(400).send({ error: 'Database query failed', details: err });
         } else {
-            res.send(result);
+            const formatted = result.map(item => {
+                const [mon, yr] = item.month.split("-");
+                const monthsEN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                const monthIndex = monthsEN.indexOf(mon);
+                const year = yr;
+                return {
+                    ...item,
+                    month: monthTH[monthIndex] + " " + year
+                };
+            });
+            res.send(formatted);
         }
     });
 };
+
+exports.dataCurrentMonth = (req, res) => {
+    const kpi_name = req.query.kpi_name || "1";
+    const whereClause = ["kpi_name = ?"];
+    const params = [kpi_name];
+    const query = `
+    SELECT 
+      DATE_FORMAT(timestamp, '%b-%y') AS month,
+      type,
+      ROUND((a_value / b_value) * 100, 2) AS result,
+      CONCAT(
+        CASE 
+            WHEN ROUND((a_value / b_value) * 100, 2) - 
+                 LAG(ROUND((a_value / b_value) * 100, 2)) 
+                 OVER (PARTITION BY type ORDER BY timestamp) > 0 
+            THEN '+'
+            ELSE ''
+        END,
+        ROUND(
+          ROUND((a_value / b_value) * 100, 2) -
+          LAG(ROUND((a_value / b_value) * 100, 2)) OVER (PARTITION BY type ORDER BY timestamp),
+          1
+        ),
+        '%'
+      ) AS note
+    FROM kpi_data
+    ${whereClause.length ? "WHERE " + whereClause.join(" AND ") : ""}
+    ORDER BY timestamp;
+  `;
+
+    db.query(query, params, (err, result) => {
+        if (err) {
+            return res.status(400).send({ error: 'Database query failed', details: err });
+        }
+
+        if (!result.length) return res.send([]);
+
+        // Get the latest month
+        const months = [...new Set(result.map(r => r.month))];
+        const latestMonth = months[months.length - 1];
+
+        // Filter for latest month only
+        const latestData = result.filter(r => r.month === latestMonth);
+
+        // Convert month to Thai format
+        const monthsEN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const monthsTH = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+
+        const formatted = latestData.map(item => {
+            const [mon, yr] = item.month.split("-");
+            const monthIndex = monthsEN.indexOf(mon);
+            const year = `20${yr}`;
+            return {
+                type: item.type,
+                result: `${item.result}%`,
+                note: item.note,
+                month: `${monthsTH[monthIndex]} ${year}`
+            };
+        });
+
+        res.send(formatted);
+    });
+};
+
 
 exports.getKPIName = (req, res) => {
     const query = `

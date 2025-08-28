@@ -10,7 +10,7 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
-
+import ChartDataLabels from "chartjs-plugin-datalabels";
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -18,7 +18,8 @@ ChartJS.register(
   PointElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  ChartDataLabels
 );
 
 const KPILineChart = ({ data }) => {
@@ -32,15 +33,15 @@ const KPILineChart = ({ data }) => {
   }, []);
 
   // 1️⃣ Get unique months for x-axis
-  const labels = [...new Set(data.map(item => item.month))];
+  const labels = [...new Set(data.map((item) => item.month))];
 
   // 2️⃣ Group data by type (or by kpi_name if you have multiple)
-  const types = [...new Set(data.map(item => item.type))];
+  const types = [...new Set(data.map((item) => item.type))];
 
   // 3️⃣ Build datasets dynamically
   const datasets = types.map((type, idx) => {
-    const typeData = labels.map(month => {
-      const item = data.find(d => d.type === type && d.month === month);
+    const typeData = labels.map((month) => {
+      const item = data.find((d) => d.type === type && d.month === month);
       return item ? item.result : 0;
     });
 
@@ -49,7 +50,7 @@ const KPILineChart = ({ data }) => {
       "rgba(54, 162, 235, 1)",
       "rgba(255, 206, 86, 1)",
       "rgba(75, 192, 192, 1)",
-      "rgba(255, 99, 132, 1)"
+      "rgba(255, 99, 132, 1)",
     ];
 
     return {
@@ -77,6 +78,14 @@ const KPILineChart = ({ data }) => {
           label: function (tooltipItem) {
             return `${tooltipItem.dataset.label}: ${tooltipItem.raw}%`;
           },
+        },
+      },
+      datalabels: {
+        color: "#555555", // text color
+        align: "top",
+        formatter: (value) => `${value}%`, // show value with %
+        font: {
+          weight: "bold",
         },
       },
     },

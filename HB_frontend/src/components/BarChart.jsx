@@ -9,8 +9,9 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
-
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+import ChartDataLabels from "chartjs-plugin-datalabels";
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend,
+  ChartDataLabels);
 
 const BarChart = ({ data, type }) => {
   const [isMobile, setIsMobile] = useState(false);
@@ -94,6 +95,13 @@ const BarChart = ({ data, type }) => {
             return label;
           },
         },
+      },
+       datalabels: {
+        color: "#555555",
+        anchor: "end",
+        align: "end",
+        formatter: (value) => value,
+        font: { weight: "bold" },
       },
     },
     scales: {

@@ -1,23 +1,18 @@
 import axios from "axios";
 import React, { useState, useEffect } from "react";
-import { Button } from "primereact/button";
 import { Dropdown } from "primereact/dropdown";
 import { Calendar } from "primereact/calendar";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
 import SideBarMenu from "../components/SideBarMenu";
-import Card from "../components/Card";
-import { ToggleButton } from "primereact/togglebutton";
-import DetailCard from "../components/DetailCard";
 import KPILineChart from "../components/KPILineChart";
 import BarChart from "../components/BarChart";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faSliders,
-  faArrowUpWideShort,
-  faArrowDownWideShort,
+  faArrowTrendUp,
+  faArrowTrendDown,
 } from "@fortawesome/free-solid-svg-icons";
-import Logo from "../assets/logo.png";
+
 //เอาใส่ util ภายหลัง
 const formatWaitTime = (minutes) => {
   if (!minutes) return "0 นาที";
@@ -59,14 +54,9 @@ const formatDateForSQL = (date, endOfMonth = false) => {
 };
 
 function KpiDashboard() {
-  const [visible, setVisible] = useState(false);
-  const [summary, setSummary] = useState(null);
   const [data, setData] = useState(null);
   const [detail, setDetail] = useState(null);
-  const [allOpdChoices, setAllOpdChoices] = useState([]);
-  const [sortField, setSortField] = useState("ALL_USER");
-  const [sortOrder, setSortOrder] = useState("desc");
-
+  const [dataCurrentMonth, setDataCurrentMonth] = useState([]);
   const [selectedTypeOptions, setselectedTypeOptions] = useState("รวม");
   const [selectedKPIName, setSelectedKPIName] = useState("1");
   const [allKPIChoices, setAllKPIChoices] = useState([]);
@@ -87,21 +77,6 @@ function KpiDashboard() {
     "TSET",
   ]);
 
-  const sortFieldOptions = [
-    { label: "ผู้ป่วยลงทะเบียน", value: "ALL_USER" },
-    { label: "ผู้ป่วยรอรับบริการ", value: "WAIT_PTS" },
-    { label: "ตรวจเสร็จ", value: "COMPLETED" },
-    { label: "ผู้ป่วยผิดนัด", value: "NOSHOW_PTS" },
-    { label: "เวลารอตรวจเฉลี่ย", value: "avg_wait_screen" },
-    { label: "เวลารอยาเฉลี่ย", value: "avg_wait_drug" },
-    { label: "เวลารวมเฉลี่ย", value: "avg_wait_all" },
-  ];
-
-  const sortOrderOptions = [
-    { label: "น้อยไปมาก", value: "asc" },
-    { label: "มากไปน้อย", value: "desc" },
-  ];
-
   const selectedOptions = [
     { label: "รวมทั้งหมด", value: "รวม" },
     { label: "ชาวไทย", value: "ไทย" },
@@ -120,7 +95,7 @@ function KpiDashboard() {
     }).toString();
 
     axios
-      .get(`http://172.16.39.6:3000/api/summary?${queryParams}`)
+      .get(`http://172.16.190.17:3000/api/summary?${queryParams}`)
       .then((response) => {
         if (response.data.length > 0) {
           const formattedSummary = {
@@ -136,7 +111,7 @@ function KpiDashboard() {
   const fetchKPInames = async () => {
     try {
       const response = await axios.get(
-        "http://172.16.39.6:3000/api/getKPIName"
+        "http://172.16.190.17:3000/api/getKPIName"
       );
       const options = response.data.map((item) => ({
         label: item.kpi_name,
@@ -158,7 +133,7 @@ function KpiDashboard() {
     }).toString();
 
     axios
-      .get(`http://172.16.39.6:3000/api/getData?${queryParams}`)
+      .get(`http://172.16.190.17:3000/api/getData?${queryParams}`)
       .then((response) => {
         setData(response.data);
       })
@@ -177,7 +152,7 @@ function KpiDashboard() {
     }).toString();
 
     axios
-      .get(`http://172.16.39.6:3000/api/getDetail?${queryParams}`)
+      .get(`http://172.16.190.17:3000/api/getDetail?${queryParams}`)
       .then((response) => {
         setDetail(response.data);
       })
@@ -191,9 +166,8 @@ function KpiDashboard() {
     fetchSummary();
     fetchKPInames();
     fetchDetailTable();
+    fetchDataCurrentMonth();
   }, [
-    sortField,
-    sortOrder,
     selectedOpdNames,
     selectedChartType,
     selectedKPIName,
@@ -202,25 +176,85 @@ function KpiDashboard() {
     endDate,
   ]);
 
-  const handleCheckboxChange = (opdName) => {
-    setSelectedOpdNames((prevSelected) =>
-      prevSelected.includes(opdName)
-        ? prevSelected.filter((name) => name !== opdName)
-        : [...prevSelected, opdName]
+  const noteBodyTemplate = (rowData) => {
+    const value = rowData.note; // e.g., "+0.5%" or "-0.6%"
+
+    if (!value) return null; // show nothing if null
+
+    // Determine if positive or negative
+    const isPositive = value.startsWith("+");
+
+    return (
+      <div
+        className={`w-fit flex items-center px-2 rounded-md ${
+          isPositive ? "bg-red-100" : "bg-green-100"
+        }`}
+      >
+        <FontAwesomeIcon
+          icon={isPositive ? faArrowTrendUp : faArrowTrendDown}
+          className={isPositive ? "text-red-500" : "text-green-500"}
+        />
+        <p className={`ml-2 ${isPositive ? "text-red-500" : "text-green-500"}`}>
+          {value}
+        </p>
+      </div>
     );
+  };
+
+  const fetchDataCurrentMonth = () => {
+    const queryParams = new URLSearchParams({
+      kpi_name: selectedKPIName,
+      since: formatDateForSQL(sinceDate),
+      until: formatDateForSQL(endDate, true),
+    }).toString();
+
+    axios
+      .get(`http://172.16.190.17:3000/api/dataCurrentMonth?${queryParams}`)
+      .then((res) => {
+        const order = ["รวม", "ไทย", "ต่างชาติ"];
+        const sortedData = res.data.sort(
+          (a, b) => order.indexOf(a.type) - order.indexOf(b.type)
+        );
+        setDataCurrentMonth(sortedData);
+      })
+      .catch((error) =>
+        console.error("Error fetching department data:", error)
+      );
+  };
+
+  const getTrendText = (note) => {
+    if (!note || note === "null") return null;
+
+    const isPositive = note.startsWith("+");
+
+    return (
+      <span
+        className={`w-fit flex items-center px-2 py-1 gap-2 rounded-md ${
+          isPositive ? "bg-red-100" : "bg-green-100"
+        }`}
+      >
+        <FontAwesomeIcon
+          icon={isPositive ? faArrowTrendUp : faArrowTrendDown}
+          className={isPositive ? "text-red-500" : "text-green-500"}
+        />
+        {isPositive ? "เพิ่มขึ้นจากเดือนที่แล้ว" : "ลดลงจากเดือนที่แล้ว"} {note}
+      </span>
+    );
+  };
+  const getTitle = (type) => {
+    if (type === "รวม") return "ร้อยละการเสียชีวิตรวม เดือนนี้";
+    if (type === "ไทย") return "ร้อยละการเสียชีวิตชาวไทยรวม เดือนนี้";
+    if (type === "ต่างชาติ") return "ร้อยละการเสียชีวิตชาวต่างชาติรวม เดือนนี้";
+    return `ร้อยละการเสียชีวิต (${type})`;
   };
 
   return (
     <div className="Home-page flex">
       <SideBarMenu
-        visible={visible}
-        // setVisible={setVisible}
-        allOpdChoices={allOpdChoices}
         selectedOpdNames={selectedOpdNames}
-        handleCheckboxChange={handleCheckboxChange}
         setSelectedOpdNames={setSelectedOpdNames}
       />
-      <div className="w-full p-4 sm:p-8 pt-5">
+      <div className="ml-75 w-full p-4 sm:p-8 pt-5">
         <div className="sm lg:flex justify-between items-center mb-4">
           <div className="flex items-center">
             <h5 className="text-2xl font-semibold">
@@ -245,9 +279,9 @@ function KpiDashboard() {
 
             <div className="hidden sm:block">
               <Dropdown
-                value={selectedTypeOptions}
-                onChange={(e) => setselectedTypeOptions(e.value)}
-                options={selectedOptions}
+                value={selectedChartType}
+                onChange={(e) => setSelectedChartType(e.value)}
+                options={selectedChart}
                 optionLabel="label"
                 placeholder="เลือกเรียงลำดับ"
                 checkmark={true}
@@ -255,12 +289,11 @@ function KpiDashboard() {
                 className="mr-5"
               />
             </div>
-
             <div className="hidden sm:block">
               <Dropdown
-                value={selectedChartType}
-                onChange={(e) => setSelectedChartType(e.value)}
-                options={selectedChart}
+                value={selectedTypeOptions}
+                onChange={(e) => setselectedTypeOptions(e.value)}
+                options={selectedOptions}
                 optionLabel="label"
                 placeholder="เลือกเรียงลำดับ"
                 checkmark={true}
@@ -289,41 +322,23 @@ function KpiDashboard() {
           </div>
         </div>
 
-        {summary && (
-          <>
-            <div className="card-board grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 md:gap-8">
-              <div className="bg-white shadow-md border-1 border-gray-200 h-[100px] md:h-[136px] p-3 md:p-5 rounded-xl flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <h1 className="text-5xl font-semibold">
-                    18<span className="text-3xl">%</span>
-                  </h1>
-                  <p>เพิ่มขึ้น 7%</p>
-                </div>
-                <p>ร้อยละการเสียชีวิตรวม</p>
+        <div className="card-board grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 md:gap-8">
+          {dataCurrentMonth.map((item) => (
+            <div
+              key={item.type}
+              className="bg-white shadow-md border-1 border-gray-200 h-[100px] md:h-[136px] p-3 md:p-5 rounded-xl flex flex-col justify-between"
+            >
+              <div className="flex items-center justify-between">
+                <h1 className="text-5xl font-semibold">
+                  {item.result.replace("%", "")}
+                  <span className="text-3xl">%</span>
+                </h1>
+                {getTrendText(item.note)}
               </div>
-
-              <div className="bg-white shadow-md border-1 border-gray-200 h-[100px] md:h-[136px] p-3 md:p-5 rounded-xl flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <h1 className="text-5xl font-semibold">
-                    18<span className="text-3xl">%</span>
-                  </h1>
-                  <p>เพิ่มขึ้น 7%</p>
-                </div>
-                <p>ร้อยละการเสียชีวิตชาวไทย</p>
-              </div>
-
-              <div className="bg-white shadow-md border-1 border-gray-200 h-[100px] md:h-[136px] p-3 md:p-5 rounded-xl flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <h1 className="text-5xl font-semibold">
-                    18<span className="text-3xl">%</span>
-                  </h1>
-                  <p>เพิ่มขึ้น 7%</p>
-                </div>
-                <p>ร้อยละการเสียชีวิตชาวต่างชาติ</p>
-              </div>
+              <p>{getTitle(item.type)}</p>
             </div>
-          </>
-        )}
+          ))}
+        </div>
 
         <div className="bg-white p-4 my-7 w-full rounded-xl shadow-md h-auto border-1 border-gray-200">
           {data?.length > 0 ? (
@@ -333,7 +348,7 @@ function KpiDashboard() {
               <BarChart data={data} type="kpi" />
             )
           ) : (
-            <p>Loading chart...</p>
+            <p>ไม่พบข้อมูล...</p>
           )}
         </div>
         <div className="bg-white p-4 my-7 w-full rounded-xl shadow-md h-auto border-1 border-gray-200">
@@ -342,7 +357,7 @@ function KpiDashboard() {
             <Column field="a_value" header="A (จำนวนผู้เสียชีวิต)"></Column>
             <Column field="b_value" header="B (จำนวนผู้ป่วยทุกสถานะ)"></Column>
             <Column field="result" header="อัตราการเสียชีวิต (%)"></Column>
-            <Column field="note" header="หมายเหตุ"></Column>
+            <Column header="หมายเหตุ" body={noteBodyTemplate}></Column>
           </DataTable>
         </div>
       </div>

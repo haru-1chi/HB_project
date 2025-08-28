@@ -27,7 +27,7 @@ function Lookup() {
   const [editRowId, setEditRowId] = useState(null);
   const [editValue, setEditValue] = useState("");
   const toast = useRef(null);
-  const API_BASE = "http://172.16.39.6:3000/api";
+  const API_BASE = "http://172.16.190.17:3000/api";
 
   const fetchKPInames = async () => {
     try {
@@ -48,6 +48,11 @@ function Lookup() {
     try {
       const response = await axios.post(`${API_BASE}/createKPIName`, [
         { kpi_name: newKPI },
+        {
+          headers: {
+            token: token,
+          },
+        },
       ]);
       console.log(response.data);
       fetchKPInames();
@@ -56,12 +61,18 @@ function Lookup() {
       console.error("Failed to add KPI:", error);
     }
   };
-
+  const token = localStorage.getItem("token");
   const handleEditSave = async (id) => {
     try {
-      await axios.put(`${API_BASE}/updateKPIName`, [
-        { id, kpi_name: editValue },
-      ]);
+      await axios.put(
+        `${API_BASE}/updateKPIName`,
+        [{ id, kpi_name: editValue }],
+        {
+          headers: {
+            token: token,
+          },
+        }
+      );
       toast.current.show({
         severity: "success",
         summary: "สำเร็จ",
@@ -78,7 +89,11 @@ function Lookup() {
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`${API_BASE}/deleteKPIName/${id}`);
+      await axios.delete(`${API_BASE}/deleteKPIName/${id}`, {
+        headers: {
+          token: token,
+        },
+      });
       toast.current.show({
         severity: "success",
         summary: "สำเร็จ",
@@ -167,11 +182,11 @@ function Lookup() {
   };
 
   return (
-    <div className="Home-page flex">
+    <div className="Home-page h-dvh flex">
       <Toast ref={toast} />
       <ConfirmDialog />
       <SideBarMenu visible={visible} setVisible={setVisible} />
-      <div className="w-full p-4 sm:p-8 pt-5">
+      <div className="ml-75 w-full p-4 sm:p-8 pt-5">
         <div className="flex items-center mb-5">
           <h5 className="text-2xl font-semibold">เพิ่มตัวชี้วัด</h5>
         </div>

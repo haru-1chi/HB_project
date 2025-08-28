@@ -8,6 +8,7 @@ import { ToggleButton } from "primereact/togglebutton";
 import DetailCard from "../components/DetailCard";
 import BarChart from "../components/BarChart";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import SideBarMenu from "../components/SideBarMenu";
 import {
   faSliders,
   faArrowUpWideShort,
@@ -130,6 +131,10 @@ function Home() {
 
   return (
     <div className="Home-page flex">
+      <SideBarMenu
+        selectedOpdNames={selectedOpdNames}
+        setSelectedOpdNames={setSelectedOpdNames}
+      />
       <SideBarFilter
         visible={visible}
         setVisible={setVisible}
@@ -138,7 +143,7 @@ function Home() {
         handleCheckboxChange={handleCheckboxChange}
         setSelectedOpdNames={setSelectedOpdNames}
       />
-      <div className="w-full p-4 sm:p-8 pt-5">
+      <div className="w-full ml-75 p-4 sm:p-8 pt-5">
         <div className="sm lg:flex justify-between items-center mb-4">
           <div className="flex items-center">
             <img className="w-17" src={Logo} alt="" />
@@ -198,10 +203,7 @@ function Home() {
               <Card count={summary.ALL_USER} keyword="ผู้ป่วยลงทะเบียน" />
               <Card count={summary.WAIT_PTS} keyword="ผู้ป่วยรอรับบริการ" />
               <Card count={summary.COMPLETED} keyword="ตรวจเสร็จ" />
-              <Card
-                count={summary.NOSHOW_PTS}
-                keyword="ผู้ป่วยผิดนัด"
-              />
+              <Card count={summary.NOSHOW_PTS} keyword="ผู้ป่วยผิดนัด" />
 
               <Card count={summary.AVG_WAIT_TIME} keyword="เวลารวมเฉลี่ย" />
             </div>
@@ -210,13 +212,13 @@ function Home() {
 
         <div className="bg-white p-4 my-7 w-full rounded-xl shadow-md h-auto border-1 border-gray-200">
           {data?.length > 0 ? (
-            <BarChart data={data}  type="opd"/>
+            <BarChart data={data} type="opd" />
           ) : (
-            <p>Loading chart...</p>
+            <p>ไม่พบข้อมูล...</p>
           )}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           {data?.map((item, index) => (
             <DetailCard
               key={index}

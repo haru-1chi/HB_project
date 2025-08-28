@@ -1,43 +1,91 @@
 const bcrypt = require('bcrypt');
-const { pool } = require('../mysql');
+const db = require('../mysql.js');
 const jwt = require('jsonwebtoken');
-const SECRET = 'your_intranet_safe_secret';
 
-async function createUser(req, res) {
+exports.login = (req, res) => {
   const { username, password } = req.body;
 
-  if (!username || !password)
-    return res.status(400).json({ message: 'Missing username or password' });
+  if (!username || !password) {
+    return res.status(400).json({ message: "username and password is required" });
+  }
 
-  const hashed = await bcrypt.hash(password, 10);
-  await pool.query('INSERT INTO user (username, password, timestamp) VALUES (?, ?, NOW())', [username, hashed]);
-  res.json({ message: 'User created successfully' });
-}
+  // Find user by username
+  db.query('SELECT * FROM user WHERE username = ?', [username], async (err, results) => {
+    if (err) return res.status(500).json({ message: err.message });
+
+    if (results.length === 0) {
+      return res.status(404).json({ message: "ไม่พบผู้ใช้งานนี้ในระบบ" });
+    }
+
+    const user = results[0];
+
+    try {
+      // Compare password
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (!isMatch) {
+        return res.status(400).json({ message: "รหัสผ่านไม่ถูกต้อง" });
+      }
+
+      // Create JWT token
+      const token = jwt.sign({ username: user.username }, process.env.JWT_SECRET || 'secret_key', { expiresIn: '1h' });
+
+      // Remove password before sending response
+      const { password: hashedPassword, ...userData } = user;
+
+      return res.status(200).json({
+        message: "เข้าสู่ระบบสําเร็จ",
+        status: true,
+        data: userData,
+        token: token
+      });
+
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ message: "มีบางอย่างผิดพลาด โปรดลองอีกครั้ง" });
+    }
+  });
+};
 
 
+exports.createUser = (req, res) => {
+  const { username, password, name } = req.body;
 
-async function login(req, res) {
-  const { username, password } = req.body;
-  const [rows] = await pool.query('SELECT * FROM user WHERE username = ?', [username]);
+  if (!username || !password || !name) {
+    return res.status(400).json({ message: "username, password, and name is required" });
+  }
 
-  if (!rows.length) return res.status(401).json({ message: 'User not found' });
+  if (password.length < 8) {
+    return res.status(400).json({ message: "กรุณาใส่รหัสผ่านอย่างน้อย 8 ตัวอักษร" });
+  }
 
-  const user = rows[0];
-  const match = await bcrypt.compare(password, user.password);
+  // Check if username exists
+  db.query('SELECT username FROM user WHERE username = ?', [username], (err, results) => {
+    if (err) return res.status(500).json({ message: err.message });
+    if (results.length > 0) return res.status(400).json({ message: "username นี้ มีอยู่ในระบบแล้ว" });
 
-  if (!match) return res.status(401).json({ message: 'Invalid password' });
+    // Check if name exists
+    db.query('SELECT name FROM user WHERE name = ?', [name], async (err, results) => {
+      if (err) return res.status(500).json({ message: err.message });
+      if (results.length > 0) return res.status(400).json({ message: "ชื่อนี้ มีอยู่ในระบบแล้ว" });
 
-  const token = jwt.sign({ username: user.username }, SECRET, { expiresIn: '1h' });
+      try {
+        const hashedPassword = await bcrypt.hash(password, 10);
 
-  await pool.query('INSERT INTO token (username, token, timestamp) VALUES (?, ?, NOW())', [user.username, token]);
-
-  res.json({ token });
-}
-
-async function logout(req, res) {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(400).json({ message: 'No token provided' });
-
-  await pool.query('INSERT INTO blacklist (token, timestamp) VALUES (?, NOW())', [token]);
-  res.json({ message: 'Logged out' });
-}
+        db.query(
+          'INSERT INTO user (username, password, name, timestamp) VALUES (?, ?, ?, NOW())',
+          [username, hashedPassword, name],
+          (err) => {
+            if (err) return res.status(500).json({ message: err.message });
+            res.status(200).json({
+              message: "สร้างบัญชีผู้ใช้สำเร็จ",
+              status: true,
+              data: { username, name }
+            });
+          }
+        );
+      } catch (err) {
+        return res.status(500).json({ message: err.message });
+      }
+    });
+  });
+};

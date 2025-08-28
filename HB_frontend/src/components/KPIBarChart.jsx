@@ -9,7 +9,7 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
-
+import ChartDataLabels from "chartjs-plugin-datalabels";
 // Register necessary components
 ChartJS.register(
   CategoryScale,
@@ -17,7 +17,8 @@ ChartJS.register(
   BarElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  ChartDataLabels
 );
 
 const KPIBarChart = ({ data }) => {
@@ -69,6 +70,13 @@ const KPIBarChart = ({ data }) => {
             return label;
           },
         },
+      },
+      datalabels: {
+        color: "#555555",
+        anchor: "end",
+        align: "end",
+        formatter: (value) => value,
+        font: { weight: "bold" },
       },
     },
     scales: {
