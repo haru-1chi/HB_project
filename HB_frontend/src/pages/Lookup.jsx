@@ -28,6 +28,7 @@ function Lookup() {
   const [editValue, setEditValue] = useState("");
   const toast = useRef(null);
   const API_BASE = "http://172.16.190.17:3000/api";
+  const token = localStorage.getItem("token");
 
   const fetchKPInames = async () => {
     try {
@@ -46,14 +47,15 @@ function Lookup() {
     if (newKPI.trim() === "") return;
 
     try {
-      const response = await axios.post(`${API_BASE}/createKPIName`, [
-        { kpi_name: newKPI },
+      const response = await axios.post(
+        `${API_BASE}/createKPIName`,
+        [{ kpi_name: newKPI }],
         {
           headers: {
             token: token,
           },
-        },
-      ]);
+        }
+      );
       console.log(response.data);
       fetchKPInames();
       setNewKPI("");
@@ -61,7 +63,7 @@ function Lookup() {
       console.error("Failed to add KPI:", error);
     }
   };
-  const token = localStorage.getItem("token");
+
   const handleEditSave = async (id) => {
     try {
       await axios.put(
