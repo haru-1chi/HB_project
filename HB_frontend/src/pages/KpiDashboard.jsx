@@ -232,7 +232,6 @@ function KpiDashboard() {
       <div
         // className="ml-75 w-full p-4 sm:p-8 pt-5"
         className={`flex-1 transition-all duration-300 p-4 sm:p-8 pt-5 overflow-auto`}
-        style={{ marginLeft: collapsed ? "4rem" : "18.75rem" }}
       >
         <div className="flex items-center mb-4">
           <h5 className="text-2xl font-semibold">

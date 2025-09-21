@@ -1,12 +1,13 @@
 import React, { createContext, useState, useEffect, useContext } from "react";
-import axios from "axios";
 import { useNavigate } from "react-router-dom";
+
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem("token") || null);
+  const [loading, setLoading] = useState(true);
 
   const login = async (username, password) => {
     try {
@@ -23,11 +24,9 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem("token", data.token);
       setToken(data.token);
 
-      const profileRes = await fetch("http://172.16.39.6:3000/api/me", {
+      const profileRes = await fetch("http://172.16.190.17:3000/api/me", {
         method: "POST",
-        headers: {
-          token: data.token,
-        },
+        headers: { token: data.token },
       });
       const profile = await profileRes.json();
       setUser(profile.data);
@@ -48,10 +47,13 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const loadUser = async () => {
       const storedToken = localStorage.getItem("token");
-      if (!storedToken) return;
+      if (!storedToken) {
+        setLoading(false);
+        return;
+      }
 
       try {
-        const profileRes = await fetch("http://172.16.39.6:3000/api/me", {
+        const profileRes = await fetch("http://172.16.190.17:3000/api/me", {
           method: "POST",
           headers: { token: storedToken },
         });
@@ -60,14 +62,22 @@ export const AuthProvider = ({ children }) => {
       } catch {
         setUser(null);
         localStorage.removeItem("token");
+      } finally {
+        setLoading(false);
       }
     };
     loadUser();
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
-      {children}
+    <AuthContext.Provider value={{ user, token, login, logout, loading }}>
+      {loading ? (
+        <div className="flex items-center justify-center h-screen">
+          <p>Loading...</p>
+        </div>
+      ) : (
+        children
+      )}
     </AuthContext.Provider>
   );
 };

@@ -29,7 +29,7 @@ function Lookup() {
   const [editValue, setEditValue] = useState("");
   const toast = useRef(null);
   // const API_BASE = "http://172.16.190.17:3000/api"
-  const API_BASE = "http://172.16.39.6:3000/api";
+  const API_BASE = "http://172.16.190.17:3000/api";
   const token = localStorage.getItem("token");
 
   const fetchKPInames = async () => {
@@ -42,7 +42,6 @@ function Lookup() {
   };
 
   useEffect(() => {
-    console.log(token);
     fetchKPInames();
   }, []);
 
@@ -59,7 +58,7 @@ function Lookup() {
           },
         }
       );
-      console.log(response.data);
+
       fetchKPInames();
       setNewKPI("");
     } catch (error) {
@@ -193,7 +192,6 @@ function Lookup() {
       <div
         // className="ml-75 w-full p-4 sm:p-8 pt-5"
         className={`flex-1 transition-all duration-300 p-4 sm:p-8 pt-5 overflow-auto`}
-        style={{ marginLeft: collapsed ? "4rem" : "18.75rem" }}
       >
         <div className="flex items-center mb-5">
           <h5 className="text-2xl font-semibold">เพิ่มตัวชี้วัด</h5>

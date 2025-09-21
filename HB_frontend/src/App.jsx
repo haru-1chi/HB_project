@@ -20,7 +20,6 @@ function App() {
 
             <Route element={<Layout />}>
               <Route path="/" element={<Home />} />
-
               <Route
                 path="/kpi"
                 element={

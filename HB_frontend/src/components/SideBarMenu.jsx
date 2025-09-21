@@ -23,11 +23,9 @@ function SideBarMenu({ collapsed, setCollapsed }) {
   return (
     <div
       className={`fixed top-0 left-0 h-dvh bg-white flex flex-col transition-all duration-300 pt-5`}
-      style={{ width: collapsed ? "4rem" : "18.75rem" }} // adjust width
+      style={{ width: collapsed ? "4rem" : "18.75rem" }}
     >
-      {/* Collapse button */}
 
-      {/* Logo */}
       {!collapsed ? (
         <div className="flex justify-between items-center mb-4 pl-4 pr-2">
           <div className="flex items-center ">
@@ -59,7 +57,6 @@ function SideBarMenu({ collapsed, setCollapsed }) {
         </div>
       )}
 
-      {/* Links */}
       <div className="flex flex-col flex-grow px-2">
         <Link
           to="/"
@@ -113,7 +110,6 @@ function SideBarMenu({ collapsed, setCollapsed }) {
         </Link>
       </div>
 
-      {/* Logout */}
       <div className="mt-auto px-2 py-4">
         {!collapsed && user && (
           <div className="p-3 mb-2 border-b border-gray-300">

@@ -10,11 +10,15 @@ import BarChart from "../components/BarChart";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import SideBarMenu from "../components/SideBarMenu";
 import {
+  faUserLock,
   faSliders,
   faArrowUpWideShort,
   faArrowDownWideShort,
 } from "@fortawesome/free-solid-svg-icons";
 import Logo from "../assets/logo.png";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+
 //เอาใส่ util ภายหลัง
 const formatWaitTime = (minutes) => {
   if (!minutes) return "0 นาที";
@@ -24,7 +28,8 @@ const formatWaitTime = (minutes) => {
 };
 import { useOutletContext } from "react-router-dom";
 function Home() {
-  const { collapsed } = useOutletContext();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [visible, setVisible] = useState(false);
   const [summary, setSummary] = useState(null);
   const [data, setData] = useState(null);
@@ -141,10 +146,22 @@ function Home() {
         setSelectedOpdNames={setSelectedOpdNames}
       />
       <div
-        //  className="w-full ml-75 p-4 sm:p-8 pt-5"
-        className={`flex-1 transition-all duration-300 p-4 sm:p-8 pt-5 overflow-auto`}
-        style={{ marginLeft: collapsed ? "4rem" : "18.75rem" }} // 75px vs 300px example
+        className={`flex-1 transition-all duration-300 p-8 overflow-auto ${
+          !user ? "pt-2" : ""
+        }`}
       >
+        {!user && (
+          <div className="flex justify-end">
+            <Button
+              icon={<FontAwesomeIcon icon={faUserLock} />}
+              label=" เข้าสู่ระบบ"
+              unstyled
+              className="text-sm p-1 px-2 bg-linear-65 from-indigo-400 to-cyan-400 hover:from-indigo-500 hover:to-cyan-500 text-white rounded-md cursor-pointer  transition-colors duration-150 ease-in-out"
+              onClick={() => navigate("/login")}
+            />
+          </div>
+        )}
+
         <div className="sm lg:flex justify-between items-center mb-4">
           <div className="flex items-center">
             <img className="w-17" src={Logo} alt="" />
