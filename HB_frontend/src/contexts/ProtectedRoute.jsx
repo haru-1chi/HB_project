@@ -2,7 +2,7 @@ import React from "react";
 import { Navigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 
-
+//พิเศษ
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem("token");
 
@@ -12,15 +12,13 @@ const ProtectedRoute = ({ children }) => {
 
   try {
     const decoded = jwtDecode(token);
-    const currentTime = Date.now() / 1000; // in seconds
+    const currentTime = Date.now() / 1000;
 
     if (decoded.exp && decoded.exp < currentTime) {
-      // Token expired
       localStorage.removeItem("token");
       return <Navigate to="/login" replace />;
     }
   } catch (error) {
-    // Invalid token
     localStorage.removeItem("token");
     return <Navigate to="/login" replace />;
   }

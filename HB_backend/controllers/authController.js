@@ -89,3 +89,18 @@ exports.createUser = (req, res) => {
     });
   });
 };
+
+exports.getMe = (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    return res.status(200).json({
+      status: true,
+      data: req.user   // already without password
+    });
+  } catch (err) {
+    return res.status(500).json({ message: "มีบางอย่างผิดพลาด โปรดลองอีกครั้ง" });
+  }
+};

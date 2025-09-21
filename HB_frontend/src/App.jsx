@@ -7,34 +7,40 @@ import "primereact/resources/primereact.min.css";
 import KpiDashboard from "./pages/KpiDashboard";
 import Lookup from "./pages/Lookup";
 import Login from "./pages/Login";
-import ProtectedRoute from "./components/ProtectedRoute";
+import ProtectedRoute from "./contexts/ProtectedRoute";
+import Layout from "./contexts/Layout";
+import { AuthProvider } from "./contexts/AuthContext";
 function App() {
   return (
     <Router>
-      <div className="bg-[#F2F8FD]">
-        <Routes>
-          <Route path="/" element={<Home />} />
+      <AuthProvider>
+        <div className="bg-[#F2F8FD]">
+          <Routes>
+            <Route path="/login" element={<Login />} />
 
-          <Route
-            path="/kpi"
-            element={
-              <ProtectedRoute>
-                <KpiDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/lookup"
-            element={
-              <ProtectedRoute>
-                <Lookup />
-              </ProtectedRoute>
-            }
-          />
+            <Route element={<Layout />}>
+              <Route path="/" element={<Home />} />
 
-          <Route path="/login" element={<Login />} />
-        </Routes>
-      </div>
+              <Route
+                path="/kpi"
+                element={
+                  <ProtectedRoute>
+                    <KpiDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/lookup"
+                element={
+                  <ProtectedRoute>
+                    <Lookup />
+                  </ProtectedRoute>
+                }
+              />
+            </Route>
+          </Routes>
+        </div>
+      </AuthProvider>
     </Router>
   );
 }

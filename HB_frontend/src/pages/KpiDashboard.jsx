@@ -12,7 +12,7 @@ import {
   faArrowTrendUp,
   faArrowTrendDown,
 } from "@fortawesome/free-solid-svg-icons";
-
+import { useOutletContext } from "react-router-dom";
 //เอาใส่ util ภายหลัง
 const formatWaitTime = (minutes) => {
   if (!minutes) return "0 นาที";
@@ -88,26 +88,6 @@ function KpiDashboard() {
     { label: "A,B", value: "ratio" },
   ];
 
-  // Function to fetch summary data
-  const fetchSummary = () => {
-    const queryParams = new URLSearchParams({
-      opdNames: selectedOpdNames.join(","),
-    }).toString();
-
-    axios
-      .get(`http://172.16.190.17:3000/api/summary?${queryParams}`)
-      .then((response) => {
-        if (response.data.length > 0) {
-          const formattedSummary = {
-            ...response.data[0],
-            AVG_WAIT_TIME: formatWaitTime(response.data[0].AVG_WAIT_TIME), // Format here
-          };
-          setSummary(formattedSummary);
-        }
-      })
-      .catch((error) => console.error("Error fetching summary data:", error));
-  };
-
   const fetchKPInames = async () => {
     try {
       const response = await axios.get(
@@ -163,7 +143,6 @@ function KpiDashboard() {
 
   useEffect(() => {
     fetchDepartmentState();
-    fetchSummary();
     fetchKPInames();
     fetchDetailTable();
     fetchDataCurrentMonth();
@@ -247,20 +226,18 @@ function KpiDashboard() {
     if (type === "ต่างชาติ") return "ร้อยละการเสียชีวิตชาวต่างชาติรวม เดือนนี้";
     return `ร้อยละการเสียชีวิต (${type})`;
   };
-
+  const { collapsed } = useOutletContext();
   return (
-    <div className="Home-page flex">
-      <SideBarMenu
-        selectedOpdNames={selectedOpdNames}
-        setSelectedOpdNames={setSelectedOpdNames}
-      />
-      <div className="ml-75 w-full p-4 sm:p-8 pt-5">
-        <div className="sm lg:flex justify-between items-center mb-4">
-          <div className="flex items-center">
-            <h5 className="text-2xl font-semibold">
-              แผนผังตัวชี้วัดอัตราการเสียชีวิต
-            </h5>
-          </div>
+    <div className="Home-page flex overflow-hidden">
+      <div
+        // className="ml-75 w-full p-4 sm:p-8 pt-5"
+        className={`flex-1 transition-all duration-300 p-4 sm:p-8 pt-5 overflow-auto`}
+        style={{ marginLeft: collapsed ? "4rem" : "18.75rem" }}
+      >
+        <div className="flex items-center mb-4">
+          <h5 className="text-2xl font-semibold">
+            แผนผังตัวชี้วัดอัตราการเสียชีวิต
+          </h5>
         </div>
 
         <div className="flex justify-between mb-4">
@@ -343,7 +320,7 @@ function KpiDashboard() {
         <div className="bg-white p-4 my-7 w-full rounded-xl shadow-md h-auto border-1 border-gray-200">
           {data?.length > 0 ? (
             selectedChartType === "percent" ? (
-              <KPILineChart data={data} />
+              <KPILineChart key={collapsed} data={data} />
             ) : (
               <BarChart data={data} type="kpi" />
             )

@@ -22,8 +22,9 @@ const formatWaitTime = (minutes) => {
   const mins = Math.round(minutes % 60);
   return hrs > 0 ? `${hrs} ชม. ${mins} นาที` : `${mins} นาที`;
 };
-
+import { useOutletContext } from "react-router-dom";
 function Home() {
+  const { collapsed } = useOutletContext();
   const [visible, setVisible] = useState(false);
   const [summary, setSummary] = useState(null);
   const [data, setData] = useState(null);
@@ -130,11 +131,7 @@ function Home() {
   };
 
   return (
-    <div className="Home-page flex">
-      <SideBarMenu
-        selectedOpdNames={selectedOpdNames}
-        setSelectedOpdNames={setSelectedOpdNames}
-      />
+    <div className="Home-page flex h-screen overflow-hidden">
       <SideBarFilter
         visible={visible}
         setVisible={setVisible}
@@ -143,7 +140,11 @@ function Home() {
         handleCheckboxChange={handleCheckboxChange}
         setSelectedOpdNames={setSelectedOpdNames}
       />
-      <div className="w-full ml-75 p-4 sm:p-8 pt-5">
+      <div
+        //  className="w-full ml-75 p-4 sm:p-8 pt-5"
+        className={`flex-1 transition-all duration-300 p-4 sm:p-8 pt-5 overflow-auto`}
+        style={{ marginLeft: collapsed ? "4rem" : "18.75rem" }} // 75px vs 300px example
+      >
         <div className="sm lg:flex justify-between items-center mb-4">
           <div className="flex items-center">
             <img className="w-17" src={Logo} alt="" />

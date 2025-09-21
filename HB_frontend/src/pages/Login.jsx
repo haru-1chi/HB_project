@@ -4,7 +4,9 @@ import { Password } from "primereact/password";
 import { Button } from "primereact/button";
 import Logo from "../assets/logo.png";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 function Login() {
+  const { login } = useAuth();
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -18,26 +20,7 @@ function Login() {
     }
 
     try {
-      const res = await fetch("http://172.16.190.17:3000/api/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ username, password }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.message || "Login failed");
-        return;
-      }
-
-      // Save token to localStorage for authentication
-      localStorage.setItem("token", data.token);
-
-      // Navigate to /lookup page
-      navigate("/kpi");
+      await login(username, password);
     } catch (err) {
       setError("เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
     }
