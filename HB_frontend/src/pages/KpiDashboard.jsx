@@ -13,6 +13,7 @@ import {
   faArrowTrendDown,
 } from "@fortawesome/free-solid-svg-icons";
 import { useOutletContext } from "react-router-dom";
+import NavbarMenu from "../components/NavbarMenu";
 //เอาใส่ util ภายหลัง
 const formatWaitTime = (minutes) => {
   if (!minutes) return "0 นาที";
@@ -226,9 +227,12 @@ function KpiDashboard() {
     if (type === "ต่างชาติ") return "ร้อยละการเสียชีวิตชาวต่างชาติรวม เดือนนี้";
     return `ร้อยละการเสียชีวิต (${type})`;
   };
-  const { collapsed } = useOutletContext();
   return (
-    <div className="Home-page flex overflow-hidden">
+    <div className="Home-page sm:flex overflow-hidden">
+      {/* <div className="block sm:hidden">
+        <NavbarMenu />
+      </div> */}
+
       <div
         // className="ml-75 w-full p-4 sm:p-8 pt-5"
         className={`flex-1 transition-all duration-300 p-4 sm:p-8 pt-5 overflow-auto`}
@@ -319,7 +323,7 @@ function KpiDashboard() {
         <div className="bg-white p-4 my-7 w-full rounded-xl shadow-md h-auto border-1 border-gray-200">
           {data?.length > 0 ? (
             selectedChartType === "percent" ? (
-              <KPILineChart key={collapsed} data={data} />
+              <KPILineChart data={data} />
             ) : (
               <BarChart data={data} type="kpi" />
             )

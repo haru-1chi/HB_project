@@ -1,3 +1,4 @@
+// Layout.jsx
 import React, { useState } from "react";
 import SideBarMenu from "../components/SideBarMenu";
 import { Outlet } from "react-router-dom";

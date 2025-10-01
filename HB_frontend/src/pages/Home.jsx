@@ -9,6 +9,7 @@ import DetailCard from "../components/DetailCard";
 import BarChart from "../components/BarChart";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import SideBarMenu from "../components/SideBarMenu";
+
 import {
   faUserLock,
   faSliders,

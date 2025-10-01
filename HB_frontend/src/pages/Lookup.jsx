@@ -19,9 +19,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 
 import Logo from "../assets/logo.png";
-import { useOutletContext } from "react-router-dom";
 function Lookup() {
-  const { collapsed } = useOutletContext();
   const [visible, setVisible] = useState(false);
   const [allKPIChoices, setAllKPIChoices] = useState([]);
   const [newKPI, setNewKPI] = useState("");

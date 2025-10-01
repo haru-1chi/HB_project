@@ -22,10 +22,9 @@ function SideBarMenu({ collapsed, setCollapsed }) {
 
   return (
     <div
-      className={`fixed top-0 left-0 h-dvh bg-white flex flex-col transition-all duration-300 pt-5`}
+      className={`sm:fixed sm:top-0 sm:left-0 sm:h-dvh bg-white flex flex-col transition-all duration-300 pt-5`}
       style={{ width: collapsed ? "4rem" : "18.75rem" }}
     >
-
       {!collapsed ? (
         <div className="flex justify-between items-center mb-4 pl-4 pr-2">
           <div className="flex items-center ">
@@ -108,13 +107,28 @@ function SideBarMenu({ collapsed, setCollapsed }) {
             </div>
           )}
         </Link>
+
+        <Link
+          to="/KpiFormPage"
+          className={`p-3 rounded-lg block mb-3 ${
+            isActive("/KpiFormPage")
+              ? "text-white font-bold bg-teal-500"
+              : "text-gray-700 hover:text-teal-500"
+          }`}
+        >
+          {!collapsed ? (
+            "จัดการข้อมูล"
+          ) : (
+            <div className="text-center">
+              <FontAwesomeIcon icon={faFilePen} />
+            </div>
+          )}
+        </Link>
       </div>
 
       <div className="mt-auto px-2 py-4">
         {!collapsed && user && (
-          <div className="p-3 mb-2 border-b border-gray-300">
-            {user.name}
-          </div>
+          <div className="p-3 mb-2 border-b border-gray-300">{user.name}</div>
         )}
         <Button
           icon={<FontAwesomeIcon icon={faArrowRightFromBracket} />}

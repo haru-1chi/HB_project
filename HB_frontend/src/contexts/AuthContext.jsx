@@ -31,7 +31,7 @@ export const AuthProvider = ({ children }) => {
       const profile = await profileRes.json();
       setUser(profile.data);
 
-      navigate("/kpi");
+      navigate("/");
     } catch (err) {
       throw err;
     }

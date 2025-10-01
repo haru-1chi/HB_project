@@ -32,6 +32,59 @@ exports.createdata = (req, res) => {
     });
 };
 
+// controllers/kpiController.js
+exports.updateKPIData = (req, res) => {
+    const dataArray = req.body; // Expecting array of objects เช่น [{id: 1, kpi_name: "xxx", ...}]
+    if (!Array.isArray(dataArray)) {
+        return res.status(400).send("Data must be an array");
+    }
+
+    if (dataArray.length === 0) {
+        return res.status(400).send("No data provided");
+    }
+
+    const updatePromises = dataArray.map((item) => {
+        return new Promise((resolve, reject) => {
+            const sql = `
+                UPDATE kpi_data 
+                SET 
+                    kpi_name = ?, 
+                    a_name = ?, 
+                    b_name = ?, 
+                    a_value = ?, 
+                    b_value = ?, 
+                    type = ?,
+                    timestamp = ?
+                WHERE id = ?
+            `;
+            const values = [
+                item.kpi_name || null,
+                item.a_name || null,
+                item.b_name || null,
+                item.a_value || null,
+                item.b_value || null,
+                item.type || null,
+                item.timestamp || null,
+                item.id
+            ];
+
+            db.query(sql, values, (err, result) => {
+                if (err) return reject(err);
+                resolve(result);
+            });
+        });
+    });
+
+    Promise.all(updatePromises)
+        .then((results) => {
+            res.send({ message: "Data updated successfully", results });
+        })
+        .catch((err) => {
+            console.error("Error updating data:", err);
+            res.status(500).send("Failed to update data");
+        });
+};
+
 exports.createKPIName = (req, res) => {
     const dataArray = req.body; // Expecting an array of objects
     if (!Array.isArray(dataArray)) {
@@ -337,6 +390,26 @@ exports.getKPIName = (req, res) => {
     `;
 
     db.query(query, (err, result) => {
+        if (err) {
+            res.status(400).send({ error: 'Database query failed', details: err });
+        } else {
+            res.send(result);
+        }
+    });
+};
+
+exports.getKPIData = (req, res) => {
+    const { kpi_name } = req.query;
+
+    let query = `SELECT * FROM kpi_data`;
+    const params = [];
+
+    if (kpi_name) {
+        query += ` WHERE kpi_name = ?`;
+        params.push(kpi_name);
+    }
+
+    db.query(query, params, (err, result) => {
         if (err) {
             res.status(400).send({ error: 'Database query failed', details: err });
         } else {
