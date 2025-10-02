@@ -3,7 +3,7 @@ import { InputText } from "primereact/inputtext";
 import { Password } from "primereact/password";
 import { Button } from "primereact/button";
 import Logo from "../assets/logo.png";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 function Login() {
   const { login } = useAuth();
@@ -66,6 +66,29 @@ function Login() {
           className="w-full p-2 bg-linear-65 from-indigo-400 to-cyan-400 hover:from-indigo-500 hover:to-cyan-500 text-white font-bold rounded-md mt-5 cursor-pointer  transition-colors duration-150 ease-in-out"
           onClick={handleLogin}
         />
+
+        <div className="flex items-center my-1">
+          <hr className="flex-grow border-t border-gray-300" />
+          <span className="px-3 text-gray-500">or</span>
+          <hr className="flex-grow border-t border-gray-300" />
+        </div>
+
+        <div
+          className="w-full font-bold rounded-md cursor-pointer 
+             transition-colors duration-150 ease-in-out 
+             bg-gradient-to-r from-indigo-400 to-cyan-400 
+             hover:from-indigo-500 hover:to-cyan-500
+             bg-clip-text text-transparent 
+             text-center mt-2"
+        >
+          <Link
+            to="/"
+            className="
+             "
+          >
+            กลับไปหน้าหลัก
+          </Link>
+        </div>
       </div>
     </div>
   );
