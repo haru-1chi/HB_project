@@ -75,7 +75,7 @@ function NavbarMenu() {
                   : "text-gray-700 hover:text-teal-500"
               }`}
             >
-              จัดการตัวชี้วัด
+              จัดการชื่อตัวชี้วัด
             </Link>
           </div>
 

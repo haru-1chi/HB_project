@@ -5,6 +5,7 @@ const { auth } = require("../middleware/auth")
 
 router.post('/create', auth, kpiController.createdata);
 router.put('/updateKPIData', auth, kpiController.updateKPIData);
+router.delete("/deleteKPIData/:id", auth, kpiController.deleteKPIData);
 router.get('/getData', kpiController.getData);
 router.get('/getDetail', kpiController.getDetail);
 router.get('/dataCurrentMonth', kpiController.dataCurrentMonth);

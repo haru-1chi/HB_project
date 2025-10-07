@@ -8,10 +8,12 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem("token") || null);
   const [loading, setLoading] = useState(true);
+  const API_BASE =
+    import.meta.env.VITE_REACT_APP_API || "http://localhost:3000/api";
 
   const login = async (username, password) => {
     try {
-      const res = await fetch("http://172.16.190.17:3000/api/login", {
+      const res = await fetch(`${API_BASE}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
@@ -24,7 +26,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem("token", data.token);
       setToken(data.token);
 
-      const profileRes = await fetch("http://172.16.190.17:3000/api/me", {
+      const profileRes = await fetch(`${API_BASE}/me`, {
         method: "POST",
         headers: { token: data.token },
       });
@@ -53,7 +55,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       try {
-        const profileRes = await fetch("http://172.16.190.17:3000/api/me", {
+        const profileRes = await fetch(`${API_BASE}/me`, {
           method: "POST",
           headers: { token: storedToken },
         });

@@ -55,6 +55,9 @@ const formatDateForSQL = (date, endOfMonth = false) => {
 };
 
 function KpiDashboard() {
+  const API_BASE =
+    import.meta.env.VITE_REACT_APP_API || "http://localhost:3000/api";
+
   const [data, setData] = useState(null);
   const [detail, setDetail] = useState(null);
   const [dataCurrentMonth, setDataCurrentMonth] = useState([]);
@@ -64,20 +67,6 @@ function KpiDashboard() {
   const [selectedChartType, setSelectedChartType] = useState("percent");
   const [sinceDate, setSinceDate] = useState(defaultSinceDate);
   const [endDate, setEndDate] = useState(defaultEndDate);
-  const [selectedOpdNames, setSelectedOpdNames] = useState([
-    "Napha Clinic",
-    "อายุรกรรมชั้น2",
-    "กุมารเวชกรรมชั้น4",
-    "โรคทั่วไป",
-    "ทันตกรรม",
-    "ตา",
-    "แม่สอดพัฒน์ ชั้น 6",
-    "ศัลยกรรมกระดูก",
-    "หู คอ จมูก",
-    "อุบัติเหตุและฉุกเฉิน",
-    "TSET",
-  ]);
-
   const selectedOptions = [
     { label: "รวมทั้งหมด", value: "รวม" },
     { label: "ชาวไทย", value: "ไทย" },
@@ -91,9 +80,7 @@ function KpiDashboard() {
 
   const fetchKPInames = async () => {
     try {
-      const response = await axios.get(
-        "http://172.16.190.17:3000/api/getKPIName"
-      );
+      const response = await axios.get(`${API_BASE}/getKPIName`);
       const options = response.data.map((item) => ({
         label: item.kpi_name,
         value: item.id.toString(),
@@ -114,9 +101,15 @@ function KpiDashboard() {
     }).toString();
 
     axios
-      .get(`http://172.16.190.17:3000/api/getData?${queryParams}`)
+      .get(`${API_BASE}/getData?${queryParams}`)
       .then((response) => {
         setData(response.data);
+        console.log(response.data);
+        console.log("kpi_name", selectedKPIName);
+        console.log("type", selectedTypeOptions);
+        console.log("chart", selectedChartType);
+        console.log("since", formatDateForSQL(sinceDate));
+        console.log("until", formatDateForSQL(endDate, true));
       })
       .catch((error) =>
         console.error("Error fetching department data:", error)
@@ -133,7 +126,7 @@ function KpiDashboard() {
     }).toString();
 
     axios
-      .get(`http://172.16.190.17:3000/api/getDetail?${queryParams}`)
+      .get(`${API_BASE}/getDetail?${queryParams}`)
       .then((response) => {
         setDetail(response.data);
       })
@@ -148,7 +141,6 @@ function KpiDashboard() {
     fetchDetailTable();
     fetchDataCurrentMonth();
   }, [
-    selectedOpdNames,
     selectedChartType,
     selectedKPIName,
     selectedTypeOptions,
@@ -157,11 +149,10 @@ function KpiDashboard() {
   ]);
 
   const noteBodyTemplate = (rowData) => {
-    const value = rowData.note; // e.g., "+0.5%" or "-0.6%"
+    const value = rowData.note;
 
-    if (!value) return null; // show nothing if null
+    if (!value) return null;
 
-    // Determine if positive or negative
     const isPositive = value.startsWith("+");
 
     return (
@@ -189,7 +180,7 @@ function KpiDashboard() {
     }).toString();
 
     axios
-      .get(`http://172.16.190.17:3000/api/dataCurrentMonth?${queryParams}`)
+      .get(`${API_BASE}/dataCurrentMonth?${queryParams}`)
       .then((res) => {
         const order = ["รวม", "ไทย", "ต่างชาติ"];
         const sortedData = res.data.sort(
@@ -202,10 +193,11 @@ function KpiDashboard() {
       );
   };
 
-  const getTrendText = (note) => {
+  const getTrendText = (note, prevMonth) => {
     if (!note || note === "null") return null;
 
     const isPositive = note.startsWith("+");
+    const prevMonthShort = prevMonth?.split(" ")[0] || "";
 
     return (
       <span
@@ -217,24 +209,27 @@ function KpiDashboard() {
           icon={isPositive ? faArrowTrendUp : faArrowTrendDown}
           className={isPositive ? "text-red-500" : "text-green-500"}
         />
-        {isPositive ? "เพิ่มขึ้นจากเดือนที่แล้ว" : "ลดลงจากเดือนที่แล้ว"} {note}
+        {isPositive
+          ? `เพิ่มขึ้นจากเดือนก่อนหน้า ${prevMonthShort}`
+          : `ลดลงจากเดือนก่อนหน้า ${prevMonthShort}`}{" "}
+        {note}
       </span>
     );
   };
-  const getTitle = (type) => {
-    if (type === "รวม") return "ร้อยละการเสียชีวิตรวม เดือนนี้";
-    if (type === "ไทย") return "ร้อยละการเสียชีวิตชาวไทยรวม เดือนนี้";
-    if (type === "ต่างชาติ") return "ร้อยละการเสียชีวิตชาวต่างชาติรวม เดือนนี้";
+  const getTitle = (type, prevMonth) => {
+    const prevMonthShort = prevMonth?.split(" ")[0] || "";
+
+    if (type === "รวม")
+      return `ร้อยละการเสียชีวิตรวมทั้งหมด เดือนล่าสุด ${prevMonthShort}`;
+    if (type === "ไทย")
+      return `ร้อยละการเสียชีวิตชาวไทยรวม เดือนล่าสุด ${prevMonthShort}`;
+    if (type === "ต่างชาติ")
+      return `ร้อยละการเสียชีวิตชาวต่างชาติรวม เดือนล่าสุด ${prevMonthShort}`;
     return `ร้อยละการเสียชีวิต (${type})`;
   };
   return (
     <div className="Home-page sm:flex overflow-hidden">
-      {/* <div className="block sm:hidden">
-        <NavbarMenu />
-      </div> */}
-
       <div
-        // className="ml-75 w-full p-4 sm:p-8 pt-5"
         className={`flex-1 transition-all duration-300 p-4 sm:p-8 pt-5 overflow-auto`}
       >
         <div className="flex items-center mb-4">
@@ -303,9 +298,9 @@ function KpiDashboard() {
         </div>
 
         <div className="card-board grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 md:gap-8">
-          {dataCurrentMonth.map((item) => (
+          {dataCurrentMonth.map((item, index) => (
             <div
-              key={item.type}
+              key={`${item.type}-${index}`}
               className="bg-white shadow-md border-1 border-gray-200 h-[100px] md:h-[136px] p-3 md:p-5 rounded-xl flex flex-col justify-between"
             >
               <div className="flex items-center justify-between">
@@ -313,9 +308,9 @@ function KpiDashboard() {
                   {item.result.replace("%", "")}
                   <span className="text-3xl">%</span>
                 </h1>
-                {getTrendText(item.note)}
+                {getTrendText(item.note, item.prev_month)}
               </div>
-              <p>{getTitle(item.type)}</p>
+              <p>{getTitle(item.type, item.month)}</p>
             </div>
           ))}
         </div>
@@ -331,6 +326,7 @@ function KpiDashboard() {
             <p>ไม่พบข้อมูล...</p>
           )}
         </div>
+
         <div className="bg-white p-4 my-7 w-full rounded-xl shadow-md h-auto border-1 border-gray-200">
           <DataTable value={detail} tableStyle={{ minWidth: "50rem" }}>
             <Column field="month" header="เดือน-ปี"></Column>

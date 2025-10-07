@@ -100,7 +100,7 @@ function SideBarMenu({ collapsed, setCollapsed }) {
           }`}
         >
           {!collapsed ? (
-            "จัดการตัวชี้วัด"
+            "จัดการชื่อตัวชี้วัด"
           ) : (
             <div className="text-center">
               <FontAwesomeIcon icon={faFilePen} />
@@ -117,7 +117,7 @@ function SideBarMenu({ collapsed, setCollapsed }) {
           }`}
         >
           {!collapsed ? (
-            "จัดการข้อมูล"
+            "จัดการข้อมูลตัวชี้วัด"
           ) : (
             <div className="text-center">
               <FontAwesomeIcon icon={faFilePen} />

@@ -9,3 +9,7 @@ body {
   font-variation-settings: "wdth" 100;
   color: rgb(85, 85, 85);
 }
+
+.p-input-icon {
+  transform: translateY(-15%);
+}

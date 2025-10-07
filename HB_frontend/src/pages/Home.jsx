@@ -29,6 +29,8 @@ const formatWaitTime = (minutes) => {
 };
 import { useOutletContext } from "react-router-dom";
 function Home() {
+  const API_BASE =
+    import.meta.env.VITE_REACT_APP_API || "http://localhost:3000/api";
   const { user } = useAuth();
   const navigate = useNavigate();
   const [visible, setVisible] = useState(false);
@@ -73,7 +75,7 @@ function Home() {
     }).toString();
 
     axios
-      .get(`http://172.16.190.17:3000/api/summary?${queryParams}`)
+      .get(`${API_BASE}/summary?${queryParams}`)
       .then((response) => {
         if (response.data.length > 0) {
           const formattedSummary = {
@@ -88,7 +90,7 @@ function Home() {
 
   const fetchAllOpdChoices = () => {
     axios
-      .get(`http://172.16.190.17:3000/api/departments/state`)
+      .get(`${API_BASE}/departments/state`)
       .then((response) => {
         // Extract unique OPD_NAME values from the response
         const opdNames = response.data.map((item) => item.OPD_NAME);
@@ -105,7 +107,7 @@ function Home() {
     }).toString();
 
     axios
-      .get(`http://172.16.190.17:3000/api/departments/state?${queryParams}`)
+      .get(`${API_BASE}/departments/state?${queryParams}`)
       .then((response) => setData(response.data))
       .catch((error) =>
         console.error("Error fetching department data:", error)
