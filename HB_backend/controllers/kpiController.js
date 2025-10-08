@@ -1,5 +1,86 @@
 const db = require('../mysql.js'); // ⬅️ Import MySQL connection
 
+exports.checkDuplicates = (req, res) => {
+    const dataArray = req.body;
+    if (!Array.isArray(dataArray)) {
+        return res.status(400).send("Data must be an array");
+    }
+
+    const conditions = dataArray.map(() => "(kpi_name = ? AND type = ? AND DATE_FORMAT(report_date, '%Y-%m') = ?)").join(" OR ");
+    const values = dataArray.flatMap(item => [
+        item.kpi_name,
+        item.type,
+        item.report_date.slice(0, 7) // only YYYY-MM
+    ]);
+
+    const sql = `SELECT id, kpi_name, a_value, b_value, type, report_date 
+               FROM kpi_data WHERE ${conditions}`;
+
+    db.query(sql, values, (err, result) => {
+        if (err) return res.status(500).send(err);
+
+        res.json({
+            duplicates: result,  // existing records
+            totalChecked: dataArray.length
+        });
+    });
+};
+
+exports.createOrUpdate = (req, res) => {
+    const { data, mode } = req.body; // mode = 'overwrite' | 'skip'
+    const createdBy = req.user?.name || "Unknown User";
+    const updatedBy = createdBy;
+
+    if (!Array.isArray(data)) return res.status(400).send("Data must be an array");
+
+    // if overwrite -> update if exists else insert
+    if (mode === 'overwrite') {
+        const promises = data.map(item => new Promise((resolve, reject) => {
+            const sql = `
+        INSERT INTO kpi_data (kpi_name, a_value, b_value, type, report_date, created_by, updated_by, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+        ON DUPLICATE KEY UPDATE 
+          a_value = VALUES(a_value),
+          b_value = VALUES(b_value),
+          updated_by = VALUES(updated_by),
+          updated_at = NOW()
+      `;
+            const vals = [item.kpi_name, item.a_value, item.b_value, item.type, item.report_date, createdBy, updatedBy];
+            db.query(sql, vals, (err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+            });
+        }));
+
+        Promise.all(promises)
+            .then(() => res.send("Inserted or updated successfully"))
+            .catch(err => res.status(500).send(err));
+    }
+    else if (mode === 'skip') {
+        // insert only non-existing
+        const sql = `
+      INSERT IGNORE INTO kpi_data 
+      (kpi_name, a_value, b_value, type, report_date, created_by)
+      VALUES ?
+    `;
+        const values = data.map(item => [
+            item.kpi_name,
+            item.a_value,
+            item.b_value,
+            item.type,
+            item.report_date,
+            createdBy
+        ]);
+        db.query(sql, [values], (err, result) => {
+            if (err) return res.status(500).send(err);
+            res.send("Inserted non-duplicate records only");
+        });
+    }
+    else {
+        res.status(400).send("Invalid mode");
+    }
+};
+
 exports.createdata = (req, res) => {
     const dataArray = req.body;
     if (!Array.isArray(dataArray)) {
@@ -32,82 +113,78 @@ exports.createdata = (req, res) => {
     });
 };
 
-
-exports.updateKPIData = (req, res) => {
+exports.updateKPIData = async (req, res) => {
     const dataArray = req.body;
-    if (!Array.isArray(dataArray)) {
-        return res.status(400).send("Data must be an array");
-    }
-
-    if (dataArray.length === 0) {
-        return res.status(400).send("No data provided");
+    if (!Array.isArray(dataArray) || dataArray.length === 0) {
+        return res.status(400).send("Invalid or empty data array");
     }
 
     const updatedBy = req.user?.name || "Unknown User";
 
-    const updatePromises = dataArray.map((item) => {
-        return new Promise((resolve, reject) => {
-            const sql = `
-                UPDATE kpi_data 
-                SET 
-                    kpi_name = ?, 
-                    a_value = ?, 
-                    b_value = ?, 
-                    type = ?,
-                    report_date = ?,
-                    updated_by = ?,
-                    updated_at = NOW()
-                WHERE id = ?
-            `;
-            const values = [
-                item.kpi_name || null,
-                item.a_value || null,
-                item.b_value || null,
-                item.type || null,
-                item.report_date || null,
-                updatedBy,
-                item.id
-            ];
+    const ids = [];
+    const fields = ["kpi_name", "a_value", "b_value", "type", "report_date"];
 
-            db.query(sql, values, (err, result) => {
-                if (err) return reject(err);
-                resolve(result);
-            });
+    const cases = {};
+    fields.forEach(field => (cases[field] = []));
+
+    dataArray.forEach(item => {
+        ids.push(item.id);
+        fields.forEach(field => {
+            const value = item[field] ?? null;
+            cases[field].push(`WHEN ${item.id} THEN ${db.escape(value)}`);
         });
     });
 
-    Promise.all(updatePromises)
-        .then((results) => {
-            res.send({ message: "Data updated successfully", results });
-        })
-        .catch((err) => {
-            console.error("Error updating data:", err);
-            res.status(500).send("Failed to update data");
-        });
+    const updateSQL = `
+    UPDATE kpi_data
+    SET 
+      ${fields.map(f => `${f} = CASE id ${cases[f].join(" ")} END`).join(", ")},
+      updated_by = ${db.escape(updatedBy)},
+      updated_at = NOW()
+    WHERE id IN (${ids.join(",")})
+  `;
+
+    db.query(updateSQL, (err, result) => {
+        if (err) {
+            console.error("❌ Error updating data:", err);
+            return res.status(500).send("Failed to update data");
+        }
+        res.send({ message: "✅ Data updated successfully", affectedRows: result.affectedRows });
+    });
 };
 
 exports.deleteKPIData = (req, res) => {
-    const { id } = req.params;
+    let { id } = req.params;
+    let { ids } = req.body;
 
-    if (!id) {
-        return res.status(400).send("ID is required");
+    if (id) ids = [id];
+    if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).send("At least one ID is required");
     }
 
-    const sql = `DELETE FROM kpi_data WHERE id = ?`;
+    const safeIds = ids.map(Number).filter(Boolean);
+    if (safeIds.length === 0) {
+        return res.status(400).send("Invalid ID format");
+    }
 
-    db.query(sql, [id], (err, result) => {
+    const sql = `DELETE FROM kpi_data WHERE id IN (${safeIds.map(() => '?').join(',')})`;
+
+    db.query(sql, safeIds, (err, result) => {
         if (err) {
-            console.error("Delete error:", err);
+            console.error("❌ Delete error:", err);
             return res.status(500).send("Database error");
         }
 
         if (result.affectedRows === 0) {
-            return res.status(404).send("Data not found");
+            return res.status(404).send("No data found for provided IDs");
         }
 
-        res.send({ message: "Data deleted successfully", result });
+        res.send({
+            message: `✅ ${result.affectedRows} record(s) deleted successfully`,
+        });
     });
 };
+
 
 exports.getKPIData = (req, res) => {
     const { kpi_name, search } = req.query;
@@ -135,7 +212,7 @@ exports.getKPIData = (req, res) => {
     });
 };
 
-//kpi name
+//kpi name--------------------------------------------------------------------------
 exports.createKPIName = (req, res) => {
     const dataArray = req.body;
     if (!Array.isArray(dataArray)) {
@@ -227,7 +304,7 @@ exports.getKPIName = (req, res) => {
     });
 };
 
-//dashboard
+//dashboard--------------------------------------------------------------------------
 exports.getData = (req, res) => {
     try {
         const kpi_name = req.query.kpi_name?.trim();

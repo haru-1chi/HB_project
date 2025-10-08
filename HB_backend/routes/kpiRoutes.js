@@ -4,6 +4,8 @@ const kpiController = require('../controllers/kpiController');
 const { auth } = require("../middleware/auth")
 
 router.post('/create', auth, kpiController.createdata);
+router.post('/checkDuplicates', auth, kpiController.checkDuplicates);
+router.post('/create-or-update', auth, kpiController.createOrUpdate);
 router.put('/updateKPIData', auth, kpiController.updateKPIData);
 router.delete("/deleteKPIData/:id", auth, kpiController.deleteKPIData);
 router.get('/getData', kpiController.getData);

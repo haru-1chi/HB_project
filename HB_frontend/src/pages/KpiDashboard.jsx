@@ -12,15 +12,6 @@ import {
   faArrowTrendUp,
   faArrowTrendDown,
 } from "@fortawesome/free-solid-svg-icons";
-import { useOutletContext } from "react-router-dom";
-import NavbarMenu from "../components/NavbarMenu";
-//เอาใส่ util ภายหลัง
-const formatWaitTime = (minutes) => {
-  if (!minutes) return "0 นาที";
-  const hrs = Math.floor(minutes / 60);
-  const mins = Math.round(minutes % 60);
-  return hrs > 0 ? `${hrs} ชม. ${mins} นาที` : `${mins} นาที`;
-};
 
 const currentDate = new Date();
 
