@@ -11,6 +11,8 @@ import Login from "./pages/Login";
 import ProtectedRoute from "./contexts/ProtectedRoute";
 import Layout from "./contexts/Layout";
 import { AuthProvider } from "./contexts/AuthContext";
+import ConditionalStyleDemo from "./pages/test";
+
 function App() {
   return (
     <Router>
@@ -18,7 +20,7 @@ function App() {
         <div className="bg-[#F2F8FD]">
           <Routes>
             <Route path="/login" element={<Login />} />
-
+            <Route path="/test1" element={<ConditionalStyleDemo />} />
             <Route element={<Layout />}>
               <Route path="/" element={<Home />} />
               <Route

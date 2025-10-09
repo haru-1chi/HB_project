@@ -5,6 +5,7 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
+import { classNames } from "primereact/utils";
 import axios from "axios";
 import { debounce } from "lodash";
 import { Button } from "primereact/button";
@@ -46,8 +47,7 @@ function KpiFormPage() {
   const [selectedKpi, setSelectedKpi] = useState(null);
   const [kpiData, setKpiData] = useState([]);
 
-  const [duplicateData, setDuplicateData] = useState([]);
-  const [duplicateNewData, setDuplicateNewData] = useState([]);
+  const [duplicatePairs, setDuplicatePairs] = useState([]);
 
   const [editRowId, setEditRowId] = useState(null);
   const [editRowData, setEditRowData] = useState({});
@@ -75,11 +75,15 @@ function KpiFormPage() {
         setKpiNames(options);
         if (options.length > 0) {
           const firstKpi = options[0].value;
-          setSelectedKpi(firstKpi);
+          setSelectedKpi(28);
           fetchKpiData(firstKpi);
         }
       } catch (err) {
-        showToast("error", "ผิดพลาด", "โหลดชื่อตัวชี้วัดล้มเหลว");
+        showToast(
+          "error",
+          "ผิดพลาด",
+          err.message || "โหลดชื่อตัวชี้วัดล้มเหลว"
+        );
       }
     };
     fetchKpiNames();
@@ -95,7 +99,7 @@ function KpiFormPage() {
         });
         setKpiData(res.data);
       } catch (err) {
-        showToast("error", "ผิดพลาด", "โหลดข้อมูลไม่สำเร็จ");
+        showToast("error", "ผิดพลาด", err.message || "โหลดข้อมูลไม่สำเร็จ");
       } finally {
         setLoading(false);
       }
@@ -166,13 +170,10 @@ function KpiFormPage() {
             prev.map((row) => (row.id === editRowId ? payload : row))
           );
 
-          // console.log("kpiData", kpiData);
-          // console.log("editRowData", editRowData);
-          // console.log("payload", payload);
           showToast("success", "สำเร็จ", "อัพเดตข้อมูลเรียบร้อยแล้ว");
-          cancelEdit(); // exit edit mode
+          cancelEdit();
         } catch (err) {
-          showToast("error", "ผิดพลาด", "การอัพเดตล้มเหลว");
+          showToast("error", "ผิดพลาด", err.message || "การอัพเดตล้มเหลว");
         }
       },
     });
@@ -316,14 +317,13 @@ function KpiFormPage() {
         return;
       }
 
+      // normalize date
       const payload = rows.map((r) => {
         let report_date = r.report_date;
         if (report_date instanceof Date) {
           const year = report_date.getFullYear();
           const month = String(report_date.getMonth() + 1).padStart(2, "0");
           report_date = `${year}-${month}-01`;
-        } else if (typeof report_date === "string") {
-          report_date = report_date.slice(0, 7); // ensure YYYY-MM
         }
         return { ...r, report_date };
       });
@@ -332,87 +332,52 @@ function KpiFormPage() {
         headers: { token },
       });
 
-      if (res.data.duplicates.length > 0) {
-        // filter duplicates and their new versions
-        const existing = res.data.duplicates;
-        const newOnes = payload.filter((r) =>
-          existing.some((e) => {
-            const eMonth = String(e.report_date).slice(0, 7);
-            const rMonth = String(r.report_date).slice(0, 7);
-            return (
-              e.kpi_name === r.kpi_name &&
-              e.type === r.type &&
-              eMonth === rMonth
-            );
-          })
-        );
-        console.log(newOnes);
-        setDuplicateData(existing);
-        setDuplicateNewData(newOnes);
+      // console.log(res);
+
+      if (res.data.pairs.length > 0) {
+        // console.log(res.data.pairs);
+        setDuplicatePairs(res.data.pairs);
         setShowDuplicateDialog(true);
       } else {
-        // no duplicates → directly insert
         await axios.post(
           `${API_BASE}/create-or-update`,
           { data: payload, mode: "skip" },
           { headers: { token } }
         );
         showSuccess("เพิ่มข้อมูลเรียบร้อยแล้ว");
-        setDialogVisible(false);
-        setShowDuplicateDialog(false);
         fetchKpiData(selectedKpi);
+        setDialogVisible(false);
       }
-
-      showSuccess("เพิ่มข้อมูลเรียบร้อยแล้ว");
-      // setDialogVisible(false);
-      fetchKpiData(selectedKpi);
     } catch (err) {
-      showError("เพิ่มข้อมูลล้มเหลว");
+      console.log(err);
     }
   };
-
-  //  const submitRows = async () => {
-  //   try {
-  //     if (rows.some((r) => !r.kpi_name || !r.a_value || !r.b_value)) {
-  //       showError("กรุณากรอกข้อมูลให้ครบ");
-  //       return;
-  //     }
-
-  //     const payload = rows.map((r) => {
-  //       let report_date = r.report_date;
-  //       if (report_date instanceof Date) {
-  //         const year = report_date.getFullYear();
-  //         const month = String(report_date.getMonth() + 1).padStart(2, "0");
-  //         report_date = `${year}-${month}-01`;
-  //       }
-  //       return { ...r, report_date };
-  //     });
-
-  //     await axios.post(`${API_BASE}/create`, payload, { headers: { token } });
-  //     // const res = await axios.post(`${API_BASE}/checkDuplicates`, payload, {
-  //     //   headers: { token },
-  //     // });
-  //     // console.log(res)
-  //     showSuccess("เพิ่มข้อมูลเรียบร้อยแล้ว");
-  //     setDialogVisible(false);
-  //     fetchKpiData(selectedKpi);
-  //   } catch (err) {
-  //     showError("เพิ่มข้อมูลล้มเหลว");
-  //   }
-  // };
 
   const handleUserChoice = async (choice) => {
     if (choice === "cancel") return;
 
     const mode = choice === "overwrite" ? "overwrite" : "skip";
+
+    const payload = rows.map((r) => {
+      let report_date = r.report_date;
+      if (report_date instanceof Date) {
+        const year = report_date.getFullYear();
+        const month = String(report_date.getMonth() + 1).padStart(2, "0");
+        report_date = `${year}-${month}-01`;
+      }
+      return { ...r, report_date };
+    });
+
     await axios.post(
       `${API_BASE}/create-or-update`,
-      { data: rows, mode },
+      { data: payload, mode },
       { headers: { token } }
     );
 
     if (mode === "overwrite") showSuccess("เขียนทับข้อมูลเรียบร้อยแล้ว");
     else showSuccess("เพิ่มข้อมูลที่ไม่ซ้ำเรียบร้อยแล้ว");
+    setDialogVisible(false);
+    setShowDuplicateDialog(false);
   };
 
   const dialogFooterTemplate = (
@@ -422,48 +387,50 @@ function KpiFormPage() {
   );
 
   //ลบแถว
-  const confirmDelete = (rowId) => {
-    confirmDialog({
-      message: "ต้องการลบรายการนี้หรือไม่?",
-      header: "ยืนยันการลบ",
-      icon: "pi pi-exclamation-triangle",
-      acceptClassName: "p-button-danger",
-      accept: () => handleDelete(rowId),
-      reject: () => {
-        toast.current.show({
-          severity: "info",
-          summary: "ยกเลิก",
-          detail: "การลบถูกยกเลิก",
-          life: 2000,
+  const handleDelete = useCallback(
+    async (id) => {
+      try {
+        await axios.delete(`${API_BASE}/deleteKPIData/${id}`, {
+          headers: { token },
         });
-      },
-    });
-  };
 
-  const handleDelete = async (id) => {
-    try {
-      await axios.delete(`${API_BASE}/deleteKPIData/${id}`, {
-        headers: { token },
-      });
+        setKpiData((prev) => prev.filter((row) => row.id !== id));
 
-      setKpiData((prev) => prev.filter((row) => row.id !== id));
+        showToast("success", "สำเร็จ", "ลบข้อมูลเรียบร้อยแล้ว");
+      } catch (err) {
+        console.error("Delete failed:", err);
+        showToast("error", "Error", err.message || "ลบข้อมูลล้มเหลว");
+      }
+    },
+    [token, showToast]
+  );
 
-      toast.current.show({
-        severity: "success",
-        summary: "สำเร็จ",
-        detail: "ลบข้อมูลเรียบร้อยแล้ว",
-        life: 3000,
+  const confirmDelete = useCallback(
+    (rowId) => {
+      confirmDialog({
+        message: "ต้องการลบรายการนี้หรือไม่?",
+        header: "ยืนยันการลบ",
+        icon: "pi pi-exclamation-triangle",
+        acceptClassName: "p-button-danger",
+        accept: () => handleDelete(rowId),
+        reject: () => showToast("info", "ยกเลิก", "การลบถูกยกเลิก"),
       });
-    } catch (err) {
-      console.error("Delete failed:", err);
-      toast.current.show({
-        severity: "error",
-        summary: "Error",
-        detail: "ลบข้อมูลล้มเหลว",
-        life: 3000,
-      });
-    }
-  };
+    },
+    [handleDelete, showToast]
+  );
+
+  const renderDeleteButton = useCallback(
+    (rowData) => (
+      <Button
+        icon={<FontAwesomeIcon icon={faTrash} />}
+        severity="danger"
+        rounded
+        onClick={() => confirmDelete(rowData.id)}
+      />
+    ),
+    [confirmDelete]
+  );
+
   return (
     <div className="Home-page h-dvh flex overflow-hidden">
       <Toast ref={toast} />
@@ -561,14 +528,7 @@ function KpiFormPage() {
 
             <Column
               header="ลบ"
-              body={(rowData) => (
-                <Button
-                  icon={<FontAwesomeIcon icon={faTrash} />}
-                  severity="danger"
-                  rounded
-                  onClick={() => confirmDelete(rowData.id)}
-                />
-              )}
+              body={renderDeleteButton}
               style={{ width: "80px", textAlign: "center" }}
             />
           </DataTable>
@@ -729,11 +689,6 @@ function KpiFormPage() {
             size="small"
           />
         </div>
-        <Button
-          label="+ เพิ่มข้อมูล"
-          onClick={() => setShowDuplicateDialog(true)}
-          severity="success"
-        />
       </Dialog>
 
       <Dialog
@@ -745,37 +700,40 @@ function KpiFormPage() {
         onHide={() => setShowDuplicateDialog(false)}
         contentStyle={{ minHeight: "500px" }}
       >
-        <h4 className="mb-2 text-red-600 font-semibold">ข้อมูลเดิมในระบบ</h4>
         <DataTable
-          value={duplicateData}
-          dataKey="id"
+          value={duplicatePairs}
           showGridlines
           size="small"
-          tableStyle={{ minWidth: "60rem", marginBottom: "1rem" }}
+          tableStyle={{ minWidth: "60rem" }}
+          rowClassName={(rowData) => ({
+            "new-row": rowData[0].status === "ใหม่",
+            "old-row": rowData[0].status === "เดิม",
+          })}
         >
-          <Column field="id" header="ID" style={{ width: "5%" }} />
-          <Column field="kpi_label" header="ตัวชี้วัด" />
-          <Column field="a_value" header="ค่าตัวตั้ง" />
-          <Column field="b_value" header="ค่าตัวหาร" />
-          <Column field="type" header="ประเภท" />
-          <Column field="report_date" header="เดือน/ปี" body={renderDateCell} />
-        </DataTable>
-
-        <h4 className="mt-4 mb-2 text-blue-600 font-semibold">
-          ข้อมูลที่ต้องการเพิ่ม
-        </h4>
-        <DataTable
-          value={duplicateNewData}
-          dataKey="report_date"
-          showGridlines
-          size="small"
-          tableStyle={{ minWidth: "60rem", marginBottom: "1rem" }}
-        >
+          <Column field="status" header="สถานะ" style={{ width: "8rem" }} />
           <Column field="kpi_name" header="ตัวชี้วัด" />
-          <Column field="a_value" header="ค่าตัวตั้ง" />
-          <Column field="b_value" header="ค่าตัวหาร" />
+          <Column
+            field="a_value"
+            header="ค่าตัวตั้ง"
+            bodyClassName={(rowData) =>
+              classNames({
+                "old-cell": rowData[0].status === "เดิม",
+                "new-cell": rowData[0].status === "ใหม่",
+              })
+            }
+          />
+          <Column
+            field="b_value"
+            header="ค่าตัวหาร"
+            bodyClassName={(rowData) =>
+              classNames({
+                "old-cell": rowData[0].status === "เดิม",
+                "new-cell": rowData[0].status === "ใหม่",
+              })
+            }
+          />
+          <Column field="report_date" header="เดือน/ปี" />
           <Column field="type" header="ประเภท" />
-          <Column field="report_date" header="เดือน/ปี" body={renderDateCell} />
         </DataTable>
 
         <div className="flex justify-end gap-2 mt-4">

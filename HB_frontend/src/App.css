@@ -13,3 +13,19 @@ body {
 .p-input-icon {
   transform: translateY(-15%);
 }
+
+.old-row {
+    background-color: oklch(97.1% 0.013 17.38) !important;
+}
+
+.new-row {
+    background-color: oklch(98.2% 0.018 155.826) !important;
+}
+
+.old-cell {
+    background-color: oklch(93.6% 0.032 17.717) !important;
+}
+
+.new-cell {
+    background-color: oklch(96.2% 0.044 156.743) !important;
+}

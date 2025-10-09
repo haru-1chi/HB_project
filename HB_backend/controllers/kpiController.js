@@ -6,74 +6,183 @@ exports.checkDuplicates = (req, res) => {
         return res.status(400).send("Data must be an array");
     }
 
-    const conditions = dataArray.map(() => "(kpi_name = ? AND type = ? AND DATE_FORMAT(report_date, '%Y-%m') = ?)").join(" OR ");
+    const conditions = dataArray.map(() => "(d.kpi_name = ? AND d.type = ? AND DATE_FORMAT(d.report_date, '%Y-%m') = ?)").join(" OR ");
     const values = dataArray.flatMap(item => [
         item.kpi_name,
         item.type,
         item.report_date.slice(0, 7) // only YYYY-MM
     ]);
 
-    const sql = `SELECT id, kpi_name, a_value, b_value, type, report_date 
-               FROM kpi_data WHERE ${conditions}`;
+    const sql = `
+    SELECT 
+      d.id,
+      d.kpi_name AS kpi_id,
+      n.kpi_name AS kpi_label,
+      d.a_value,
+      d.b_value,
+      d.type,
+      d.report_date
+    FROM kpi_data d
+    LEFT JOIN kpi_name n ON d.kpi_name = n.id
+    WHERE ${conditions}
+  `;
 
-    db.query(sql, values, (err, result) => {
+
+    db.query(sql, values, (err, existing) => {
         if (err) return res.status(500).send(err);
 
-        res.json({
-            duplicates: result,  // existing records
-            totalChecked: dataArray.length
-        });
+        // Build paired list
+        const result = [];
+        for (const newItem of dataArray) {
+            const oldItem = existing.find(
+                (e) =>
+                    e.kpi_id === newItem.kpi_name && // compare by id!
+                    e.type === newItem.type &&
+                    String(e.report_date).slice(0, 7) === String(newItem.report_date).slice(0, 7)
+            );
+
+            if (oldItem) {
+                result.push(
+                    {
+                        status: "เดิม",
+                        kpi_name: oldItem.kpi_label,
+                        a_value: oldItem.a_value,
+                        b_value: oldItem.b_value,
+                        type: oldItem.type,
+                        report_date: oldItem.report_date,
+                    },
+                    {
+                        status: "ใหม่",
+                        kpi_name: oldItem.kpi_label,
+                        a_value: newItem.a_value,
+                        b_value: newItem.b_value,
+                        type: newItem.type,
+                        report_date: newItem.report_date,
+                    }
+                );
+            }
+        }
+
+        res.json({ pairs: result, totalChecked: dataArray.length });
     });
 };
 
 exports.createOrUpdate = (req, res) => {
-    const { data, mode } = req.body; // mode = 'overwrite' | 'skip'
+    const { data, mode } = req.body;
     const createdBy = req.user?.name || "Unknown User";
     const updatedBy = createdBy;
 
     if (!Array.isArray(data)) return res.status(400).send("Data must be an array");
 
     // if overwrite -> update if exists else insert
-    if (mode === 'overwrite') {
+    if (mode === "overwrite") {
         const promises = data.map(item => new Promise((resolve, reject) => {
-            const sql = `
-        INSERT INTO kpi_data (kpi_name, a_value, b_value, type, report_date, created_by, updated_by, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
-        ON DUPLICATE KEY UPDATE 
-          a_value = VALUES(a_value),
-          b_value = VALUES(b_value),
-          updated_by = VALUES(updated_by),
+            const updateSql = `
+        UPDATE kpi_data 
+        SET 
+          a_value = ?, 
+          b_value = ?, 
+          updated_by = ?, 
           updated_at = NOW()
+        WHERE kpi_name = ? AND type = ? AND DATE_FORMAT(report_date, '%Y-%m') = DATE_FORMAT(?, '%Y-%m')
       `;
-            const vals = [item.kpi_name, item.a_value, item.b_value, item.type, item.report_date, createdBy, updatedBy];
-            db.query(sql, vals, (err, result) => {
-                if (err) reject(err);
-                else resolve(result);
+
+            const updateVals = [
+                item.a_value,
+                item.b_value,
+                updatedBy,
+                item.kpi_name,
+                item.type,
+                item.report_date
+            ];
+
+            db.query(updateSql, updateVals, (err, result) => {
+                if (err) return reject(err);
+
+                if (result.affectedRows === 0) {
+                    // no existing -> insert new
+                    const insertSql = `
+                    INSERT INTO kpi_data
+                    (kpi_name, a_value, b_value, type, report_date, created_by, updated_by, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+
+          `;
+                    const insertVals = [
+                        item.kpi_name,
+                        item.a_value,
+                        item.b_value,
+                        item.type,
+                        item.report_date,
+                        createdBy,
+                        ''
+                    ];
+                    db.query(insertSql, insertVals, (insertErr, insertRes) => {
+                        if (insertErr) reject(insertErr);
+                        else resolve(insertRes);
+                    });
+                } else {
+                    resolve(result);
+                }
             });
         }));
 
         Promise.all(promises)
-            .then(() => res.send("Inserted or updated successfully"))
+            .then(() => res.send("Overwritten or inserted as needed"))
             .catch(err => res.status(500).send(err));
     }
-    else if (mode === 'skip') {
-        // insert only non-existing
-        const sql = `
-      INSERT IGNORE INTO kpi_data 
-      (kpi_name, a_value, b_value, type, report_date, created_by)
-      VALUES ?
-    `;
-        const values = data.map(item => [
+    else if (mode === "skip") {
+        // Step 1: Check which records already exist
+        const conditions = data
+            .map(() => "(kpi_name = ? AND type = ? AND DATE_FORMAT(report_date, '%Y-%m') = ?)")
+            .join(" OR ");
+        const values = data.flatMap((item) => [
             item.kpi_name,
-            item.a_value,
-            item.b_value,
             item.type,
-            item.report_date,
-            createdBy
+            item.report_date.slice(0, 7),
         ]);
-        db.query(sql, [values], (err, result) => {
+
+        const checkSql = `
+      SELECT kpi_name, type, DATE_FORMAT(report_date, '%Y-%m') AS report_month
+      FROM kpi_data
+      WHERE ${conditions}
+    `;
+
+        db.query(checkSql, values, (err, existing) => {
             if (err) return res.status(500).send(err);
-            res.send("Inserted non-duplicate records only");
+
+            // Step 2: Filter new items (skip existing ones)
+            const newData = data.filter((item) => {
+                return !existing.some(
+                    (e) =>
+                        e.kpi_name === item.kpi_name &&
+                        e.type === item.type &&
+                        e.report_month === item.report_date.slice(0, 7)
+                );
+            });
+
+            if (newData.length === 0) {
+                return res.send("No new records to insert");
+            }
+
+            // Step 3: Insert only new records
+            const insertSql = `
+        INSERT INTO kpi_data 
+        (kpi_name, a_value, b_value, type, report_date, created_by)
+        VALUES ?
+      `;
+            const insertValues = newData.map((item) => [
+                item.kpi_name,
+                item.a_value,
+                item.b_value,
+                item.type,
+                item.report_date,
+                createdBy,
+            ]);
+
+            db.query(insertSql, [insertValues], (err2) => {
+                if (err2) return res.status(500).send(err2);
+                res.send(`Inserted ${newData.length} non-duplicate records`);
+            });
         });
     }
     else {
