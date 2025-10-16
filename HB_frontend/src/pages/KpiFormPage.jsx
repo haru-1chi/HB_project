@@ -1,10 +1,4 @@
-import React, {
-  useState,
-  useEffect,
-  useRef,
-  useCallback,
-  useMemo,
-} from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { classNames } from "primereact/utils";
 import axios from "axios";
 import { debounce } from "lodash";
@@ -29,8 +23,9 @@ import {
   faSave,
   faMagnifyingGlass,
 } from "@fortawesome/free-solid-svg-icons";
-import DuplicateRecordModal from "../components/DuplicateRecordModal";
-
+import KpiFormDialog from "../components/KpiFormDialog";
+import Footer from "../components/Footer";
+import { Checkbox } from "primereact/checkbox";
 const API_BASE =
   import.meta.env.VITE_REACT_APP_API || "http://localhost:3000/api";
 
@@ -43,7 +38,9 @@ function KpiFormPage() {
   const [dialogVisible, setDialogVisible] = useState(false);
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
 
+  const [kpiNamesActive, setKpiNamesActive] = useState([]);
   const [kpiNames, setKpiNames] = useState([]);
+
   const [selectedKpi, setSelectedKpi] = useState(null);
   const [kpiData, setKpiData] = useState([]);
 
@@ -65,17 +62,24 @@ function KpiFormPage() {
   useEffect(() => {
     const fetchKpiNames = async () => {
       try {
-        const res = await axios.get(`${API_BASE}/getKPIName`);
+        const res = await axios.get(`${API_BASE}/getKPIName`, {
+          params: { includeDeleted: true },
+        });
         const options = res.data.map((item) => ({
           label: item.kpi_name,
           value: item.id,
           a_name: item.a_name,
           b_name: item.b_name,
+          deleted: item.deleted_at !== null,
         }));
         setKpiNames(options);
+
+        const optionsActive = options.filter((item) => !item.deleted);
+        setKpiNamesActive(optionsActive);
+
         if (options.length > 0) {
           const firstKpi = options[0].value;
-          setSelectedKpi(28);
+          setSelectedKpi(firstKpi);
           fetchKpiData(firstKpi);
         }
       } catch (err) {
@@ -116,6 +120,13 @@ function KpiFormPage() {
     debounced();
     return () => debounced.cancel();
   }, [searchTerm, selectedKpi, fetchKpiData]);
+
+  useEffect(() => {
+    if (showDuplicateDialog && duplicatePairs.length > 0) {
+      const allNewRows = duplicatePairs.filter((p) => p.status === "ใหม่");
+      setSelectedRows(allNewRows);
+    }
+  }, [showDuplicateDialog, duplicatePairs]);
 
   const showSuccess = (msg) =>
     toast.current.show({
@@ -281,20 +292,12 @@ function KpiFormPage() {
       type: "",
     },
   ]);
+  const [selectedRows, setSelectedRows] = useState([]);
 
-  const handleInputChange = (rowIndex, field, value) => {
-    setRows((prev) => {
-      const updated = [...prev];
-      updated[rowIndex][field] = value;
-      return updated;
-    });
-  };
-
-  const addRow = () => {
+  const resetRows = useCallback(() => {
     setRows([
-      ...rows,
       {
-        id: rows.length + 1,
+        id: 1,
         kpi_name: null,
         a_name: "",
         b_name: "",
@@ -304,39 +307,70 @@ function KpiFormPage() {
         type: "",
       },
     ]);
-  };
+  }, []);
 
-  const removeRow = (rowIndex) => {
+  const normalizeDate = useCallback((date) => {
+    if (!(date instanceof Date)) return date;
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    return `${year}-${month}-01`;
+  }, []);
+
+  const buildPayload = useCallback(() => {
+    return rows.map((r) => ({
+      ...r,
+      report_date: normalizeDate(r.report_date),
+    }));
+  }, [rows, normalizeDate]);
+
+  const handleInputChange = useCallback((rowIndex, field, value) => {
+    setRows((prev) =>
+      prev.map((row, idx) =>
+        idx === rowIndex ? { ...row, [field]: value } : row
+      )
+    );
+  }, []);
+
+  const addRow = useCallback(() => {
+    setRows((prev) => [
+      ...prev,
+      {
+        id: prev.length + 1,
+        kpi_name: null,
+        a_name: "",
+        b_name: "",
+        report_date: null,
+        a_value: "",
+        b_value: "",
+        type: "",
+      },
+    ]);
+  }, []);
+
+  const removeRow = useCallback((rowIndex) => {
     setRows((prev) => prev.filter((_, i) => i !== rowIndex));
-  };
+  }, []);
 
-  const submitRows = async () => {
+  const submitRows = useCallback(async () => {
     try {
       if (rows.some((r) => !r.kpi_name || !r.a_value || !r.b_value)) {
         showError("กรุณากรอกข้อมูลให้ครบ");
         return;
       }
 
-      // normalize date
-      const payload = rows.map((r) => {
-        let report_date = r.report_date;
-        if (report_date instanceof Date) {
-          const year = report_date.getFullYear();
-          const month = String(report_date.getMonth() + 1).padStart(2, "0");
-          report_date = `${year}-${month}-01`;
-        }
-        return { ...r, report_date };
-      });
+      const payload = buildPayload();
 
       const res = await axios.post(`${API_BASE}/checkDuplicates`, payload, {
         headers: { token },
       });
-
-      // console.log(res);
-
+      console.log("submit payload", payload);
       if (res.data.pairs.length > 0) {
-        // console.log(res.data.pairs);
         setDuplicatePairs(res.data.pairs);
+
+        const allNewRows = res.data.pairs.filter((p) => p.status === "ใหม่");
+        setSelectedRows(allNewRows);
+
+        console.log("submit DuplicatePairs", res.data.pairs);
         setShowDuplicateDialog(true);
       } else {
         await axios.post(
@@ -346,43 +380,99 @@ function KpiFormPage() {
         );
         showSuccess("เพิ่มข้อมูลเรียบร้อยแล้ว");
         fetchKpiData(selectedKpi);
+        resetRows();
         setDialogVisible(false);
       }
     } catch (err) {
       console.log(err);
     }
-  };
+  }, [
+    rows,
+    API_BASE,
+    token,
+    showError,
+    showSuccess,
+    fetchKpiData,
+    selectedKpi,
+    buildPayload,
+  ]);
 
-  const handleUserChoice = async (choice) => {
-    if (choice === "cancel") return;
+  const handleUserChoice = useCallback(
+    async (choice) => {
+      if (choice === "cancel") return;
 
-    const mode = choice === "overwrite" ? "overwrite" : "skip";
+      const normalizeSelectedRows = (rows) =>
+        rows.map((r) => ({
+          ...r,
+          report_date: normalizeDate(r.report_date),
+          kpi_name: r.kpi_name,
+        }));
 
-    const payload = rows.map((r) => {
-      let report_date = r.report_date;
-      if (report_date instanceof Date) {
-        const year = report_date.getFullYear();
-        const month = String(report_date.getMonth() + 1).padStart(2, "0");
-        report_date = `${year}-${month}-01`;
+      let payload = [];
+
+      if (choice === "overwrite") {
+        const overwriteRows = normalizeSelectedRows(selectedRows);
+        const allRows = buildPayload();
+
+        const nonDuplicateRows = allRows.filter(
+          (row) =>
+            !selectedRows.some(
+              (sel) =>
+                sel.kpi_name === row.kpi_name &&
+                sel.type === row.type &&
+                normalizeDate(sel.report_date) ===
+                  normalizeDate(row.report_date)
+            )
+        );
+
+        payload = [...overwriteRows, ...nonDuplicateRows];
+      } else {
+        payload = buildPayload();
       }
-      return { ...r, report_date };
-    });
 
-    await axios.post(
-      `${API_BASE}/create-or-update`,
-      { data: payload, mode },
-      { headers: { token } }
-    );
-
-    if (mode === "overwrite") showSuccess("เขียนทับข้อมูลเรียบร้อยแล้ว");
-    else showSuccess("เพิ่มข้อมูลที่ไม่ซ้ำเรียบร้อยแล้ว");
-    setDialogVisible(false);
-    setShowDuplicateDialog(false);
-  };
+      const mode = choice === "overwrite" ? "overwrite" : "skip";
+      console.log("confirm payload", payload);
+      try {
+        await axios.post(
+          `${API_BASE}/create-or-update`,
+          { data: payload, mode },
+          { headers: { token } }
+        );
+        showSuccess(
+          mode === "overwrite"
+            ? "เขียนทับข้อมูลเรียบร้อยแล้ว"
+            : "เพิ่มข้อมูลที่ไม่ซ้ำเรียบร้อยแล้ว"
+        );
+        fetchKpiData(selectedKpi);
+        resetRows();
+        setDialogVisible(false);
+        setShowDuplicateDialog(false);
+      } catch (err) {
+        console.error(err);
+        showError("ไม่สามารถดำเนินการได้");
+      }
+    },
+    [API_BASE, token, buildPayload, showError, showSuccess]
+  );
 
   const dialogFooterTemplate = (
     <div className="border-t-1 pt-3 border-gray-300">
       <Button label="บันทึกข้อมูล" severity="success" onClick={submitRows} />
+    </div>
+  );
+
+  const dialogFooterDuplicate = (
+    <div className="flex justify-end gap-2 mt-4">
+      <Button
+        label="ข้ามข้อมูลนี้"
+        severity="info"
+        onClick={() => handleUserChoice("skip")}
+      />
+      <Button
+        label="ใช่ เขียนทับข้อมูลเดิม"
+        severity="danger"
+        onClick={() => handleUserChoice("overwrite")}
+      />
     </div>
   );
 
@@ -432,7 +522,7 @@ function KpiFormPage() {
   );
 
   return (
-    <div className="Home-page h-dvh flex overflow-hidden">
+    <div className="Home-page overflow-hidden">
       <Toast ref={toast} />
       <ConfirmDialog />
       <div
@@ -487,7 +577,13 @@ function KpiFormPage() {
             size="small"
             emptyMessage="ไม่พบข้อมูล"
           >
-            <Column field="id" header="ID" style={{ width: "5%" }} sortable />
+            <Column
+              header="ลำดับ"
+              body={(rowData) => kpiData.indexOf(rowData) + 1}
+              sortable
+              field="id"
+              style={{ width: "5%" }}
+            />
             <Column field="kpi_label" header="ตัวชี้วัด" sortable />
             <Column field="a_name" header="ตัวตั้ง" sortable />
             <Column field="b_name" header="ตัวหาร" sortable />
@@ -552,9 +648,8 @@ function KpiFormPage() {
           size="small"
         >
           <Column
-            field="id"
-            header="ID"
-            body={(row, opt) => opt.rowIndex + 1}
+            header="ลำดับ"
+            body={(_, opt) => opt.rowIndex + 1}
             style={{ width: "50px" }}
           />
 
@@ -565,10 +660,12 @@ function KpiFormPage() {
             body={(row, opt) => (
               <Dropdown
                 value={row.kpi_name}
-                options={kpiNames}
+                options={kpiNamesActive}
+                placeholder="เลือก KPI"
+                className="w-75"
                 onChange={(e) => {
                   const selectedId = e.value;
-                  const selectedOption = kpiNames.find(
+                  const selectedOption = kpiNamesActive.find(
                     (o) => o.value === selectedId
                   );
 
@@ -584,8 +681,7 @@ function KpiFormPage() {
                     selectedOption?.b_name || ""
                   );
                 }}
-                placeholder="เลือก KPI"
-                className="w-75"
+                optionLabel="label"
               />
             )}
           />
@@ -698,7 +794,7 @@ function KpiFormPage() {
         maximizable
         modal
         onHide={() => setShowDuplicateDialog(false)}
-        contentStyle={{ minHeight: "500px" }}
+        footer={dialogFooterDuplicate}
       >
         <DataTable
           value={duplicatePairs}
@@ -709,10 +805,39 @@ function KpiFormPage() {
             "new-row": rowData[0].status === "ใหม่",
             "old-row": rowData[0].status === "เดิม",
           })}
+          selection={selectedRows}
+          onSelectionChange={(e) => setSelectedRows(e.value)}
         >
-          <Column field="status" header="สถานะ" style={{ width: "8rem" }} />
-          <Column field="kpi_name" header="ตัวชี้วัด" />
           <Column
+            headerStyle={{ width: "3rem", textAlign: "center" }}
+            bodyStyle={{ textAlign: "center" }}
+            body={(rowData) =>
+              rowData.status === "ใหม่" ? (
+                <Checkbox
+                  checked={selectedRows.some((r) => r.id === rowData.id)}
+                  onChange={(e) => {
+                    setSelectedRows((prev) =>
+                      e.checked
+                        ? [...prev, rowData]
+                        : prev.filter((r) => r.id !== rowData.id)
+                    );
+                  }}
+                />
+              ) : (
+                <span>—</span>
+              )
+            }
+          />
+
+          <Column
+            sortable
+            field="status"
+            header="สถานะ"
+            style={{ width: "8rem" }}
+          />
+          <Column sortable field="kpi_label" header="ตัวชี้วัด" />
+          <Column
+            sortable
             field="a_value"
             header="ค่าตัวตั้ง"
             bodyClassName={(rowData) =>
@@ -722,7 +847,9 @@ function KpiFormPage() {
               })
             }
           />
+
           <Column
+            sortable
             field="b_value"
             header="ค่าตัวหาร"
             bodyClassName={(rowData) =>
@@ -732,28 +859,11 @@ function KpiFormPage() {
               })
             }
           />
-          <Column field="report_date" header="เดือน/ปี" />
-          <Column field="type" header="ประเภท" />
+          <Column sortable field="report_date" header="เดือน/ปี" />
+          <Column sortable field="type" header="ประเภท" />
         </DataTable>
-
-        <div className="flex justify-end gap-2 mt-4">
-          <Button
-            label="ยกเลิก"
-            severity="secondary"
-            onClick={() => setShowDuplicateDialog(false)}
-          />
-          <Button
-            label="ข้ามข้อมูลนี้"
-            severity="info"
-            onClick={() => handleUserChoice("skip")}
-          />
-          <Button
-            label="ใช่ เขียนทับข้อมูลเดิม"
-            severity="danger"
-            onClick={() => handleUserChoice("overwrite")}
-          />
-        </div>
       </Dialog>
+      <Footer />
     </div>
   );
 }

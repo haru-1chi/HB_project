@@ -15,6 +15,7 @@ import {
   faCheck,
   faXmark,
 } from "@fortawesome/free-solid-svg-icons";
+import Footer from "../components/Footer";
 
 function Lookup() {
   const [dialogVisible, setDialogVisible] = useState(false);
@@ -217,92 +218,98 @@ function Lookup() {
   };
 
   return (
-    <div className="Home-page h-dvh flex overflow-hidden">
-      <Toast ref={toast} />
-      <ConfirmDialog />
-      <div
-        className={`flex-1 transition-all duration-300 p-4 sm:p-8 pt-5 overflow-auto`}
-      >
-        <div className="flex items-center mb-5">
-          <h5 className="text-2xl font-semibold">จัดการชื่อตัวชี้วัด</h5>
-        </div>
-
-        <div className="">
-          <div className="flex justify-end my-3">
-            <Button
-              label="+ เพิ่มข้อมูล"
-              onClick={() => setDialogVisible(true)}
-              severity="success"
-            />
-          </div>
-          <DataTable
-            value={allKPIChoices}
-            tableStyle={{ minWidth: "50rem" }}
-            emptyMessage="ไม่พบข้อมูล"
-            paginator
-            rows={10}
-            rowsPerPageOptions={[10, 25, 50]}
-          >
-            <Column field="id" header="ID" style={{ width: "5%" }}></Column>
-            <Column
-              field="kpi_name"
-              header="ชื่อตัวชี้วัด"
-              body={kpiNameBody}
-            ></Column>
-            <Column
-              header="แก้ไข"
-              body={editActionBody}
-              style={{ width: "10%" }}
-            />
-            <Column
-              header="ลบ"
-              body={deleteActionBody}
-              style={{ width: "10%" }}
-            />
-          </DataTable>
-        </div>
-
-        <Dialog
-          header="เพิ่มตัวชี้วัด"
-          visible={dialogVisible}
-          modal
-          onHide={() => setDialogVisible(false)}
-          style={{ width: "50vw" }}
+      <div className="Home-page overflow-hidden">
+        <Toast ref={toast} />
+        <ConfirmDialog />
+        <div
+          className={`flex-1 transition-all duration-300 p-4 sm:p-8 pt-5 overflow-auto`}
         >
-          {["kpi_name", "a_name", "b_name"].map((field, idx) => (
-            <div key={idx} className="mt-3">
-              <label htmlFor={field}>
-                {field === "kpi_name"
-                  ? "ชื่อตัวชี้วัดใหม่"
-                  : field === "a_name"
-                  ? "ชื่อตัวตั้ง"
-                  : "ชื่อตัวหาร"}
-              </label>
-              <InputText
-                id={field}
-                value={formValues[field]}
-                onChange={(e) =>
-                  setFormValues({ ...formValues, [field]: e.target.value })
-                }
-                className={`w-full ${formErrors[field] ? "p-invalid" : ""}`} // PrimeReact red border
-              />
-              {formErrors[field] && (
-                <small className="p-error">{formErrors[field]}</small> // error message
-              )}
-            </div>
-          ))}
-
-          <div className="flex justify-end mt-6">
-            <Button
-              label="บันทึกข้อมูล"
-              icon={<FontAwesomeIcon icon={faPlus} />}
-              className="p-button-success"
-              onClick={handleAdd}
-            />
+          <div className="flex items-center mb-5">
+            <h5 className="text-2xl font-semibold">จัดการชื่อตัวชี้วัด</h5>
           </div>
-        </Dialog>
+
+          <div className="">
+            <div className="flex justify-end my-3">
+              <Button
+                label="+ เพิ่มข้อมูล"
+                onClick={() => setDialogVisible(true)}
+                severity="success"
+              />
+            </div>
+            <DataTable
+              value={allKPIChoices}
+              tableStyle={{ minWidth: "50rem" }}
+              emptyMessage="ไม่พบข้อมูล"
+              paginator
+              rows={10}
+              rowsPerPageOptions={[10, 25, 50]}
+            >
+              <Column
+                field="id"
+                header="ID"
+                style={{ width: "5%" }}
+                body={(rowData) => allKPIChoices.indexOf(rowData) + 1}
+              ></Column>
+              <Column
+                field="kpi_name"
+                header="ชื่อตัวชี้วัด"
+                body={kpiNameBody}
+              ></Column>
+              <Column
+                header="แก้ไข"
+                body={editActionBody}
+                style={{ width: "10%" }}
+              />
+              <Column
+                header="ลบ"
+                body={deleteActionBody}
+                style={{ width: "10%" }}
+              />
+            </DataTable>
+          </div>
+
+          <Dialog
+            header="เพิ่มตัวชี้วัด"
+            visible={dialogVisible}
+            modal
+            onHide={() => setDialogVisible(false)}
+            style={{ width: "50vw" }}
+          >
+            {["kpi_name", "a_name", "b_name"].map((field, idx) => (
+              <div key={idx} className="mt-3">
+                <label htmlFor={field}>
+                  {field === "kpi_name"
+                    ? "ชื่อตัวชี้วัดใหม่"
+                    : field === "a_name"
+                    ? "ชื่อตัวตั้ง"
+                    : "ชื่อตัวหาร"}
+                </label>
+                <InputText
+                  id={field}
+                  value={formValues[field]}
+                  onChange={(e) =>
+                    setFormValues({ ...formValues, [field]: e.target.value })
+                  }
+                  className={`w-full ${formErrors[field] ? "p-invalid" : ""}`} // PrimeReact red border
+                />
+                {formErrors[field] && (
+                  <small className="p-error">{formErrors[field]}</small> // error message
+                )}
+              </div>
+            ))}
+
+            <div className="flex justify-end mt-6">
+              <Button
+                label="บันทึกข้อมูล"
+                icon={<FontAwesomeIcon icon={faPlus} />}
+                className="p-button-success"
+                onClick={handleAdd}
+              />
+            </div>
+          </Dialog>
+        </div>
+        <Footer />
       </div>
-    </div>
   );
 }
 

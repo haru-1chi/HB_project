@@ -44,7 +44,7 @@ function SideBarFilter({
   );
 
   return (
-    <div className="card h-dvh bg-white">
+    <>
       <Sidebar
         header={customHeader}
         visible={visible}
@@ -103,12 +103,12 @@ function SideBarFilter({
             </div>
           ))}
 
-           {filteredOpdChoices?.length === 0 && (
+          {filteredOpdChoices?.length === 0 && (
             <p className="text-gray-400 text-center mt-4">ไม่พบข้อมูล</p>
           )}
         </div>
       </Sidebar>
-    </div>
+    </>
   );
 }
 

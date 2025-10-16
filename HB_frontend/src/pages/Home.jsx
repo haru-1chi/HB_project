@@ -9,7 +9,7 @@ import DetailCard from "../components/DetailCard";
 import BarChart from "../components/BarChart";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import SideBarMenu from "../components/SideBarMenu";
-
+import Footer from "../components/Footer";
 import {
   faUserLock,
   faSliders,
@@ -137,9 +137,8 @@ function Home() {
         : [...prevSelected, opdName]
     );
   };
-
   return (
-    <div className="Home-page flex h-screen overflow-hidden">
+    <div className="Home-page overflow-hidden">
       <SideBarFilter
         visible={visible}
         setVisible={setVisible}
@@ -256,6 +255,7 @@ function Home() {
           ))}
         </div>
       </div>
+      <Footer />
     </div>
   );
 }

@@ -1,23 +1,25 @@
 import axios from "axios";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Dropdown } from "primereact/dropdown";
 import { Calendar } from "primereact/calendar";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
-import SideBarMenu from "../components/SideBarMenu";
+import { ColumnGroup } from "primereact/columngroup";
+import { Row } from "primereact/row";
+import { Button } from "primereact/button";
 import KPILineChart from "../components/KPILineChart";
 import BarChart from "../components/BarChart";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
+  faFileExport,
   faArrowTrendUp,
   faArrowTrendDown,
 } from "@fortawesome/free-solid-svg-icons";
-
+import Footer from "../components/Footer";
 const currentDate = new Date();
 
-// January of current year
 const defaultSinceDate = new Date(currentDate.getFullYear(), 0, 1);
-// Current month and year
+
 const defaultEndDate = new Date(
   currentDate.getFullYear(),
   currentDate.getMonth(),
@@ -45,10 +47,32 @@ const formatDateForSQL = (date, endOfMonth = false) => {
   )} 00:00:00`;
 };
 
+const formatMonthYear = (date) => {
+  if (!date) return "";
+  const monthTH = [
+    "ม.ค.",
+    "ก.พ.",
+    "มี.ค.",
+    "เม.ย.",
+    "พ.ค.",
+    "มิ.ย.",
+    "ก.ค.",
+    "ส.ค.",
+    "ก.ย.",
+    "ต.ค.",
+    "พ.ย.",
+    "ธ.ค.",
+  ];
+  const d = new Date(date);
+  const month = monthTH[d.getMonth()];
+  const year = d.getFullYear().toString().slice(-2); // 2025 → 25
+  return `${month} ${year}`;
+};
+
 function KpiDashboard() {
   const API_BASE =
     import.meta.env.VITE_REACT_APP_API || "http://localhost:3000/api";
-
+  const dt = useRef(null);
   const [data, setData] = useState(null);
   const [detail, setDetail] = useState(null);
   const [dataCurrentMonth, setDataCurrentMonth] = useState([]);
@@ -95,12 +119,6 @@ function KpiDashboard() {
       .get(`${API_BASE}/getData?${queryParams}`)
       .then((response) => {
         setData(response.data);
-        console.log(response.data);
-        console.log("kpi_name", selectedKPIName);
-        console.log("type", selectedTypeOptions);
-        console.log("chart", selectedChartType);
-        console.log("since", formatDateForSQL(sinceDate));
-        console.log("until", formatDateForSQL(endDate, true));
       })
       .catch((error) =>
         console.error("Error fetching department data:", error)
@@ -173,23 +191,18 @@ function KpiDashboard() {
     axios
       .get(`${API_BASE}/dataCurrentMonth?${queryParams}`)
       .then((res) => {
-        const order = ["รวม", "ไทย", "ต่างชาติ"];
-        const sortedData = res.data.sort(
-          (a, b) => order.indexOf(a.type) - order.indexOf(b.type)
-        );
-        setDataCurrentMonth(sortedData);
+        setDataCurrentMonth(res.data);
       })
       .catch((error) =>
         console.error("Error fetching department data:", error)
       );
   };
 
-  const getTrendText = (note, prevMonth) => {
+  const getTrendText = (note) => {
     if (!note || note === "null") return null;
 
-    const isPositive = note.startsWith("+");
-    const prevMonthShort = prevMonth?.split(" ")[0] || "";
-
+    const isPositive = true;
+    // const isPositive = note.startsWith("+");
     return (
       <span
         className={`w-fit flex items-center px-2 py-1 gap-2 rounded-md ${
@@ -200,26 +213,146 @@ function KpiDashboard() {
           icon={isPositive ? faArrowTrendUp : faArrowTrendDown}
           className={isPositive ? "text-red-500" : "text-green-500"}
         />
-        {isPositive
-          ? `เพิ่มขึ้นจากเดือนก่อนหน้า ${prevMonthShort}`
-          : `ลดลงจากเดือนก่อนหน้า ${prevMonthShort}`}{" "}
-        {note}
+        เกินเป้าหมาย 1.5%
+        {/* {isPositive ? `เพิ่มขึ้นจากเดือนก่อนหน้า` : `ลดลงจากเดือนก่อนหน้า`}{" "}
+        {note} */}
       </span>
     );
   };
-  const getTitle = (type, prevMonth) => {
-    const prevMonthShort = prevMonth?.split(" ")[0] || "";
+  const getTitle = (type) => {
+    const startLabel = formatMonthYear(sinceDate);
+    const endLabel = formatMonthYear(endDate);
 
-    if (type === "รวม")
-      return `ร้อยละการเสียชีวิตรวมทั้งหมด เดือนล่าสุด ${prevMonthShort}`;
-    if (type === "ไทย")
-      return `ร้อยละการเสียชีวิตชาวไทยรวม เดือนล่าสุด ${prevMonthShort}`;
-    if (type === "ต่างชาติ")
-      return `ร้อยละการเสียชีวิตชาวต่างชาติรวม เดือนล่าสุด ${prevMonthShort}`;
-    return `ร้อยละการเสียชีวิต (${type})`;
+    const rangeText =
+      startLabel && endLabel ? ` | ${startLabel} - ${endLabel}` : "";
+
+    switch (type) {
+      case "sum_rate":
+        return `ร้อยละการเสียชีวิตรวมทั้งหมด${rangeText}`;
+      case "thai_rate":
+        return `ร้อยละการเสียชีวิตชาวไทยรวม${rangeText}`;
+      case "foreigner_rate":
+        return `ร้อยละการเสียชีวิตชาวต่างชาติรวม${rangeText}`;
+      default:
+        return `ร้อยละการเสียชีวิต (${type})${rangeText}`;
+    }
   };
+
+  const totalA = detail?.reduce(
+    (sum, row) => sum + Number(row.a_value || 0),
+    0
+  );
+  const totalB = detail?.reduce(
+    (sum, row) => sum + Number(row.b_value || 0),
+    0
+  );
+  const rate = totalB ? ((totalA / totalB) * 100).toFixed(2) : 0;
+
+  const selectedKPINameLabel =
+    allKPIChoices.find((item) => item.value === selectedKPIName)?.label || "";
+  const selectedTypeLabel =
+    selectedOptions.find((item) => item.value === selectedTypeOptions)?.label ||
+    "";
+
+  const exportExcel = () => {
+    import("xlsx").then((xlsx) => {
+      const data = [
+        ["รายการตัวชี้วัดคุณภาพในกลุ่มโรคสำคัญ ที่ผู้บริหารติดตาม"], // hard text
+        [selectedKPINameLabel], // KPI name
+        ["ประเภท", selectedTypeLabel], // type info row
+        [
+          "เดือน/ปี",
+          "A (จำนวนผู้เสียชีวิต)",
+          "B (จำนวนผู้ป่วยทุกสถานะ)",
+          "อัตราการเสียชีวิต (%)",
+          "แนวโน้ม",
+        ], // table header
+        // map your detail data to each row
+        ...detail.map((item) => [
+          item.month,
+          Number(item.a_value || 0),
+          Number(item.b_value || 0),
+          Number(item.result || 0),
+          item.note || "",
+        ]),
+        ["รวม", totalA, totalB, Number(rate), ""], // summary row
+      ];
+
+      // const worksheet = xlsx.utils.json_to_sheet(detail);
+      const worksheet = xlsx.utils.aoa_to_sheet(data);
+      worksheet["!merges"] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }, // merge first header row
+        { s: { r: 1, c: 0 }, e: { r: 1, c: 4 } }, // merge KPI name row
+      ];
+
+      worksheet["!cols"] = [
+        { wch: 10 },
+        { wch: 20 },
+        { wch: 25 },
+        { wch: 25 },
+        { wch: 15 },
+      ];
+
+      // const maxWidths = [10, 20, 25, 25, 15];
+      // worksheet["!cols"] = maxWidths.map((w) => ({ wch: w }));
+
+      const workbook = { Sheets: { data: worksheet }, SheetNames: ["data"] };
+      const excelBuffer = xlsx.write(workbook, {
+        bookType: "xlsx",
+        type: "array",
+      });
+      const fileName = `สรุป_${selectedKPINameLabel
+        .replace(/[\\/:*?"<>|]/g, "_")
+        .trim()}`;
+      saveAsExcelFile(excelBuffer, fileName);
+    });
+  };
+
+  const saveAsExcelFile = (buffer, fileName) => {
+    import("file-saver").then((module) => {
+      if (module && module.default) {
+        let EXCEL_TYPE =
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8";
+        let EXCEL_EXTENSION = ".xlsx";
+        const data = new Blob([buffer], {
+          type: EXCEL_TYPE,
+        });
+
+        module.default.saveAs(data, `${fileName}${EXCEL_EXTENSION}`);
+      }
+    });
+  };
+
+  const header = (
+    <div className="flex items-center justify-end">
+      <Button
+        type="button"
+        label="Export to Excel"
+        severity="info"
+        onClick={exportExcel}
+        data-pr-tooltip="XLS"
+        className="p-button-icon-right-custom"
+      >
+        {" "}
+        <FontAwesomeIcon icon={faFileExport} style={{ marginLeft: "0.5rem" }} />
+      </Button>
+    </div>
+  );
+
+  const footerGroup = (
+    <ColumnGroup>
+      <Row>
+        <Column footer="รวม" />
+        <Column footer={totalA?.toLocaleString()} />
+        <Column footer={totalB?.toLocaleString()} />
+        <Column footer={rate} />
+        <Column />
+      </Row>
+    </ColumnGroup>
+  );
+
   return (
-    <div className="Home-page sm:flex overflow-hidden">
+    <div className="Home-page overflow-hidden">
       <div
         className={`flex-1 transition-all duration-300 p-4 sm:p-8 pt-5 overflow-auto`}
       >
@@ -238,7 +371,6 @@ function KpiDashboard() {
                 options={allKPIChoices}
                 optionLabel="label"
                 checkmark
-                highlightOnSelect={false}
                 className="mr-5"
               />
             </div>
@@ -249,9 +381,7 @@ function KpiDashboard() {
                 onChange={(e) => setSelectedChartType(e.value)}
                 options={selectedChart}
                 optionLabel="label"
-                placeholder="เลือกเรียงลำดับ"
                 checkmark={true}
-                highlightOnSelect={false}
                 className="mr-5"
               />
             </div>
@@ -261,9 +391,7 @@ function KpiDashboard() {
                 onChange={(e) => setselectedTypeOptions(e.value)}
                 options={selectedOptions}
                 optionLabel="label"
-                placeholder="เลือกเรียงลำดับ"
                 checkmark={true}
-                highlightOnSelect={false}
                 className="mr-5"
               />
             </div>
@@ -296,12 +424,12 @@ function KpiDashboard() {
             >
               <div className="flex items-center justify-between">
                 <h1 className="text-5xl font-semibold">
-                  {item.result.replace("%", "")}
+                  {item.value}
                   <span className="text-3xl">%</span>
                 </h1>
-                {getTrendText(item.note, item.prev_month)}
+                {getTrendText(item.type)}
               </div>
-              <p>{getTitle(item.type, item.month)}</p>
+              <p>{getTitle(item.type)}</p>
             </div>
           ))}
         </div>
@@ -319,7 +447,13 @@ function KpiDashboard() {
         </div>
 
         <div className="bg-white p-4 my-7 w-full rounded-xl shadow-md h-auto border-1 border-gray-200">
-          <DataTable value={detail} tableStyle={{ minWidth: "50rem" }}>
+          <DataTable
+            ref={dt}
+            header={header}
+            value={detail}
+            tableStyle={{ minWidth: "50rem" }}
+            footerColumnGroup={footerGroup}
+          >
             <Column field="month" header="เดือน-ปี"></Column>
             <Column field="a_value" header="A (จำนวนผู้เสียชีวิต)"></Column>
             <Column field="b_value" header="B (จำนวนผู้ป่วยทุกสถานะ)"></Column>
@@ -328,6 +462,7 @@ function KpiDashboard() {
           </DataTable>
         </div>
       </div>
+      <Footer />
     </div>
   );
 }
