@@ -1,83 +1,144 @@
-import React, { useState, useEffect } from "react";
-import { Sidebar } from "primereact/sidebar";
-import { Checkbox } from "primereact/checkbox";
+// SideBarMenu.jsx
+import React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faSliders } from "@fortawesome/free-solid-svg-icons";
+import {
+  faChartColumn,
+  faChartLine,
+  faFilePen,
+  faArrowRightFromBracket,
+  faChevronLeft,
+  faChevronRight,
+  faMarker
+} from "@fortawesome/free-solid-svg-icons";
 import { Button } from "primereact/button";
-function SideBarMenu({
-  visible,
-  setVisible,
-  allOpdChoices,
-  selectedOpdNames,
-  handleCheckboxChange,
-  setSelectedOpdNames,
-}) {
-  const isAllChecked =
-  allOpdChoices?.length > 0 && selectedOpdNames.length === allOpdChoices.length;
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import Logo from "../assets/logo.png";
+import { useAuth } from "../contexts/AuthContext";
+function SideBarMenu({ collapsed, setCollapsed }) {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  const toggleCheckAll = () => {
-    if (isAllChecked) {
-      setSelectedOpdNames([]); // Uncheck all
-    } else {
-      setSelectedOpdNames(allOpdChoices); // Check all
-    }
-  };
-
-  const customHeader = (
-    <div className="flex items-center gap-2 text-xl">
-      <FontAwesomeIcon icon={faSliders} />
-      <span className="font-bold">กรอง</span>
-    </div>
-  );
+  const isActive = (path) => location.pathname === path;
 
   return (
-    <div className="card h-dvh bg-white">
-      <Sidebar
-        header={customHeader}
-        visible={visible}
-        position="right"
-        onHide={() => setVisible(false)}
-      >
-        <div>
-          <div className="flex justify-between mb-3 items-center">
-            <div className="flex items-center">
-              <Checkbox
-                inputId="check-all"
-                checked={isAllChecked}
-                onChange={toggleCheckAll}
-              />
-              <label htmlFor="check-all" className="ml-2">
-                ทั้งหมด
-              </label>
-            </div>
-            <Button
-              label={
-                <>
-                  <FontAwesomeIcon icon={faSliders} className="mr-2" />
-                  ล้างตัวกรอง
-                </>
-              }
-              onClick={() => setSelectedOpdNames([])}
-              text
-              className="text-blue-500 hover:bg-blue-50 cursor-pointer px-3 py-1 rounded-md"
-              unstyled
-            />
+    <div
+      className={`sm:fixed sm:top-0 sm:left-0 sm:h-dvh bg-white flex flex-col transition-all duration-300 pt-5`}
+      style={{ width: collapsed ? "4rem" : "18.75rem" }}
+    >
+      {!collapsed ? (
+        <div className="flex justify-between items-center mb-4 pl-4 pr-2">
+          <div className="flex items-center ">
+            <img className="w-15 mr-3" src={Logo} alt="" />
+            <h5 className="text-lg font-bold text-teal-500">MaeSot Hospital</h5>
           </div>
 
-          {allOpdChoices?.map((opd, index) => (
-          <div key={index} className="mb-3 items-center">
-            <Checkbox
-              inputId={`cb-${index}`}
-              checked={selectedOpdNames.includes(opd)}
-              onChange={() => handleCheckboxChange(opd)}
-            />
-            <label htmlFor={`cb-${index}`} className="ml-2">
-              {opd}
-            </label>
-          </div>
-        ))}
+          <Button
+            icon={
+              <FontAwesomeIcon
+                icon={collapsed ? faChevronRight : faChevronLeft}
+              />
+            }
+            text
+            onClick={() => setCollapsed(!collapsed)}
+          />
         </div>
-      </Sidebar>
+      ) : (
+        <div className="p-2">
+          <Button
+            icon={
+              <FontAwesomeIcon
+                icon={collapsed ? faChevronRight : faChevronLeft}
+              />
+            }
+            text
+            onClick={() => setCollapsed(!collapsed)}
+          />
+        </div>
+      )}
+
+      <div className="flex flex-col flex-grow px-2">
+        <Link
+          to="/"
+          className={`p-3 rounded-lg block mb-3 ${
+            isActive("/")
+              ? "text-white font-bold bg-teal-500"
+              : "text-gray-700 hover:text-teal-500"
+          }`}
+        >
+          {!collapsed ? (
+            "สถิติทั่วไป"
+          ) : (
+            <div className="text-center">
+              <FontAwesomeIcon icon={faChartColumn} />
+            </div>
+          )}
+        </Link>
+
+        <Link
+          to="/kpi"
+          className={`p-3 rounded-lg block mb-3 ${
+            isActive("/kpi")
+              ? "text-white font-bold bg-teal-500"
+              : "text-gray-700 hover:text-teal-500"
+          }`}
+        >
+          {!collapsed ? (
+            "ตัวชี้วัดอัตราการเสียชีวิต"
+          ) : (
+            <div className="text-center">
+              <FontAwesomeIcon icon={faChartLine} />
+            </div>
+          )}
+        </Link>
+
+        <Link
+          to="/lookup"
+          className={`p-3 rounded-lg block mb-3 ${
+            isActive("/lookup")
+              ? "text-white font-bold bg-teal-500"
+              : "text-gray-700 hover:text-teal-500"
+          }`}
+        >
+          {!collapsed ? (
+            "จัดการชื่อตัวชี้วัด"
+          ) : (
+            <div className="text-center">
+              <FontAwesomeIcon icon={faMarker} />
+            </div>
+          )}
+        </Link>
+
+        <Link
+          to="/KpiFormPage"
+          className={`p-3 rounded-lg block mb-3 ${
+            isActive("/KpiFormPage")
+              ? "text-white font-bold bg-teal-500"
+              : "text-gray-700 hover:text-teal-500"
+          }`}
+        >
+          {!collapsed ? (
+            "จัดการข้อมูลตัวชี้วัด"
+          ) : (
+            <div className="text-center">
+              <FontAwesomeIcon icon={faFilePen} />
+            </div>
+          )}
+        </Link>
+      </div>
+
+      <div className="mt-auto px-2 py-4">
+        {!collapsed && user && (
+          <div className="p-3 mb-2 border-b border-gray-300">{user.name}</div>
+        )}
+        <Button
+          icon={<FontAwesomeIcon icon={faArrowRightFromBracket} />}
+          label={!collapsed ? "ออกจากระบบ" : ""}
+          text
+          className="w-full text-left"
+          onClick={logout}
+        />
+      </div>
     </div>
   );
 }

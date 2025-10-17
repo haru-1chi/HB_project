@@ -1,5 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@100..900&display=swap');
 
+:root {
+  --font-family: "noto Sans Thai", sans-serif;
+}
+
 body {
   margin: 0;
   padding: 0;
@@ -8,4 +12,33 @@ body {
   font-style: normal;
   font-variation-settings: "wdth" 100;
   color: rgb(85, 85, 85);
+
+}
+
+.p-input-icon {
+  transform: translateY(-15%);
+}
+
+.old-row {
+  background-color: oklch(97.1% 0.013 17.38) !important;
+}
+
+.new-row {
+  background-color: oklch(98.2% 0.018 155.826) !important;
+}
+
+.old-cell {
+  background-color: oklch(93.6% 0.032 17.717) !important;
+}
+
+.new-cell {
+  background-color: oklch(96.2% 0.044 156.743) !important;
+}
+
+.p-password .p-icon-field {
+  width: 100%;
+}
+
+.p-password .p-inputtext {
+  width: 100%;
 }

@@ -14,8 +14,8 @@ function Card({ count, keyword }) {
 
   useEffect(() => {
     if (count !== prevCount) {
-      setIsUpdated(true); // Highlight red if count changes
-      setTimeout(() => setIsUpdated(false), 2000); // Reset after 2 seconds
+      setIsUpdated(true);
+      setTimeout(() => setIsUpdated(false), 2000);
       setPrevCount(count);
     }
   }, [count, prevCount]);

@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "healthboard-468113",
+  "private_key_id": "21b330e524cca613780e6af865d7984532067902",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCPVOtOTH0bpXh9\n4B7H/1mp4HyV4oNmnJSA/kH4DLp/meOyVjPKrxyGN+zxWa1Ce7RJDwwT+7qm9orx\n97TgVv6IknaqJCsKDKoN71E3OcSaOT+hIbKr12FlAC/maUOLiDrbnIDn9eqIhjvL\n6kFEmHUSuU2z7vCuyM+vIXQcw3LjHzUlSlqkPuQBRVzZmF5fb6YbKnl2d0PmVrhx\nWPdKgl5h9v/ZADjE/EnE6v4aNqlaKs6vo4FsVQm/d5JnpVPg5oc+F+LZhmV89PE0\nhjI3EIo/+61ED5wUZFoiqpW+E/qdkXI8hJLe0ZeELI8pOMSDYCmI9rKSJg+O2Ueu\ni1+zVJlZAgMBAAECggEAHST5S8yFy+9TltTRrX0gsEgzTQ7oBR9lmu0YYOXFrliO\nUh7xHQ+KT0hj55eCgXhB6nEi1ZVkGLsc+aKSpuNJkl+lvWbpUXvNwFOfQgl/DpUB\neTQu7n43EaB+HO3ejCrBPRKPq5r3e5c/5XDWoKoXdB01zZaSXhf7EvNMduTPIZtS\n+0mB8Pe33hwDzU4qCvJ+w7ARfKSf5H42zINIYPMUN1MMwaKCDxMNosI9MpVnhPgL\nZjf+tW2tmGGUZSAG/hueLibOsgYqBlw/Ca5IGS2SGYBNpgKb3W4jmS6nfmHD8Mbf\nGIAt3EPH9kjRP9IjIMjUrgPB0eQ1lc5bdX+5AXob2QKBgQDDEv+nhse135Xr/YKd\nSBWyFPjj8VtpvnRYYZHBgUA6DoxncN/xxPEwXuv9wSeb2ir/PH953SedmZjEGVAH\nnyYcGeIhca/vN/nRT/5KPqXDpqrvWhhcPh8HIfEnbNdT7zzpHtoEbgvpLzhHY0HH\n2iQZG/JedaPcNvzalidi0c45RwKBgQC8GOQNoEvJZQoxelee4AO94qNdaVQDebgg\nJ0B9DYsK9cxWTyqeVuRlPs8XTtPEVsghjPisNHUsZ/h0z0Qyvhvun3wC76PSboJN\nOyUrBo/7NxpuQspgOaqLTYX42BImsJTa41tdD5LYcK3m3On7faCfX+grRsVylYcv\nDEPlf3PoXwKBgBUZCO1ldlQFSoGreWTpVu9btU9x2yEkqBCm/Myg3gFpcWX+nznW\nwv8oRP281jvU7LGOKXtUn+Q7qHoNAsrQO57ubbaQRSbqNuqcbDQ7clImxHX+mIPh\ndBmhYiORcfhx93R/EbVI8aDWqo+N/J9QyHauvxfYQVCf4dkCRGA7sMIhAoGAZdhg\nWtRpVKGl1EZ2/Oo0fHMjm2d1evBD9vzp2QwlNgkC29S/sb5AqmVIwkkHNq76a9gl\nqTA6JZIiIDU9qu/utdSa1AgnPsBhQyn8JQDHovEiGYOGinWO1yBhouxzX4mK/73M\n8WWGUDUqo+8HrglGmCTY093c+P7nlFziwnexLacCgYEAkyM42sRxcL65yoFdGBUC\nqhV1xKJPFF1/Q/ZIPswOGTDsQL+VGjH9ra9DFKZvhGK24Je0pQGiojQ04Exwnj3M\nlN7k1bKOGH2yCfreRnXuLV/YfO0cV1crxQvQeCVhgcmQCqeyUAVmMqJhnAS6K+e/\n/oiXNixdQZBmTosKp4kKER8=\n-----END PRIVATE KEY-----\n",
+  "client_email": "healthboard@healthboard-468113.iam.gserviceaccount.com",
+  "client_id": "104728129563194532333",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/healthboard%40healthboard-468113.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
