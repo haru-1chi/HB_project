@@ -202,43 +202,88 @@ exports.createdata = (req, res) => {
 };
 
 exports.updateKPIData = async (req, res) => {
-    const dataArray = req.body;
-    if (!Array.isArray(dataArray) || dataArray.length === 0) {
-        return res.status(400).send("Invalid or empty data array");
+  const dataArray = req.body;
+  if (!Array.isArray(dataArray) || dataArray.length === 0) {
+    return res.status(400).send("Invalid or empty data array");
+  }
+
+  const updatedBy = req.user?.name || "Unknown User";
+
+  try {
+    // helper: query function returning promise
+    const queryAsync = (sql, params = []) =>
+      new Promise((resolve, reject) => {
+        db.query(sql, params, (err, results) => {
+          if (err) reject(err);
+          else resolve(results);
+        });
+      });
+
+    // 1️⃣ Check duplicate for each item
+    for (const item of dataArray) {
+      const { id, kpi_name, type, report_date } = item;
+
+      const checkSQL = `
+        SELECT id FROM kpi_data 
+        WHERE kpi_name = ? 
+          AND type = ? 
+          AND DATE_FORMAT(report_date, '%Y-%m') = DATE_FORMAT(?, '%Y-%m')
+          AND id != ?
+      `;
+
+      const dupRows = await queryAsync(checkSQL, [
+        kpi_name,
+        type,
+        report_date,
+        id,
+      ]);
+
+      if (dupRows.length > 0) {
+        // ⚠️ Duplicate found → stop and return
+        return res.status(409).json({
+          success: false,
+          message: "ข้อมูลซ้ำกับแถวอื่น",
+          duplicate: true,
+        });
+      }
     }
 
-    const updatedBy = req.user?.name || "Unknown User";
-
+    // 2️⃣ Normal update
     const ids = [];
     const fields = ["kpi_name", "a_value", "b_value", "type", "report_date"];
-
     const cases = {};
-    fields.forEach(field => (cases[field] = []));
+    fields.forEach((f) => (cases[f] = []));
 
-    dataArray.forEach(item => {
-        ids.push(item.id);
-        fields.forEach(field => {
-            const value = item[field] ?? null;
-            cases[field].push(`WHEN ${item.id} THEN ${db.escape(value)}`);
-        });
+    dataArray.forEach((item) => {
+      ids.push(item.id);
+      fields.forEach((f) => {
+        const value = item[f] ?? null;
+        cases[f].push(`WHEN ${item.id} THEN ${db.escape(value)}`);
+      });
     });
 
     const updateSQL = `
-    UPDATE kpi_data
-    SET 
-      ${fields.map(f => `${f} = CASE id ${cases[f].join(" ")} END`).join(", ")},
-      updated_by = ${db.escape(updatedBy)},
-      updated_at = NOW()
-    WHERE id IN (${ids.join(",")})
-  `;
+      UPDATE kpi_data
+      SET 
+        ${fields.map((f) => `${f} = CASE id ${cases[f].join(" ")} END`).join(", ")},
+        updated_by = ${db.escape(updatedBy)},
+        updated_at = NOW()
+      WHERE id IN (${ids.join(",")})
+    `;
 
-    db.query(updateSQL, (err, result) => {
-        if (err) {
-            console.error("❌ Error updating data:", err);
-            return res.status(500).send("Failed to update data");
-        }
-        res.send({ message: "✅ Data updated successfully", affectedRows: result.affectedRows });
+    await queryAsync(updateSQL);
+
+    res.json({
+      success: true,
+      message: "✅ Data updated successfully",
     });
+  } catch (err) {
+    console.error("❌ Error updating data:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update data",
+    });
+  }
 };
 
 exports.deleteKPIData = (req, res) => {
@@ -448,34 +493,40 @@ exports.getData = (req, res) => {
         let query;
 
         if (chart === "percent") {
-            query = `
-      SELECT 
-        d.kpi_name,
-        n.a_name,
-        n.b_name,
-        d.type,
-        ROUND((d.a_value / d.b_value) * 100, 2) AS result,
-        DATE_FORMAT(d.report_date, '%b-%y') AS month,
-    DATE_FORMAT(d.report_date, '%Y-%m') AS month_key
-      FROM kpi_data d
-      LEFT JOIN kpi_name n ON d.kpi_name = n.id
-      ${whereClause.length ? "WHERE " + whereClause.join(" AND ") : ""}
-      UNION ALL
-
-      SELECT
-    d.kpi_name,
-    n.a_name,
-    n.b_name,
-    'รวม' AS type,
-    ROUND(SUM(d.a_value) / SUM(d.b_value) * 100, 2) AS result,
-    DATE_FORMAT(d.report_date, '%b-%y') AS month,
-    DATE_FORMAT(d.report_date, '%Y-%m') AS month_key
-FROM kpi_data d
-LEFT JOIN kpi_name n ON d.kpi_name = n.id
- ${whereClause.length ? "WHERE " + whereClause.join(" AND ") : ""}
- GROUP BY DATE_FORMAT(d.report_date, '%Y-%m')
-ORDER BY month_key, type;
-    `;
+            if (type === "รวม") {
+                // ✅ รวม case — summarized only
+                query = `
+          SELECT
+            d.kpi_name,
+            n.a_name,
+            n.b_name,
+            'รวม' AS type,
+            ROUND(SUM(d.a_value) / SUM(d.b_value) * 100, 2) AS result,
+            DATE_FORMAT(d.report_date, '%b-%y') AS month,
+            DATE_FORMAT(d.report_date, '%Y-%m') AS month_key
+          FROM kpi_data d
+          LEFT JOIN kpi_name n ON d.kpi_name = n.id
+          ${whereClause.length ? "WHERE " + whereClause.join(" AND ") : ""}
+          GROUP BY DATE_FORMAT(d.report_date, '%Y-%m')
+          ORDER BY month_key;
+        `;
+            } else {
+                query = `
+          SELECT 
+            d.kpi_name,
+            n.a_name,
+            n.b_name,
+            d.type,
+            ROUND((d.a_value / d.b_value) * 100, 2) AS result,
+            DATE_FORMAT(d.report_date, '%b-%y') AS month,
+            DATE_FORMAT(d.report_date, '%Y-%m') AS month_key
+          FROM kpi_data d
+          LEFT JOIN kpi_name n ON d.kpi_name = n.id
+          ${whereClause.length ? "WHERE " + whereClause.join(" AND ") + " AND d.type = ?" : "WHERE d.type = ?"}
+          ORDER BY month_key;
+        `;
+                params.push(type);
+            }
         } else if (chart !== "percent" && type === "รวม") {
             query = `
         SELECT 
@@ -654,7 +705,7 @@ exports.dataCurrentMonth = (req, res) => {
             return res.status(400).json({ error: "Missing required parameters: since and until" });
         }
 
-const query = `
+        const query = `
   SELECT
     ROUND(
       (SUM(CASE WHEN kpi_name = ? AND report_date BETWEEN ? AND ? THEN a_value ELSE 0 END) /

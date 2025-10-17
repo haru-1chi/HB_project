@@ -324,7 +324,8 @@ function KpiDashboard() {
   };
 
   const header = (
-    <div className="flex items-center justify-end">
+    <div className="flex items-center justify-between">
+      <h1 className="text-lg">อัตราการเสียชีวิต</h1>
       <Button
         type="button"
         label="Export to Excel"

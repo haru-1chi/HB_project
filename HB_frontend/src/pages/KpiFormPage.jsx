@@ -13,6 +13,7 @@ import { Calendar } from "primereact/calendar";
 import { Dialog } from "primereact/dialog";
 import { IconField } from "primereact/iconfield";
 import { InputIcon } from "primereact/inputicon";
+import { Checkbox } from "primereact/checkbox";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faTrash,
@@ -23,13 +24,18 @@ import {
   faSave,
   faMagnifyingGlass,
 } from "@fortawesome/free-solid-svg-icons";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 import KpiFormDialog from "../components/KpiFormDialog";
 import Footer from "../components/Footer";
-import { Checkbox } from "primereact/checkbox";
+import axiosInstance, { setAuthErrorInterceptor } from "../utils/axiosInstance";
 const API_BASE =
   import.meta.env.VITE_REACT_APP_API || "http://localhost:3000/api";
 
 function KpiFormPage() {
+  const { logout } = useAuth(); // 💡 Get logout function
+  const navigate = useNavigate();
+
   const token = localStorage.getItem("token");
   const toast = useRef(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -48,6 +54,7 @@ function KpiFormPage() {
 
   const [editRowId, setEditRowId] = useState(null);
   const [editRowData, setEditRowData] = useState({});
+  const [previousValues, setPreviousValues] = useState({});
 
   const showToast = useCallback((severity, summary, detail) => {
     toast.current?.show({ severity, summary, detail, life: 3000 });
@@ -56,8 +63,12 @@ function KpiFormPage() {
   //เรียกดูข้อมูลตามชื่อตัวชี้วัด
   const handleKpiChange = (e) => {
     setSelectedKpi(e.value);
-    fetchKpiData(e.value, searchTerm); // immediate fetch for dropdown
+    fetchKpiData(e.value, searchTerm);
   };
+
+  useEffect(() => {
+    setAuthErrorInterceptor(logout, showToast, navigate);
+  }, [logout, showToast, navigate]);
 
   useEffect(() => {
     const fetchKpiNames = async () => {
@@ -146,7 +157,11 @@ function KpiFormPage() {
   // start editing a row
   const startEditRow = useCallback((row) => {
     setEditRowId(row.id);
-    setEditRowData(row); // use reference, not copy entire object
+    setEditRowData(row);
+    setPreviousValues({
+      report_date: row.report_date,
+      type: row.type,
+    });
   }, []);
 
   // cancel edit
@@ -173,7 +188,7 @@ function KpiFormPage() {
             payload.report_date = `${year}-${month}-01`; // e.g. 2025-10-01
           }
 
-          await axios.put(`${API_BASE}/updateKPIData`, [payload], {
+          await axiosInstance.put(`${API_BASE}/updateKPIData`, [payload], {
             headers: { token },
           });
 
@@ -184,7 +199,18 @@ function KpiFormPage() {
           showToast("success", "สำเร็จ", "อัพเดตข้อมูลเรียบร้อยแล้ว");
           cancelEdit();
         } catch (err) {
-          showToast("error", "ผิดพลาด", err.message || "การอัพเดตล้มเหลว");
+          if (err.response?.status === 409) {
+            showToast("warn", "ข้อมูลซ้ำ", err.response.data.message);
+            setEditRowData((prev) => ({
+              ...prev,
+              report_date: previousValues.report_date,
+              type: previousValues.type,
+              isInvalid: true,
+            }));
+            fetchKpiData(selectedKpi);
+          } else {
+            showToast("error", "ผิดพลาด", err.message || "การอัพเดตล้มเหลว");
+          }
         }
       },
     });
@@ -193,12 +219,43 @@ function KpiFormPage() {
   const renderDateCell = (row) =>
     editRowId === row.id ? (
       <Calendar
+        className={editRowData.isInvalid ? "p-invalid" : ""}
         value={
           editRowData.report_date ? new Date(editRowData.report_date) : null
         }
-        onChange={(e) =>
-          setEditRowData({ ...editRowData, report_date: e.value })
-        }
+        onChange={(e) => {
+          const newDate = e.value;
+          const formatted = newDate
+            ? `${newDate.getFullYear()}-${String(
+                newDate.getMonth() + 1
+              ).padStart(2, "0")}-01`
+            : null;
+
+          // Check duplicate
+          const duplicate = kpiData.some(
+            (r) =>
+              r.id !== editRowData.id &&
+              r.kpi_name === editRowData.kpi_name &&
+              r.type === editRowData.type &&
+              r.report_date?.slice(0, 7) === formatted?.slice(0, 7)
+          );
+
+          if (duplicate) {
+            showToast(
+              "warn",
+              "ไม่สามารถเปลี่ยนแปลงได้",
+              "ข้อมูลจะซ้ำกับแถวอื่น"
+            );
+            // revert
+            setEditRowData((prev) => ({
+              ...prev,
+              report_date: previousValues.report_date,
+            }));
+            return;
+          }
+
+          setEditRowData((prev) => ({ ...prev, report_date: formatted }));
+        }}
         view="month"
         dateFormat="mm/yy"
         showIcon
@@ -232,14 +289,42 @@ function KpiFormPage() {
     (row) =>
       editRowId === row.id ? (
         <Dropdown
+          className={editRowData.isInvalid ? "p-invalid" : ""}
           value={editRowData.type}
           options={[
             { label: "ไทย", value: "ไทย" },
             { label: "ต่างชาติ", value: "ต่างชาติ" },
           ]}
-          onChange={(e) =>
-            setEditRowData((prev) => ({ ...prev, type: e.value }))
-          }
+          onChange={(e) => {
+            const newType = e.value;
+
+            const duplicate = kpiData.some(
+              (r) =>
+                r.id !== editRowData.id &&
+                r.kpi_name === editRowData.kpi_name &&
+                r.report_date?.slice(0, 7) ===
+                  (editRowData.report_date
+                    ? editRowData.report_date.slice(0, 7)
+                    : "") &&
+                r.type === newType
+            );
+
+            if (duplicate) {
+              showToast(
+                "warn",
+                "ไม่สามารถเปลี่ยนแปลงได้",
+                "ข้อมูลจะซ้ำกับแถวอื่น"
+              );
+
+              setEditRowData((prev) => ({
+                ...prev,
+                type: previousValues.type,
+              }));
+              return;
+            }
+
+            setEditRowData((prev) => ({ ...prev, type: newType }));
+          }}
           placeholder="เลือกประเภท"
           style={{ width: "140px" }}
         />
@@ -267,14 +352,12 @@ function KpiFormPage() {
           />
         </div>
       ) : (
-        <div className="flex justify-center gap-2">
-          <Button
-            rounded
-            icon={<FontAwesomeIcon icon={faEdit} />}
-            className="p-button-warning p-button-sm"
-            onClick={() => startEditRow(row)}
-          />
-        </div>
+        <Button
+          rounded
+          icon={<FontAwesomeIcon icon={faEdit} />}
+          className="p-button-warning p-button-sm"
+          onClick={() => startEditRow(row)}
+        />
       ),
     [editRowId, confirmSaveRow, cancelEdit, startEditRow]
   );
@@ -360,9 +443,13 @@ function KpiFormPage() {
 
       const payload = buildPayload();
 
-      const res = await axios.post(`${API_BASE}/checkDuplicates`, payload, {
-        headers: { token },
-      });
+      const res = await axiosInstance.post(
+        `${API_BASE}/checkDuplicates`,
+        payload,
+        {
+          headers: { token },
+        }
+      );
       console.log("submit payload", payload);
       if (res.data.pairs.length > 0) {
         setDuplicatePairs(res.data.pairs);
@@ -373,7 +460,7 @@ function KpiFormPage() {
         console.log("submit DuplicatePairs", res.data.pairs);
         setShowDuplicateDialog(true);
       } else {
-        await axios.post(
+        await axiosInstance.post(
           `${API_BASE}/create-or-update`,
           { data: payload, mode: "skip" },
           { headers: { token } }
@@ -433,7 +520,7 @@ function KpiFormPage() {
       const mode = choice === "overwrite" ? "overwrite" : "skip";
       console.log("confirm payload", payload);
       try {
-        await axios.post(
+        await axiosInstance.post(
           `${API_BASE}/create-or-update`,
           { data: payload, mode },
           { headers: { token } }
@@ -480,7 +567,7 @@ function KpiFormPage() {
   const handleDelete = useCallback(
     async (id) => {
       try {
-        await axios.delete(`${API_BASE}/deleteKPIData/${id}`, {
+        await axiosInstance.delete(`${API_BASE}/deleteKPIData/${id}`, {
           headers: { token },
         });
 
@@ -583,6 +670,7 @@ function KpiFormPage() {
               sortable
               field="id"
               style={{ width: "5%" }}
+              align="center"
             />
             <Column field="kpi_label" header="ตัวชี้วัด" sortable />
             <Column field="a_name" header="ตัวตั้ง" sortable />
@@ -620,12 +708,14 @@ function KpiFormPage() {
               header="แก้ไข"
               body={renderActionCell}
               style={{ width: "130px" }}
+              align="center"
             />
 
             <Column
               header="ลบ"
               body={renderDeleteButton}
               style={{ width: "80px", textAlign: "center" }}
+              align="center"
             />
           </DataTable>
         </div>
@@ -651,6 +741,7 @@ function KpiFormPage() {
             header="ลำดับ"
             body={(_, opt) => opt.rowIndex + 1}
             style={{ width: "50px" }}
+            align="center"
           />
 
           <Column
@@ -763,6 +854,7 @@ function KpiFormPage() {
             )}
           />
           <Column
+            align="center"
             header="ลบ"
             style={{ width: "50px" }}
             body={(row, opt) => (

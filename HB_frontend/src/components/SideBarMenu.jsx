@@ -8,6 +8,7 @@ import {
   faArrowRightFromBracket,
   faChevronLeft,
   faChevronRight,
+  faMarker
 } from "@fortawesome/free-solid-svg-icons";
 import { Button } from "primereact/button";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -103,7 +104,7 @@ function SideBarMenu({ collapsed, setCollapsed }) {
             "จัดการชื่อตัวชี้วัด"
           ) : (
             <div className="text-center">
-              <FontAwesomeIcon icon={faFilePen} />
+              <FontAwesomeIcon icon={faMarker} />
             </div>
           )}
         </Link>

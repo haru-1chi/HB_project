@@ -1,5 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@100..900&display=swap');
 
+:root {
+  --font-family: "noto Sans Thai", sans-serif;
+}
+
 body {
   margin: 0;
   padding: 0;
@@ -8,6 +12,7 @@ body {
   font-style: normal;
   font-variation-settings: "wdth" 100;
   color: rgb(85, 85, 85);
+
 }
 
 .p-input-icon {

@@ -1,6 +1,12 @@
-import React, { createContext, useState, useEffect, useContext } from "react";
+import React, {
+  createContext,
+  useState,
+  useEffect,
+  useContext,
+  useCallback,
+} from "react";
 import { useNavigate } from "react-router-dom";
-
+import { setAuthErrorInterceptor } from "../utils/axiosInstance";
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
@@ -39,12 +45,12 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = () => {
+  const logout = useCallback(() => { // 💡 Wrap in useCallback
     localStorage.removeItem("token");
     setToken(null);
     setUser(null);
     navigate("/login");
-  };
+  }, [navigate]);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -70,6 +76,14 @@ export const AuthProvider = ({ children }) => {
     };
     loadUser();
   }, []);
+
+  useEffect(() => {
+    const dummyToast = (severity, summary, detail) => {
+      console.error("Interceptor Toast:", summary, detail);
+    };
+
+    setAuthErrorInterceptor(logout, dummyToast, navigate);
+  }, [logout, navigate]);
 
   return (
     <AuthContext.Provider value={{ user, token, login, logout, loading }}>
