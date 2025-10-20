@@ -1,55 +1,26 @@
 // controllers/patientController.js
 const { getConnection } = require('../db');
 
-async function fetchPatientState(req, res) {
-  let connection;
-  try {
-    connection = await getConnection();
-    const result = await connection.execute(
-      `SELECT 
-        CASE o.ER_STATUS
-          WHEN '1' THEN 'คนไข้ที่ยังไม่ได้ตรวจ'
-          WHEN '2' THEN 'ตรวจแล้วรอผล/สังเกตุอาการ'
-          WHEN '3' THEN 'ออกจาก ER แล้ว'
-        END AS Title,
-        COUNT(o.ER_STATUS) AS Score
-      FROM OPDS o, PATIENTS p
-      WHERE o.PAT_RUN_HN = p.RUN_HN
-        AND o.PAT_YEAR_HN = p.YEAR_HN
-        AND o.PLA_PLACECODE = '042'
-        AND (24 * (SYSDATE - TO_DATE(TO_CHAR(o.opd_date, 'DDMMYYYY') || ' ' || TO_CHAR(o.opd_time, 'HH24:MI'), 'DDMMYYYY HH24:MI'))) <= 8
-        AND o.ER_STATUS IN ('1', '2', '3')
-      GROUP BY o.ER_STATUS
-      ORDER BY o.ER_STATUS`
-    );
-
-    res.json(result.rows);
-  } catch (err) {
-    console.error('Database error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
-  } finally {
-    if (connection) {
-      await connection.close();
-    }
-  }
-}
-
 async function summary(req, res) {
+  const { opdNames } = req.query;
   let connection;
+
   try {
     connection = await getConnection();
 
-    const { opdNames } = req.query;
-
+    const bindParams = {};
     let opdFilter = "";
-    let queryParams = [];
 
     if (opdNames) {
-      const namesArray = opdNames.split(",").map(name => name.trim());
-      opdFilter = `AND pl.fullplace IN (${namesArray.map(() => ":name").join(", ")})`;
-      queryParams = namesArray; // Bind each value separately
-    }
+      const namesArray = opdNames.split(",").map((n) => n.trim());
+      const bindPlaceholders = namesArray.map((_, i) => `:name${i}`);
+      opdFilter = `AND pl.fullplace IN (${bindPlaceholders.join(", ")})`;
 
+      // create key-value pairs for each bind
+      namesArray.forEach((name, i) => {
+        bindParams[`name${i}`] = name;
+      });
+    }
     const query = `SELECT 
      COUNT(o.OPD_NO) AS all_user,
       SUM(
@@ -59,7 +30,7 @@ async function summary(req, res) {
     ELSE 0 
   END
 ) AS WAIT_PTS,
- 	  SUM( CASE WHEN TO_CHAR( o.OPD_TIME, 'HH24:MI:SS' ) = '00:00:00' THEN 1 ELSE 0 END ) AS NOSHOW_PTS,
+ 	  SUM(CASE WHEN TO_CHAR(o.OPD_TIME, 'HH24:MI:SS') = '00:00:00' THEN 1 ELSE 0 END ) AS NOSHOW_PTS,
     SUM(CASE WHEN o.FINISH_OPD_DATETIME IS NULL THEN 1 ELSE 0 END) AS pending,
     SUM(CASE WHEN o.FINISH_OPD_DATETIME IS NOT NULL THEN 1 ELSE 0 END) AS completed,
     ROUND(AVG(
@@ -73,14 +44,21 @@ FROM OPDS o
 JOIN PLACES pl ON pl.PLACECODE = o.PLA_PLACECODE
 WHERE o.opd_date = TRUNC(SYSDATE) ${opdFilter}
 `;
-    const result = await connection.execute(query, queryParams, { autoCommit: true });
-    res.json(result.rows);
+    const result = await connection.execute(query, bindParams, {
+      outFormat: connection.OUT_FORMAT_OBJECT,
+    });
+
+    res.status(200).json(result.rows);
   } catch (err) {
     console.error('Database error:', err);
     res.status(500).json({ error: 'Internal Server Error' });
   } finally {
     if (connection) {
-      await connection.close();
+      try {
+        await connection.close();
+      } catch (closeErr) {
+        console.error("Error closing connection:", closeErr);
+      }
     }
   }
 }
@@ -167,10 +145,14 @@ ROUND(
     res.status(500).json({ error: "Internal Server Error" });
   } finally {
     if (connection) {
-      await connection.close();
+      try {
+        await connection.close();
+      } catch (closeErr) {
+        console.error("Error closing connection:", closeErr);
+      }
     }
   }
 }
 
-module.exports = { fetchPatientState, summary, stateOPDS };
+module.exports = { summary, stateOPDS };
 

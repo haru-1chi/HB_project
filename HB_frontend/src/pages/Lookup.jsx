@@ -8,18 +8,23 @@ import { ConfirmDialog, confirmDialog } from "primereact/confirmdialog";
 import { Toast } from "primereact/toast";
 import { Dialog } from "primereact/dialog";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { IconField } from "primereact/iconfield";
+import { InputIcon } from "primereact/inputicon";
 import {
   faTrash,
   faEdit,
   faPlus,
   faCheck,
   faXmark,
+  faMagnifyingGlass,
 } from "@fortawesome/free-solid-svg-icons";
 import Footer from "../components/Footer";
 
 function Lookup() {
+  const [searchTerm, setSearchTerm] = useState("");
   const [dialogVisible, setDialogVisible] = useState(false);
   const [allKPIChoices, setAllKPIChoices] = useState([]);
+  const [filteredKPIChoices, setFilteredKPIChoices] = useState([]);
 
   const [formValues, setFormValues] = useState({
     kpi_name: "",
@@ -61,6 +66,18 @@ function Lookup() {
   useEffect(() => {
     fetchKPInames();
   }, []);
+
+  useEffect(() => {
+    const filtered = allKPIChoices.filter((item) => {
+      const search = searchTerm.toLowerCase();
+      return (
+        item.kpi_name?.toLowerCase().includes(search) ||
+        item.a_name?.toLowerCase().includes(search) ||
+        item.b_name?.toLowerCase().includes(search)
+      );
+    });
+    setFilteredKPIChoices(filtered);
+  }, [searchTerm, allKPIChoices]);
 
   const validateForm = () => {
     const errors = {};
@@ -221,6 +238,26 @@ function Lookup() {
     setEditValues({ kpi_name: "", a_name: "", b_name: "" });
   };
 
+  const header = (
+    <div className="flex items-end justify-between">
+      <IconField iconPosition="left">
+        <InputIcon>
+          <FontAwesomeIcon icon={faMagnifyingGlass} />
+        </InputIcon>
+        <InputText
+          placeholder="ค้นหา"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </IconField>
+      <Button
+        label="+ เพิ่มข้อมูล"
+        onClick={() => setDialogVisible(true)}
+        severity="success"
+      />
+    </div>
+  );
+
   return (
     <div className="Home-page overflow-hidden">
       <Toast ref={toast} />
@@ -232,16 +269,10 @@ function Lookup() {
           <h5 className="text-2xl font-semibold">จัดการชื่อตัวชี้วัด</h5>
         </div>
 
-        <div className="">
-          <div className="flex justify-end my-3">
-            <Button
-              label="+ เพิ่มข้อมูล"
-              onClick={() => setDialogVisible(true)}
-              severity="success"
-            />
-          </div>
+        <div>
           <DataTable
-            value={allKPIChoices}
+            header={header}
+            value={filteredKPIChoices}
             tableStyle={{ minWidth: "50rem" }}
             emptyMessage="ไม่พบข้อมูล"
             paginator

@@ -61,7 +61,7 @@ function SideBarFilter({
                 placeholder="ค้นหา"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="p-inputtext-sm"
+                className="p-inputtext-sm w-67"
               />
             </IconField>
           </div>

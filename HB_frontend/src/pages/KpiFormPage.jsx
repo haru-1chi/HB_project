@@ -14,6 +14,7 @@ import { Dialog } from "primereact/dialog";
 import { IconField } from "primereact/iconfield";
 import { InputIcon } from "primereact/inputicon";
 import { Checkbox } from "primereact/checkbox";
+import { ScrollTop } from 'primereact/scrolltop';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faTrash,
@@ -608,51 +609,52 @@ function KpiFormPage() {
     [confirmDelete]
   );
 
+  const header = (
+    <div className="p-2 flex items-end justify-between">
+      <div className="block">
+        <Dropdown
+          value={selectedKpi}
+          options={kpiNames}
+          onChange={handleKpiChange}
+          optionLabel="label"
+          placeholder="เลือก KPI"
+          className="mr-5"
+        />
+      </div>
+
+      <IconField iconPosition="left">
+        <InputIcon>
+          <FontAwesomeIcon icon={faMagnifyingGlass} />
+        </InputIcon>
+        <InputText
+          placeholder="ค้นหา"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </IconField>
+    </div>
+  );
+
   return (
     <div className="Home-page overflow-hidden">
+      <ScrollTop />
       <Toast ref={toast} />
       <ConfirmDialog />
       <div
         className={`flex-1 transition-all duration-300 p-4 sm:p-8 pt-5 overflow-auto`}
       >
-        <div className="flex items-center mb-5">
+        <div className="flex justify-between items-center mb-3">
           <h5 className="text-2xl font-semibold">จัดการข้อมูลตัวชี้วัด</h5>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-md p-5 mb-5">
-          <h1>ชื่อตัวชี้วัด</h1>
-          <div className="flex justify-between">
-            <Dropdown
-              value={selectedKpi}
-              options={kpiNames}
-              onChange={handleKpiChange}
-              optionLabel="label"
-              placeholder="เลือก KPI"
-              className="mr-5"
-            />
-            <Button
-              label="+ เพิ่มข้อมูล"
-              onClick={() => setDialogVisible(true)}
-              severity="success"
-            />
-          </div>
-        </div>
-
-        <div className="flex justify-end mb-3">
-          <IconField iconPosition="left">
-            <InputIcon>
-              <FontAwesomeIcon icon={faMagnifyingGlass} />
-            </InputIcon>
-            <InputText
-              placeholder="ค้นหา"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </IconField>
+          <Button
+            label="+ เพิ่มข้อมูล"
+            onClick={() => setDialogVisible(true)}
+            severity="success"
+          />
         </div>
 
         <div className="">
           <DataTable
+            header={header}
             value={kpiData}
             editMode="row"
             dataKey="id"

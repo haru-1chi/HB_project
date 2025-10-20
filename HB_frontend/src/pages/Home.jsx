@@ -8,7 +8,7 @@ import { ToggleButton } from "primereact/togglebutton";
 import DetailCard from "../components/DetailCard";
 import BarChart from "../components/BarChart";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import SideBarMenu from "../components/SideBarMenu";
+import { ScrollTop } from "primereact/scrolltop";
 import Footer from "../components/Footer";
 import {
   faUserLock,
@@ -73,7 +73,7 @@ function Home() {
     const queryParams = new URLSearchParams({
       opdNames: selectedOpdNames.join(","),
     }).toString();
-
+console.log('queryParams',queryParams)
     axios
       .get(`${API_BASE}/summary?${queryParams}`)
       .then((response) => {
@@ -139,6 +139,7 @@ function Home() {
   };
   return (
     <div className="Home-page overflow-hidden">
+      <ScrollTop />
       <SideBarFilter
         visible={visible}
         setVisible={setVisible}

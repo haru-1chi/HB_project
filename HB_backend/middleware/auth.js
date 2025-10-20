@@ -1,27 +1,25 @@
 const jwt = require("jsonwebtoken");
 const db = require("../mysql.js");
 
-// If you don't have an env variable, just use a string
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key";
 
-exports.auth = (req, res, next) => {
+exports.auth = async (req, res, next) => {
   try {
     const token = req.header("token");
-    if (!token) {
+    if (!token)
       return res.status(401).json({ message: "กรุณาแนบ token มากับ header" });
-    }
 
     let decoded;
     try {
       decoded = jwt.verify(token, JWT_SECRET);
     } catch (err) {
-      if (err.name === "TokenExpiredError") {
-        return res.status(401).json({ message: "Token หมดอายุแล้ว" });
-      }
-      return res.status(401).json({ message: "Token ไม่ถูกต้อง" });
+      const msg =
+        err.name === "TokenExpiredError"
+          ? "Token หมดอายุแล้ว"
+          : "Token ไม่ถูกต้อง";
+      return res.status(401).json({ message: msg });
     }
 
-    // Check if user exists in DB
     db.query(
       "SELECT * FROM user WHERE username = ?",
       [decoded.username],
