@@ -25,6 +25,7 @@ import {
   faXmark,
   faSave,
   faMagnifyingGlass,
+  faFileImport
 } from "@fortawesome/free-solid-svg-icons";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -35,7 +36,7 @@ const API_BASE =
 import * as XLSX from "xlsx";
 
 function KpiFormPage() {
-  const { logout } = useAuth(); // 💡 Get logout function
+  const { logout } = useAuth();
   const navigate = useNavigate();
   const fileUploadRef = useRef(null);
   const token = localStorage.getItem("token");
@@ -85,7 +86,18 @@ function KpiFormPage() {
   const handleFileUpload = (event) => {
     const file = event.files?.[0];
     if (!file) return;
+    const validExtensions = ["xls", "xlsx", "csv"];
+    const fileExtension = file.name.split(".").pop().toLowerCase();
 
+    if (!validExtensions.includes(fileExtension)) {
+      showToast(
+        "warn",
+        "ประเภทไฟล์ไม่ถูกต้อง",
+        "กรุณาอัปโหลดไฟล์ Excel (.xls, .xlsx, .csv) เท่านั้น"
+      );
+      fileUploadRef.current?.clear();
+      return;
+    }
     const reader = new FileReader();
     reader.onload = ({ target }) => {
       const workbook = XLSX.read(target.result, { type: "binary" });
@@ -102,41 +114,42 @@ function KpiFormPage() {
         return;
       }
 
-      const validRows = [];
+      const importedRows = [];
+
       for (let i = 1; i < jsonData.length; i++) {
         const row = jsonData[i];
         if (!row || !row.length) continue;
 
+        // Skip truly empty rows
         const hasData = row.some(
           (cell) => cell != null && String(cell).trim() !== ""
         );
         if (!hasData) continue;
 
-        const [
-          ,
-          kpi_name,
-          a_name = "",
-          b_name = "",
-          dateVal,
-          a_value = "",
-          b_value = "",
-          type = "",
-        ] = row;
+        // Excel structure: ลำดับ, ตัวชี้วัด, ตัวตั้ง, ตัวหาร, เดือน/ปี, ค่าตัวตั้ง, ค่าตัวหาร, ประเภท
+        const [, kpiLabel, , , dateVal, a_value = "", b_value = "", type = ""] =
+          row;
+
+        // Try to match KPI label → ID
+        const matchedKpi = kpiNamesActive.find(
+          (k) => k.label.trim() === String(kpiLabel || "").trim()
+        );
 
         const report_date = parseExcelDate(dateVal);
-        validRows.push({
-          id: validRows.length + 1,
-          kpi_name: kpi_name || null,
-          a_name,
-          b_name,
-          report_date,
-          a_value,
-          b_value,
-          type,
+
+        importedRows.push({
+          id: importedRows.length + 1,
+          kpi_name: matchedKpi ? matchedKpi.value : null,
+          a_name: matchedKpi?.a_name || "",
+          b_name: matchedKpi?.b_name || "",
+          report_date: report_date || null,
+          a_value: a_value || "",
+          b_value: b_value || "",
+          type: type || "",
         });
       }
 
-      if (!validRows.length) {
+      if (!importedRows.length) {
         showToast(
           "warn",
           "ข้อมูลไม่ถูกต้อง",
@@ -147,21 +160,24 @@ function KpiFormPage() {
       }
 
       setRows((prev) => {
+        const existing = prev.filter(
+          (r) =>
+            r.kpi_name ||
+            r.a_name ||
+            r.b_name ||
+            r.a_value ||
+            r.b_value ||
+            r.type ||
+            r.report_date
+        );
+
+        const startId = existing.length + 1;
         const merged = [
-          ...prev.filter(
-            (r) =>
-              r.kpi_name ||
-              r.a_name ||
-              r.b_name ||
-              r.a_value ||
-              r.b_value ||
-              r.type ||
-              r.report_date
-          ),
-          ...validRows,
+          ...existing,
+          ...importedRows.map((r, i) => ({ ...r, id: startId + i })),
         ];
 
-        return merged.map((r, idx) => ({ ...r, id: idx + 1 }));
+        return merged;
       });
 
       showToast("success", "สำเร็จ", "นำเข้าข้อมูลเรียบร้อยแล้ว");
@@ -671,7 +687,19 @@ function KpiFormPage() {
   );
 
   const dialogFooterTemplate = (
-    <div className="border-t-1 pt-3 border-gray-300">
+    <div className="flex justify-between border-t-1 pt-3 border-gray-300">
+      <FileUpload
+        icon={<FontAwesomeIcon icon={faFileImport} />}
+        ref={fileUploadRef}
+        mode="basic"
+        name="kpiFile"
+        accept=".xlsx,.xls"
+        maxFileSize={5000000}
+        auto
+        chooseLabel="Import Excel"
+        customUpload
+        uploadHandler={handleFileUpload}
+      />
       <Button label="บันทึกข้อมูล" severity="success" onClick={submitRows} />
     </div>
   );
@@ -1006,17 +1034,6 @@ function KpiFormPage() {
             size="small"
           />
         </div>
-        <FileUpload
-          ref={fileUploadRef}
-          mode="basic"
-          name="kpiFile"
-          accept=".xlsx,.xls"
-          maxFileSize={5000000}
-          auto
-          chooseLabel="Import Excel"
-          customUpload
-          uploadHandler={handleFileUpload}
-        />
       </Dialog>
 
       <Dialog
