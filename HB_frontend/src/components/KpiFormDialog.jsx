@@ -86,7 +86,7 @@ function KpiFormDialog({
 
       const payload = buildPayload();
 
-      const res = await axios.post(`${API_BASE}/checkDuplicates`, payload, {
+      const res = await axios.post(`${API_BASE}/kpi-data/check-duplicates`, payload, {
         headers: { token },
       });
 
@@ -95,7 +95,7 @@ function KpiFormDialog({
         setShowDuplicateDialog(true);
       } else {
         await axios.post(
-          `${API_BASE}/create-or-update`,
+          `${API_BASE}/kpi-data`,
           { data: payload, mode: "skip" },
           { headers: { token } }
         );
@@ -126,7 +126,7 @@ function KpiFormDialog({
 
       try {
         await axios.post(
-          `${API_BASE}/create-or-update`,
+          `${API_BASE}/kpi-data`,
           { data: payload, mode },
           { headers: { token } }
         );

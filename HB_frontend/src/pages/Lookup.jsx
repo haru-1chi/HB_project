@@ -56,7 +56,7 @@ function Lookup() {
 
   const fetchKPInames = async () => {
     try {
-      const response = await axios.get(`${API_BASE}/getKPIName`);
+      const response = await axios.get(`${API_BASE}/kpi-name`);
       setAllKPIChoices(response.data);
     } catch (error) {
       console.error("Failed to fetch KPI names:", error);
@@ -92,7 +92,7 @@ function Lookup() {
     if (!validateForm()) return;
 
     try {
-      await axios.post(`${API_BASE}/createKPIName`, [formValues], {
+      await axios.post(`${API_BASE}/kpi-name`, [formValues], {
         headers: { token },
       });
       showToast("success", "สำเร็จ", "บันทึกรายการเรียบร้อยแล้ว");
@@ -108,7 +108,7 @@ function Lookup() {
 
   const handleEditSave = async (id) => {
     try {
-      await axios.put(`${API_BASE}/updateKPIName`, [{ id, ...editValues }], {
+      await axios.put(`${API_BASE}/kpi-name`, [{ id, ...editValues }], {
         headers: { token },
       });
       showToast("success", "สำเร็จ", "อัปเดตรายการเรียบร้อยแล้ว");
@@ -122,7 +122,7 @@ function Lookup() {
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`${API_BASE}/deleteKPIName/${id}`, {
+      await axios.delete(`${API_BASE}/kpi-name/${id}`, {
         headers: { token },
       });
       showToast("success", "สำเร็จ", "ลบรายการเรียบร้อยแล้ว");

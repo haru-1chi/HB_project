@@ -1,5 +1,18 @@
 const db = require('../mysql.js'); // ⬅️ Import MySQL connection
 
+const queryAsync = (sql, params = []) =>
+    new Promise((resolve, reject) => {
+        db.query(sql, params, (err, results) => (err ? reject(err) : resolve(results)));
+    });
+
+const monthTH = [
+    "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.",
+    "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.",
+    "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."
+];
+
+const monthEN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 exports.checkDuplicates = async (req, res) => {
     try {
         const dataArray = req.body;
@@ -199,221 +212,245 @@ exports.createdata = (req, res) => {
             res.send("Data inserted");
         }
     });
-};
+}; //ไม่ใช้แล้ว
+
+
 
 exports.updateKPIData = async (req, res) => {
-  const dataArray = req.body;
-  if (!Array.isArray(dataArray) || dataArray.length === 0) {
-    return res.status(400).send("Invalid or empty data array");
-  }
-
-  const updatedBy = req.user?.name || "Unknown User";
-
-  try {
-    // helper: query function returning promise
-    const queryAsync = (sql, params = []) =>
-      new Promise((resolve, reject) => {
-        db.query(sql, params, (err, results) => {
-          if (err) reject(err);
-          else resolve(results);
-        });
-      });
-
-    // 1️⃣ Check duplicate for each item
-    for (const item of dataArray) {
-      const { id, kpi_name, type, report_date } = item;
-
-      const checkSQL = `
-        SELECT id FROM kpi_data 
-        WHERE kpi_name = ? 
-          AND type = ? 
-          AND DATE_FORMAT(report_date, '%Y-%m') = DATE_FORMAT(?, '%Y-%m')
-          AND id != ?
-      `;
-
-      const dupRows = await queryAsync(checkSQL, [
-        kpi_name,
-        type,
-        report_date,
-        id,
-      ]);
-
-      if (dupRows.length > 0) {
-        // ⚠️ Duplicate found → stop and return
-        return res.status(409).json({
-          success: false,
-          message: "ข้อมูลซ้ำกับแถวอื่น",
-          duplicate: true,
-        });
-      }
+    const dataArray = req.body;
+    if (!Array.isArray(dataArray) || dataArray.length === 0) {
+        return res.status(400).json({ success: false, message: "Invalid or empty data array" });
     }
 
-    // 2️⃣ Normal update
-    const ids = [];
-    const fields = ["kpi_name", "a_value", "b_value", "type", "report_date"];
-    const cases = {};
-    fields.forEach((f) => (cases[f] = []));
+    const updatedBy = req.user?.name || "Unknown User";
 
-    dataArray.forEach((item) => {
-      ids.push(item.id);
-      fields.forEach((f) => {
-        const value = item[f] ?? null;
-        cases[f].push(`WHEN ${item.id} THEN ${db.escape(value)}`);
-      });
-    });
+    try {
+        const dupCheckSQL = `
+      SELECT id, kpi_name, type, report_date
+      FROM kpi_data
+      WHERE (${dataArray
+                .map(
+                    (_, i) =>
+                        `(kpi_name = ? AND type = ? AND DATE_FORMAT(report_date, '%Y-%m') = DATE_FORMAT(?, '%Y-%m') AND id != ?)`
+                )
+                .join(" OR ")})
+    `;
 
-    const updateSQL = `
+        const dupParams = dataArray.flatMap((d) => [d.kpi_name, d.type, d.report_date, d.id]);
+        const duplicates = await queryAsync(dupCheckSQL, dupParams);
+
+        if (duplicates.length > 0) {
+            return res.status(409).json({
+                success: false,
+                message: "ข้อมูลซ้ำกับแถวอื่น",
+                duplicate: true,
+                duplicates,
+            });
+        }
+
+        // ✅ 2. Start a transaction for safe batch update
+        await queryAsync("START TRANSACTION");
+
+        const ids = dataArray.map((item) => item.id);
+        const fields = ["kpi_name", "a_value", "b_value", "type", "report_date"];
+        const caseClauses = fields.map(
+            (field) =>
+                `${field} = CASE id ${dataArray
+                    .map((item) => `WHEN ${db.escape(item.id)} THEN ${db.escape(item[field] ?? null)}`)
+                    .join(" ")} END`
+        );
+
+        const updateSQL = `
       UPDATE kpi_data
       SET 
-        ${fields.map((f) => `${f} = CASE id ${cases[f].join(" ")} END`).join(", ")},
+        ${caseClauses.join(", ")},
         updated_by = ${db.escape(updatedBy)},
         updated_at = NOW()
       WHERE id IN (${ids.join(",")})
     `;
 
-    await queryAsync(updateSQL);
+        await queryAsync(updateSQL);
+        await queryAsync("COMMIT");
 
-    res.json({
-      success: true,
-      message: "✅ Data updated successfully",
-    });
-  } catch (err) {
-    console.error("❌ Error updating data:", err);
-    res.status(500).json({
-      success: false,
-      message: "Failed to update data",
-    });
-  }
+        res.json({ success: true, message: "✅ Data updated successfully" });
+    } catch (err) {
+        console.error("❌ Error updating data:", err);
+        await queryAsync("ROLLBACK");
+        res.status(500).json({ success: false, message: "Failed to update data" });
+    }
 };
 
-exports.deleteKPIData = (req, res) => {
-    let { id } = req.params;
-    let { ids } = req.body;
+exports.deleteKPIData = async (req, res) => {
+    try {
+        let { id } = req.params;
+        let { ids } = req.body;
 
-    if (id) ids = [id];
-    if (!Array.isArray(ids) || ids.length === 0) {
-        return res.status(400).send("At least one ID is required");
-    }
-
-    const safeIds = ids.map(Number).filter(Boolean);
-    if (safeIds.length === 0) {
-        return res.status(400).send("Invalid ID format");
-    }
-
-    const sql = `DELETE FROM kpi_data WHERE id IN (${safeIds.map(() => '?').join(',')})`;
-
-    db.query(sql, safeIds, (err, result) => {
-        if (err) {
-            console.error("❌ Delete error:", err);
-            return res.status(500).send("Database error");
+        if (id) ids = [id];
+        if (!Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ success: false, message: "At least one ID is required" });
         }
+
+        const safeIds = [...new Set(ids.map((v) => parseInt(v, 10)).filter((v) => Number.isInteger(v) && v > 0))];
+        if (safeIds.length === 0) {
+            return res.status(400).json({ success: false, message: "Invalid ID format" });
+        }
+
+        const sql = `DELETE FROM kpi_data WHERE id IN (${safeIds.map(() => "?").join(",")})`;
+
+        await queryAsync("START TRANSACTION");
+        const result = await queryAsync(sql, safeIds);
 
         if (result.affectedRows === 0) {
-            return res.status(404).send("No data found for provided IDs");
+            await queryAsync("ROLLBACK");
+            return res.status(404).json({ success: false, message: "No data found for provided IDs" });
         }
 
-        res.send({
+        await queryAsync("COMMIT");
+
+        res.json({
+            success: true,
             message: `✅ ${result.affectedRows} record(s) deleted successfully`,
+            deletedCount: result.affectedRows,
         });
-    });
+    } catch (err) {
+        console.error("❌ Delete error:", err);
+        try {
+            await queryAsync("ROLLBACK");
+        } catch (_) { }
+        res.status(500).json({ success: false, message: "Database error" });
+    }
 };
 
 
-exports.getKPIData = (req, res) => {
+exports.getKPIData = async (req, res) => {
     const { kpi_name, search } = req.query;
-    let query = `
+    try {
+        let query = `
     SELECT d.*, n.kpi_name AS kpi_label, n.a_name, n.b_name
     FROM kpi_data d
     LEFT JOIN kpi_name n ON d.kpi_name = n.id
     WHERE 1=1
   `;
-    const params = [];
+        const params = [];
 
-    if (kpi_name) {
-        query += ` AND d.kpi_name = ?`;
-        params.push(kpi_name);
+        if (kpi_name) {
+            query += ` AND d.kpi_name = ?`;
+            params.push(kpi_name);
+        }
+
+        if (search) {
+            query += ` AND (d.a_value LIKE ? OR d.b_value LIKE ? OR d.type LIKE ?)`;
+            params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+        }
+
+        const data = await new Promise((resolve, reject) => {
+            db.query(query, params, (err, results) => {
+                if (err) reject(err);
+                else resolve(results);
+            });
+        });
+
+        // ✅ Always return an array
+        res.status(200).json(Array.isArray(data) ? data : []);
+    } catch (err) {
+        console.error("❌ Error fetching KPI data:", err);
+        // ✅ Still return an array even if error
+        res.status(500).json([]);
     }
-
-    if (search) {
-        query += ` AND (d.a_value LIKE ? OR d.b_value LIKE ? OR d.type LIKE ?)`;
-        params.push(`%${search}%`, `%${search}%`, `%${search}%`);
-    }
-
-    db.query(query, params, (err, result) => {
-        if (err) return res.status(400).send({ error: 'Database query failed', details: err });
-        res.send(result);
-    });
 };
 
 //kpi name--------------------------------------------------------------------------
-exports.createKPIName = (req, res) => {
+exports.createKPIName = async (req, res) => {
     const dataArray = req.body;
     const userName = req.user?.name || "Unknown User";
 
-    if (!Array.isArray(dataArray)) {
-        return res.status(400).send("Data must be an array");
-    }
+    try {
+        if (!Array.isArray(dataArray) || dataArray.length === 0) {
+            return res.status(400).json({ success: false, message: "Data must be a non-empty array" });
+        }
 
-    const values = dataArray.map(item => [
-        item.kpi_name,
-        item.a_name,
-        item.b_name,
-        userName
-    ]);
+        const values = dataArray.map((item) => [
+            item.kpi_name,
+            item.a_name ?? null,
+            item.b_name ?? null,
+            userName,
+        ]);
 
-    const sql = `
+        const sql = `
       INSERT INTO kpi_name
       (kpi_name, a_name, b_name, created_by) 
       VALUES ?
     `;
 
-    db.query(sql, [values], (err, result) => {
-        if (err) {
-            res.status(400).send(err);
-        } else {
-            res.send("Data inserted");
-        }
-    });
+        const result = await queryAsync(sql, [values]);
+
+        res.json({
+            success: true,
+            message: `✅ Inserted ${result.affectedRows} record(s) successfully`,
+        });
+    } catch (err) {
+        console.error("❌ Error inserting KPI names:", err);
+        res.status(500).json({
+            success: false,
+            message: "Failed to insert data",
+            error: err.message,
+        });
+    }
 };
 
-exports.updateKPIName = (req, res) => {
+exports.updateKPIName = async (req, res) => {
     const dataArray = req.body;
     const userName = req.user?.name || "Unknown User";
 
-    if (!Array.isArray(dataArray)) {
-        return res.status(400).send("Data must be an array");
-    }
+    try {
+        if (!Array.isArray(dataArray) || dataArray.length === 0) {
+            return res.status(400).json({ success: false, message: "Data must be a non-empty array" });
+        }
 
-    const sql = `
-        UPDATE kpi_name 
-        SET kpi_name = ?, 
-            a_name = ?, 
-            b_name = ?,
-            updated_by = ?,
-            updated_at = NOW()
-        WHERE id = ?
-    `;
+        // Prepare fields for CASE WHEN update
+        const fields = ["kpi_name", "a_name", "b_name"];
+        const cases = {};
+        fields.forEach(f => (cases[f] = []));
 
-    const promises = dataArray.map(item => {
-        return new Promise((resolve, reject) => {
-            db.query(sql, [item.kpi_name, item.a_name, item.b_name, userName, item.id], (err, result) => {
-                if (err) reject(err);
-                else resolve(result);
+        const ids = [];
+
+        dataArray.forEach(item => {
+            ids.push(item.id);
+            fields.forEach(f => {
+                const value = item[f] ?? null;
+                // Use db.escape to prevent SQL injection
+                cases[f].push(`WHEN ${item.id} THEN ${db.escape(value)}`);
             });
         });
-    });
 
-    Promise.all(promises)
-        .then(() => res.send("Data updated"))
-        .catch(err => res.status(400).send(err));
+        // Construct single bulk UPDATE query
+        const sql = `
+      UPDATE kpi_name
+      SET
+        ${fields.map(f => `${f} = CASE id ${cases[f].join(" ")} END`).join(", ")},
+        updated_by = ${db.escape(userName)},
+        updated_at = NOW()
+      WHERE id IN (${ids.join(",")})
+    `;
+
+        // Execute query
+        await new Promise((resolve, reject) => {
+            db.query(sql, (err, result) => (err ? reject(err) : resolve(result)));
+        });
+
+        res.json({ success: true, message: `✅ Updated ${dataArray.length} record(s) successfully` });
+    } catch (err) {
+        console.error("❌ Error updating KPI names:", err);
+        res.status(500).json({ success: false, message: "Failed to update data", error: err.message });
+    }
 };
 
-
-exports.deleteKPIName = (req, res) => {
-    const { id } = req.params; // get id from URL
+exports.deleteKPIName = async (req, res) => {
+    const { id } = req.params;
     if (!id) {
-        return res.status(400).send("ID is required");
+        return res.status(400).json({ success: false, message: "ID is required" });
     }
+
 
     const sql = `
     UPDATE kpi_name 
@@ -421,23 +458,48 @@ exports.deleteKPIName = (req, res) => {
     WHERE id = ? AND deleted_at IS NULL
   `;
 
-    db.query(sql, [id], (err, result) => {
-        if (err) {
-            console.error("Error updating deleted_at:", err);
-            return res.status(500).send("Database error");
-        }
+    try {
+        const sql = `
+      UPDATE kpi_name
+      SET deleted_at = NOW()
+      WHERE id = ? AND deleted_at IS NULL
+    `;
+
+        // Wrap db.query in a promise for async/await
+        const result = await new Promise((resolve, reject) => {
+            db.query(sql, [id], (err, results) => {
+                if (err) reject(err);
+                else resolve(results);
+            });
+        });
+
         if (result.affectedRows === 0) {
-            return res.status(404).send("Record not found or already deleted");
+            return res.status(404).json({
+                success: false,
+                message: "Record not found or already deleted",
+            });
         }
 
-        res.send({ message: "Record soft deleted successfully", result });
-    });
+        res.json({
+            success: true,
+            message: "Record soft deleted successfully",
+            affectedRows: result.affectedRows,
+        });
+    } catch (err) {
+        console.error("❌ Error soft deleting KPI name:", err);
+        res.status(500).json({
+            success: false,
+            message: "Database error",
+            error: err.message,
+        });
+    }
 };
 
-exports.getKPIName = (req, res) => {
-    const includeDeleted = req.query.includeDeleted === "true";
+exports.getKPIName = async (req, res) => {
+    try {
+        const includeDeleted = req.query.includeDeleted === "true";
 
-    const query = `
+        const query = `
     SELECT 
       id,
       CASE 
@@ -451,15 +513,26 @@ exports.getKPIName = (req, res) => {
     ${includeDeleted ? "" : "WHERE deleted_at IS NULL"}
   `;
 
-    db.query(query, (err, result) => {
-        if (err)
-            return res.status(400).send({ error: "Database query failed", details: err });
-        res.send(result);
-    });
+        const result = await new Promise((resolve, reject) => {
+            db.query(query, (err, rows) => {
+                if (err) reject(err);
+                else resolve(rows);
+            });
+        });
+
+        res.status(200).json(Array.isArray(result) ? result : []);
+    } catch (err) {
+        console.error("❌ Error fetching KPI names:", err);
+        res.status(500).json({
+            success: false,
+            message: "Failed to fetch KPI names",
+            error: err.message,
+        });
+    }
 };
 
 //dashboard--------------------------------------------------------------------------
-exports.getData = (req, res) => {
+exports.getData = async (req, res) => {
     try {
         const kpi_name = req.query.kpi_name?.trim();
         const type = req.query.type?.trim() || "รวม";
@@ -490,7 +563,9 @@ exports.getData = (req, res) => {
             whereClause.push("d.report_date <= ?");
             params.push(until);
         }
+
         let query;
+        const whereSQL = whereClause.length ? "WHERE " + whereClause.join(" AND ") : "";
 
         if (chart === "percent") {
             if (type === "รวม") {
@@ -506,7 +581,7 @@ exports.getData = (req, res) => {
             DATE_FORMAT(d.report_date, '%Y-%m') AS month_key
           FROM kpi_data d
           LEFT JOIN kpi_name n ON d.kpi_name = n.id
-          ${whereClause.length ? "WHERE " + whereClause.join(" AND ") : ""}
+          ${whereSQL}
           GROUP BY DATE_FORMAT(d.report_date, '%Y-%m')
           ORDER BY month_key;
         `;
@@ -557,71 +632,72 @@ exports.getData = (req, res) => {
         DATE_FORMAT(d.report_date, '%b-%y') AS month
       FROM kpi_data d
       LEFT JOIN kpi_name n ON d.kpi_name = n.id
-      ${whereClause.length ? "WHERE " + whereClause.join(" AND ") : ""}
+     ${whereSQL}
       ORDER BY d.report_date;
     `;
         }
 
 
-        db.query(query, [...params, ...params], (err, result) => {
-            if (err) {
-                console.error("Database error:", err);
-                return res.status(500).json({ error: 'Database query failed' });
-            }
-
-            const formatted = result.map(item => {
-                const [mon, yr] = item.month.split("-");
-                const monthIndex = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].indexOf(mon);
-                return {
-                    ...item,
-                    month: monthTH[monthIndex] + " " + yr
-                };
-            });
-
-            res.json(formatted);
+        const result = await new Promise((resolve, reject) => {
+            db.query(query, params, (err, rows) => (err ? reject(err) : resolve(rows)));
         });
+
+        // Format month in Thai
+        const formatted = result.map(item => {
+            if (!item.month) return item;
+            const [mon, yr] = item.month.split("-");
+            const monthIndex = monthEN.indexOf(mon);
+            return {
+                ...item,
+                month: monthTH[monthIndex] + " " + yr
+            };
+        });
+
+        res.json(formatted);
     } catch (err) {
-        console.error("Unexpected error:", err);
-        res.status(500).json({ error: 'Internal server error' });
+        console.error("Database error:", err);
+        res.status(500).json({ error: "Internal server error", details: err.message });
     }
 };
 
-exports.getDetail = (req, res) => {
-    const kpi_name = req.query.kpi_name || "1";
-    const type = req.query.type || "รวม";
-    const since = req.query.since;
-    const until = req.query.until;
+exports.getDetail = async (req, res) => {
+    try {
+        const kpi_name = req.query.kpi_name || "1";
+        const type = req.query.type || "รวม";
+        const since = req.query.since;
+        const until = req.query.until;
 
-    // Build WHERE clause dynamically
-    const whereClause = [];
-    const params = [];
+        // Build WHERE clause dynamically
+        const whereClause = [];
+        const params = [];
 
-    if (kpi_name) {
-        whereClause.push("kpi_name = ?");
-        params.push(kpi_name);
-    }
+        if (kpi_name) {
+            whereClause.push("kpi_name = ?");
+            params.push(kpi_name);
+        }
 
-    if (type && type !== "รวม") {
-        whereClause.push("type = ?");
-        params.push(type);
-    }
+        if (type && type !== "รวม") {
+            whereClause.push("type = ?");
+            params.push(type);
+        }
 
-    if (since && until) {
-        whereClause.push("report_date BETWEEN ? AND ?");
-        params.push(since, until);
-    } else if (since) {
-        whereClause.push("report_date >= ?");
-        params.push(since);
-    } else if (until) {
-        whereClause.push("report_date <= ?");
-        params.push(until);
-    }
+        if (since && until) {
+            whereClause.push("report_date BETWEEN ? AND ?");
+            params.push(since, until);
+        } else if (since) {
+            whereClause.push("report_date >= ?");
+            params.push(since);
+        } else if (until) {
+            whereClause.push("report_date <= ?");
+            params.push(until);
+        }
 
-    let query;
+        const whereSQL = whereClause.length ? "WHERE " + whereClause.join(" AND ") : "";
+        let query;
 
-    if (type === "รวม") {
-        // sum all types per report_date
-        query = `
+        if (type === "รวม") {
+            // sum all types per report_date
+            query = `
           SELECT 
               DATE_FORMAT(report_date, '%b-%y') AS month,
               SUM(a_value) AS a_value,
@@ -644,12 +720,12 @@ exports.getDetail = (req, res) => {
                   '%'
               ) AS note
           FROM kpi_data
-          ${whereClause.length ? "WHERE " + whereClause.join(" AND ") : ""}
+          ${whereSQL}
           GROUP BY DATE_FORMAT(report_date, '%b-%y')
           ORDER BY report_date;
         `;
-    } else {
-        query = `
+        } else {
+            query = `
       SELECT 
       DATE_FORMAT(report_date, '%b-%y') AS month,
       a_value, 
@@ -671,31 +747,34 @@ exports.getDetail = (req, res) => {
         '%'
     ) AS note
       FROM kpi_data
-      ${whereClause.length ? "WHERE " + whereClause.join(" AND ") : ""}
+      ${whereSQL}
       ORDER BY report_date;
     `;
-    }
-
-    db.query(query, params, (err, result) => {
-        if (err) {
-            res.status(400).send({ error: 'Database query failed', details: err });
-        } else {
-            const formatted = result.map(item => {
-                const [mon, yr] = item.month.split("-");
-                const monthsEN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-                const monthIndex = monthsEN.indexOf(mon);
-                const year = yr;
-                return {
-                    ...item,
-                    month: monthTH[monthIndex] + " " + year
-                };
-            });
-            res.send(formatted);
         }
-    });
+
+        const result = await new Promise((resolve, reject) => {
+            db.query(query, params, (err, rows) => (err ? reject(err) : resolve(rows)));
+        });
+
+        // Format month in Thai
+        const formatted = result.map(item => {
+            if (!item.month) return item;
+            const [mon, yr] = item.month.split("-");
+            const monthIndex = monthEN.indexOf(mon);
+            return {
+                ...item,
+                month: monthTH[monthIndex] + " " + yr
+            };
+        });
+
+        res.json(formatted);
+    } catch (err) {
+        console.error("Database error:", err);
+        res.status(500).json({ error: "Internal server error", details: err.message });
+    }
 };
 
-exports.dataCurrentMonth = (req, res) => {
+exports.dataCurrentMonth = async (req, res) => {
     try {
         const kpi_name = req.query.kpi_name?.trim() || "1";
         const since = req.query.since;
@@ -706,64 +785,30 @@ exports.dataCurrentMonth = (req, res) => {
         }
 
         const query = `
-  SELECT
-    ROUND(
-      (SUM(CASE WHEN kpi_name = ? AND report_date BETWEEN ? AND ? THEN a_value ELSE 0 END) /
-       SUM(CASE WHEN kpi_name = ? AND report_date BETWEEN ? AND ? THEN b_value ELSE 0 END)) * 100, 
-    2) AS sum_rate,
+      SELECT
+        ROUND(SUM(a_value)/NULLIF(SUM(b_value),0)*100, 2) AS sum_rate,
+        ROUND(SUM(CASE WHEN type='ไทย' THEN a_value ELSE 0 END)/NULLIF(SUM(CASE WHEN type='ไทย' THEN b_value ELSE 0 END),0)*100, 2) AS thai_rate,
+        ROUND(SUM(CASE WHEN type='ต่างชาติ' THEN a_value ELSE 0 END)/NULLIF(SUM(CASE WHEN type='ต่างชาติ' THEN b_value ELSE 0 END),0)*100, 2) AS foreigner_rate
+      FROM kpi_data
+      WHERE kpi_name = ? AND report_date BETWEEN ? AND ?;
+    `;
 
-    ROUND(
-      (SUM(CASE WHEN kpi_name = ? AND type = 'ไทย' AND report_date BETWEEN ? AND ? THEN a_value ELSE 0 END) /
-       SUM(CASE WHEN kpi_name = ? AND type = 'ไทย' AND report_date BETWEEN ? AND ? THEN b_value ELSE 0 END)) * 100, 
-    2) AS thai_rate,
+        const params = [kpi_name, since, until];
 
-    ROUND(
-      (SUM(CASE WHEN kpi_name = ? AND type = 'ต่างชาติ' AND report_date BETWEEN ? AND ? THEN a_value ELSE 0 END) /
-       SUM(CASE WHEN kpi_name = ? AND type = 'ต่างชาติ' AND report_date BETWEEN ? AND ? THEN b_value ELSE 0 END)) * 100, 
-    2) AS foreigner_rate
-  FROM kpi_data;
-`;
-
-
-        const params = [
-            // sum_rate
-            kpi_name, since, until,
-            kpi_name, since, until,
-            // thai_rate
-            kpi_name, since, until,
-            kpi_name, since, until,
-            // foreigner_rate
-            kpi_name, since, until,
-            kpi_name, since, until
-        ];
-
-        db.query(query, params, (err, result) => {
-            if (err) {
-                console.error("Database error:", err);
-                return res.status(500).json({ error: "Database query failed", details: err });
-            }
-
-            res.json([
-                { type: "sum_rate", value: result[0].sum_rate },
-                { type: "thai_rate", value: result[0].thai_rate },
-                { type: "foreigner_rate", value: result[0].foreigner_rate },
-            ]);
-
+        // Execute query with Promise for async/await
+        const result = await new Promise((resolve, reject) => {
+            db.query(query, params, (err, rows) => (err ? reject(err) : resolve(rows)));
         });
+
+        const row = result[0] || {};
+        res.json([
+            { type: "sum_rate", value: row.sum_rate || 0 },
+            { type: "thai_rate", value: row.thai_rate || 0 },
+            { type: "foreigner_rate", value: row.foreigner_rate || 0 },
+        ]);
+
     } catch (error) {
         console.error("Unexpected error:", error);
         res.status(500).json({ error: "Internal server error", details: error.message });
     }
 };
-
-
-const monthTH = [
-    "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.",
-    "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.",
-    "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."
-];
-
-const monthsEN = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-];

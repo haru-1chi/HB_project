@@ -27,7 +27,6 @@ const formatWaitTime = (minutes) => {
   const mins = Math.round(minutes % 60);
   return hrs > 0 ? `${hrs} ชม. ${mins} นาที` : `${mins} นาที`;
 };
-import { useOutletContext } from "react-router-dom";
 function Home() {
   const API_BASE =
     import.meta.env.VITE_REACT_APP_API || "http://localhost:3000/api";
@@ -73,7 +72,6 @@ function Home() {
     const queryParams = new URLSearchParams({
       opdNames: selectedOpdNames.join(","),
     }).toString();
-console.log('queryParams',queryParams)
     axios
       .get(`${API_BASE}/summary?${queryParams}`)
       .then((response) => {

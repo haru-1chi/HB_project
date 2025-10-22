@@ -95,7 +95,7 @@ function KpiDashboard() {
 
   const fetchKPInames = async () => {
     try {
-      const response = await axios.get(`${API_BASE}/getKPIName`);
+      const response = await axios.get(`${API_BASE}/kpi-name`);
       const options = response.data.map((item) => ({
         label: item.kpi_name,
         value: item.id.toString(),
@@ -116,7 +116,7 @@ function KpiDashboard() {
     }).toString();
 
     axios
-      .get(`${API_BASE}/getData?${queryParams}`)
+      .get(`${API_BASE}/kpi-data/chart?${queryParams}`)
       .then((response) => {
         setData(response.data);
       })
@@ -135,7 +135,7 @@ function KpiDashboard() {
     }).toString();
 
     axios
-      .get(`${API_BASE}/getDetail?${queryParams}`)
+      .get(`${API_BASE}/kpi-data/detail?${queryParams}`)
       .then((response) => {
         setDetail(response.data);
       })
@@ -189,7 +189,7 @@ function KpiDashboard() {
     }).toString();
 
     axios
-      .get(`${API_BASE}/dataCurrentMonth?${queryParams}`)
+      .get(`${API_BASE}/kpi-data/summary?${queryParams}`)
       .then((res) => {
         setDataCurrentMonth(res.data);
       })

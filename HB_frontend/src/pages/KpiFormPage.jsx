@@ -14,7 +14,8 @@ import { Dialog } from "primereact/dialog";
 import { IconField } from "primereact/iconfield";
 import { InputIcon } from "primereact/inputicon";
 import { Checkbox } from "primereact/checkbox";
-import { ScrollTop } from 'primereact/scrolltop';
+import { ScrollTop } from "primereact/scrolltop";
+import { FileUpload } from "primereact/fileupload";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faTrash,
@@ -27,16 +28,16 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import KpiFormDialog from "../components/KpiFormDialog";
 import Footer from "../components/Footer";
 import axiosInstance, { setAuthErrorInterceptor } from "../utils/axiosInstance";
 const API_BASE =
   import.meta.env.VITE_REACT_APP_API || "http://localhost:3000/api";
+import * as XLSX from "xlsx";
 
 function KpiFormPage() {
   const { logout } = useAuth(); // 💡 Get logout function
   const navigate = useNavigate();
-
+  const fileUploadRef = useRef(null);
   const token = localStorage.getItem("token");
   const toast = useRef(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -61,6 +62,115 @@ function KpiFormPage() {
     toast.current?.show({ severity, summary, detail, life: 3000 });
   }, []);
 
+  const parseExcelDate = (value) => {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+
+    if (typeof value === "number") {
+      const date = XLSX.SSF.parse_date_code(value);
+      return date ? new Date(date.y, date.m - 1, date.d) : null;
+    }
+
+    if (typeof value === "string") {
+      const parts = value.split("/");
+      if (parts.length === 3) {
+        const [day, month, year] = parts.map(Number);
+        if (day && month && year) return new Date(year, month - 1, day);
+      }
+    }
+
+    return null;
+  };
+
+  const handleFileUpload = (event) => {
+    const file = event.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = ({ target }) => {
+      const workbook = XLSX.read(target.result, { type: "binary" });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+      if (!jsonData?.length || jsonData.length <= 1) {
+        showToast(
+          "warn",
+          "ไม่พบข้อมูล",
+          "ไฟล์ Excel ว่างหรือไม่มีข้อมูลให้นำเข้า"
+        );
+        fileUploadRef.current?.clear();
+        return;
+      }
+
+      const validRows = [];
+      for (let i = 1; i < jsonData.length; i++) {
+        const row = jsonData[i];
+        if (!row || !row.length) continue;
+
+        const hasData = row.some(
+          (cell) => cell != null && String(cell).trim() !== ""
+        );
+        if (!hasData) continue;
+
+        const [
+          ,
+          kpi_name,
+          a_name = "",
+          b_name = "",
+          dateVal,
+          a_value = "",
+          b_value = "",
+          type = "",
+        ] = row;
+
+        const report_date = parseExcelDate(dateVal);
+        validRows.push({
+          id: validRows.length + 1,
+          kpi_name: kpi_name || null,
+          a_name,
+          b_name,
+          report_date,
+          a_value,
+          b_value,
+          type,
+        });
+      }
+
+      if (!validRows.length) {
+        showToast(
+          "warn",
+          "ข้อมูลไม่ถูกต้อง",
+          "ไม่พบข้อมูลที่มีรูปแบบถูกต้องให้นำเข้า"
+        );
+        fileUploadRef.current?.clear();
+        return;
+      }
+
+      setRows((prev) => {
+        const merged = [
+          ...prev.filter(
+            (r) =>
+              r.kpi_name ||
+              r.a_name ||
+              r.b_name ||
+              r.a_value ||
+              r.b_value ||
+              r.type ||
+              r.report_date
+          ),
+          ...validRows,
+        ];
+
+        return merged.map((r, idx) => ({ ...r, id: idx + 1 }));
+      });
+
+      showToast("success", "สำเร็จ", "นำเข้าข้อมูลเรียบร้อยแล้ว");
+      fileUploadRef.current?.clear();
+    };
+
+    reader.readAsBinaryString(file);
+  };
+
   //เรียกดูข้อมูลตามชื่อตัวชี้วัด
   const handleKpiChange = (e) => {
     setSelectedKpi(e.value);
@@ -74,7 +184,7 @@ function KpiFormPage() {
   useEffect(() => {
     const fetchKpiNames = async () => {
       try {
-        const res = await axios.get(`${API_BASE}/getKPIName`, {
+        const res = await axios.get(`${API_BASE}/kpi-name`, {
           params: { includeDeleted: true },
         });
         const options = res.data.map((item) => ({
@@ -110,10 +220,10 @@ function KpiFormPage() {
       if (!kpiId) return;
       setLoading(true);
       try {
-        const res = await axios.get(`${API_BASE}/getKPIData`, {
+        const res = await axios.get(`${API_BASE}/kpi-data`, {
           params: { kpi_name: kpiId, search },
         });
-        setKpiData(res.data);
+        setKpiData(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
         showToast("error", "ผิดพลาด", err.message || "โหลดข้อมูลไม่สำเร็จ");
       } finally {
@@ -189,7 +299,7 @@ function KpiFormPage() {
             payload.report_date = `${year}-${month}-01`; // e.g. 2025-10-01
           }
 
-          await axiosInstance.put(`${API_BASE}/updateKPIData`, [payload], {
+          await axiosInstance.put(`${API_BASE}/kpi-data`, [payload], {
             headers: { token },
           });
 
@@ -445,7 +555,7 @@ function KpiFormPage() {
       const payload = buildPayload();
 
       const res = await axiosInstance.post(
-        `${API_BASE}/checkDuplicates`,
+        `${API_BASE}/kpi-data/check-duplicates`,
         payload,
         {
           headers: { token },
@@ -462,7 +572,7 @@ function KpiFormPage() {
         setShowDuplicateDialog(true);
       } else {
         await axiosInstance.post(
-          `${API_BASE}/create-or-update`,
+          `${API_BASE}/kpi-data`,
           { data: payload, mode: "skip" },
           { headers: { token } }
         );
@@ -497,32 +607,49 @@ function KpiFormPage() {
         }));
 
       let payload = [];
+      const allRows = buildPayload();
+
+      const duplicateKeys = duplicatePairs
+        .filter((p) => p.status === "ใหม่")
+        .map((p) => `${p.kpi_name}_${p.type}_${normalizeDate(p.report_date)}`);
 
       if (choice === "overwrite") {
+        console.log("selectedRows", selectedRows);
         const overwriteRows = normalizeSelectedRows(selectedRows);
-        const allRows = buildPayload();
-
-        const nonDuplicateRows = allRows.filter(
-          (row) =>
-            !selectedRows.some(
-              (sel) =>
-                sel.kpi_name === row.kpi_name &&
-                sel.type === row.type &&
-                normalizeDate(sel.report_date) ===
-                  normalizeDate(row.report_date)
-            )
+        const selectedKeys = selectedRows.map(
+          (s) => `${s.kpi_name}_${s.type}_${normalizeDate(s.report_date)}`
         );
 
-        payload = [...overwriteRows, ...nonDuplicateRows];
+        const filteredRows = allRows.filter((row) => {
+          const key = `${row.kpi_name}_${row.type}_${normalizeDate(
+            row.report_date
+          )}`;
+          return !duplicateKeys.includes(key) || selectedKeys.includes(key);
+        });
+
+        payload = [
+          ...overwriteRows,
+          ...filteredRows.filter(
+            (r) =>
+              !selectedKeys.includes(
+                `${r.kpi_name}_${r.type}_${normalizeDate(r.report_date)}`
+              )
+          ),
+        ];
       } else {
-        payload = buildPayload();
+        payload = allRows.filter((row) => {
+          const key = `${row.kpi_name}_${row.type}_${normalizeDate(
+            row.report_date
+          )}`;
+          return !duplicateKeys.includes(key);
+        });
       }
 
       const mode = choice === "overwrite" ? "overwrite" : "skip";
       console.log("confirm payload", payload);
       try {
         await axiosInstance.post(
-          `${API_BASE}/create-or-update`,
+          `${API_BASE}/kpi-data`,
           { data: payload, mode },
           { headers: { token } }
         );
@@ -568,7 +695,7 @@ function KpiFormPage() {
   const handleDelete = useCallback(
     async (id) => {
       try {
-        await axiosInstance.delete(`${API_BASE}/deleteKPIData/${id}`, {
+        await axiosInstance.delete(`${API_BASE}/kpi-data/${id}`, {
           headers: { token },
         });
 
@@ -879,6 +1006,17 @@ function KpiFormPage() {
             size="small"
           />
         </div>
+        <FileUpload
+          ref={fileUploadRef}
+          mode="basic"
+          name="kpiFile"
+          accept=".xlsx,.xls"
+          maxFileSize={5000000}
+          auto
+          chooseLabel="Import Excel"
+          customUpload
+          uploadHandler={handleFileUpload}
+        />
       </Dialog>
 
       <Dialog
