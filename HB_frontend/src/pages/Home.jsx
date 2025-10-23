@@ -1,37 +1,32 @@
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "axios";
-import React, { useState, useEffect } from "react";
+import { useAuth } from "../contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 import { Button } from "primereact/button";
 import { Dropdown } from "primereact/dropdown";
-import SideBarFilter from "../components/SideBarFilter";
-import Card from "../components/Card";
 import { ToggleButton } from "primereact/togglebutton";
-import DetailCard from "../components/DetailCard";
-import BarChart from "../components/BarChart";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { ScrollTop } from "primereact/scrolltop";
-import Footer from "../components/Footer";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faUserLock,
   faSliders,
   faArrowUpWideShort,
   faArrowDownWideShort,
 } from "@fortawesome/free-solid-svg-icons";
+import SideBarFilter from "../components/SideBarFilter";
+import Card from "../components/Card";
+import DetailCard from "../components/DetailCard";
+import BarChart from "../components/BarChart";
+import Footer from "../components/Footer";
 import Logo from "../assets/logo.png";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
+import { formatWaitTime } from "../utils/dateTime";
 
-//เอาใส่ util ภายหลัง
-const formatWaitTime = (minutes) => {
-  if (!minutes) return "0 นาที";
-  const hrs = Math.floor(minutes / 60);
-  const mins = Math.round(minutes % 60);
-  return hrs > 0 ? `${hrs} ชม. ${mins} นาที` : `${mins} นาที`;
-};
 function Home() {
   const API_BASE =
     import.meta.env.VITE_REACT_APP_API || "http://localhost:3000/api";
   const { user } = useAuth();
   const navigate = useNavigate();
+
   const [visible, setVisible] = useState(false);
   const [summary, setSummary] = useState(null);
   const [data, setData] = useState(null);
@@ -52,89 +47,95 @@ function Home() {
     "TSET",
   ]);
 
-  const sortFieldOptions = [
-    { label: "ผู้ป่วยลงทะเบียน", value: "ALL_USER" },
-    { label: "ผู้ป่วยรอรับบริการ", value: "WAIT_PTS" },
-    { label: "ตรวจเสร็จ", value: "COMPLETED" },
-    { label: "ผู้ป่วยผิดนัด", value: "NOSHOW_PTS" },
-    { label: "เวลารอตรวจเฉลี่ย", value: "avg_wait_screen" },
-    { label: "เวลารอยาเฉลี่ย", value: "avg_wait_drug" },
-    { label: "เวลารวมเฉลี่ย", value: "avg_wait_all" },
-  ];
+  const sortFieldOptions = useMemo(
+    () => [
+      { label: "ผู้ป่วยลงทะเบียน", value: "ALL_USER" },
+      { label: "ผู้ป่วยรอรับบริการ", value: "WAIT_PTS" },
+      { label: "ตรวจเสร็จ", value: "COMPLETED" },
+      { label: "ผู้ป่วยผิดนัด", value: "NOSHOW_PTS" },
+      { label: "เวลารอตรวจเฉลี่ย", value: "avg_wait_screen" },
+      { label: "เวลารอยาเฉลี่ย", value: "avg_wait_drug" },
+      { label: "เวลารวมเฉลี่ย", value: "avg_wait_all" },
+    ],
+    []
+  );
 
-  const sortOrderOptions = [
-    { label: "น้อยไปมาก", value: "asc" },
-    { label: "มากไปน้อย", value: "desc" },
-  ];
+  const sortOrderOptions = useMemo(
+    () => [
+      { label: "น้อยไปมาก", value: "asc" },
+      { label: "มากไปน้อย", value: "desc" },
+    ],
+    []
+  );
 
   // Function to fetch summary data
-  const fetchSummary = () => {
-    const queryParams = new URLSearchParams({
-      opdNames: selectedOpdNames.join(","),
-    }).toString();
-    axios
-      .get(`${API_BASE}/summary?${queryParams}`)
-      .then((response) => {
-        if (response.data.length > 0) {
-          const formattedSummary = {
-            ...response.data[0],
-            AVG_WAIT_TIME: formatWaitTime(response.data[0].AVG_WAIT_TIME), // Format here
-          };
-          setSummary(formattedSummary);
-        }
-      })
-      .catch((error) => console.error("Error fetching summary data:", error));
-  };
-
-  const fetchAllOpdChoices = () => {
-    axios
-      .get(`${API_BASE}/departments/state`)
-      .then((response) => {
-        // Extract unique OPD_NAME values from the response
-        const opdNames = response.data.map((item) => item.OPD_NAME);
-        setAllOpdChoices(opdNames);
-      })
-      .catch((error) => console.error("Error fetching OPD names:", error));
-  };
-
-  const fetchDepartmentState = () => {
-    const queryParams = new URLSearchParams({
-      sortField,
-      sortOrder,
-      opdNames: selectedOpdNames.join(","),
-    }).toString();
-
-    axios
-      .get(`${API_BASE}/departments/state?${queryParams}`)
-      .then((response) => setData(response.data))
-      .catch((error) =>
-        console.error("Error fetching department data:", error)
+  const fetchSummary = useCallback(async () => {
+    try {
+      const queryParams = new URLSearchParams({
+        opdNames: selectedOpdNames.join(","),
+      });
+      const { data: res } = await axios.get(
+        `${API_BASE}/summary?${queryParams}`
       );
-  };
+      if (res.length) {
+        setSummary({
+          ...res[0],
+          AVG_WAIT_TIME: formatWaitTime(res[0].AVG_WAIT_TIME),
+        });
+      } else {
+        setSummary(null);
+      }
+    } catch (error) {
+      console.error("Error fetching summary:", error);
+    }
+  }, [API_BASE, selectedOpdNames]);
+
+  const fetchAllOpdChoices = useCallback(async () => {
+    try {
+      const { data: res } = await axios.get(`${API_BASE}/departments/state`);
+      setAllOpdChoices(res.map((item) => item.OPD_NAME));
+    } catch (error) {
+      console.error("Error fetching OPD names:", error);
+    }
+  }, [API_BASE]);
+
+  const fetchDepartmentState = useCallback(async () => {
+    try {
+      const queryParams = new URLSearchParams({
+        sortField,
+        sortOrder,
+        opdNames: selectedOpdNames.join(","),
+      });
+      const { data: res } = await axios.get(
+        `${API_BASE}/departments/state?${queryParams}`
+      );
+      setData(res);
+    } catch (error) {
+      console.error("Error fetching department data:", error);
+    }
+  }, [API_BASE, sortField, sortOrder, selectedOpdNames]);
 
   useEffect(() => {
-    // Initial fetch
+    fetchAllOpdChoices();
     fetchDepartmentState();
     fetchSummary();
-    fetchAllOpdChoices();
 
-    // Set interval to fetch data every 1 minute (60,000ms)
     const interval = setInterval(() => {
       fetchDepartmentState();
       fetchSummary();
     }, 60000);
 
-    // Cleanup interval on unmount
     return () => clearInterval(interval);
-  }, [sortField, sortOrder, selectedOpdNames]);
+  }, [fetchDepartmentState, fetchSummary, fetchAllOpdChoices]);
 
-  const handleCheckboxChange = (opdName) => {
-    setSelectedOpdNames((prevSelected) =>
-      prevSelected.includes(opdName)
-        ? prevSelected.filter((name) => name !== opdName)
-        : [...prevSelected, opdName]
+  const handleCheckboxChange = useCallback((opdName) => {
+    setSelectedOpdNames((prev) =>
+      prev.includes(opdName)
+        ? prev.filter((name) => name !== opdName)
+        : [...prev, opdName]
     );
-  };
+  }, []);
+
   return (
     <div className="Home-page overflow-hidden">
       <ScrollTop />

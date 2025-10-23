@@ -106,6 +106,22 @@ function Lookup() {
     }
   };
 
+  const validateEditForm = () => {
+    const errors = {};
+    if (!editValues.kpi_name || !editValues.kpi_name.trim()) {
+      errors.kpi_name = "กรุณากรอกชื่อตัวชี้วัด";
+    }
+    if (!editValues.a_name || !editValues.a_name.trim()) {
+      errors.a_name = "กรุณากรอกชื่อตัวตั้ง";
+    }
+    if (!editValues.b_name || !editValues.b_name.trim()) {
+      errors.b_name = "กรุณากรอกชื่อตัวหาร";
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleEditSave = async (id) => {
     try {
       await axios.put(`${API_BASE}/kpi-name`, [{ id, ...editValues }], {
@@ -133,14 +149,19 @@ function Lookup() {
     }
   };
 
-  const confirmSave = (id) =>
+  const confirmSave = (id) => {
+    if (!validateEditForm()) {
+      showToast("warn", "คำเตือน", "กรุณากรอกข้อมูลให้ครบทุกช่อง");
+      return;
+    }
+
     confirmDialog({
       message: "ต้องการบันทึกรายการนี้หรือไม่",
       header: "บันทึกรายการ",
       acceptClassName: "p-button-success",
       accept: () => handleEditSave(id),
     });
-
+  };
   const confirmDelete = (id) =>
     confirmDialog({
       message: "ต้องการลบรายการนี้หรือไม่",
@@ -202,21 +223,26 @@ function Lookup() {
     editRowId === rowData.id ? (
       <div className="flex flex-col gap-2">
         {["kpi_name", "a_name", "b_name"].map((field, idx) => (
-          <InputText
-            key={idx}
-            value={editValues[field]}
-            onChange={(e) =>
-              setEditValues({ ...editValues, [field]: e.target.value })
-            }
-            placeholder={
-              field === "kpi_name"
-                ? "ชื่อตัวชี้วัด"
-                : field === "a_name"
-                ? "ค่าตัวตั้ง"
-                : "ค่าตัวหาร"
-            }
-            className="w-full"
-          />
+          <>
+            <InputText
+              key={idx}
+              value={editValues[field]}
+              onChange={(e) =>
+                setEditValues({ ...editValues, [field]: e.target.value })
+              }
+              placeholder={
+                field === "kpi_name"
+                  ? "ชื่อตัวชี้วัด"
+                  : field === "a_name"
+                  ? "ค่าตัวตั้ง"
+                  : "ค่าตัวหาร"
+              }
+              className={`w-full ${formErrors[field] ? "p-invalid" : ""}`}
+            />
+            {formErrors[field] && (
+              <small className="p-error">{formErrors[field]}</small>
+            )}
+          </>
         ))}
       </div>
     ) : (

@@ -1,5 +1,5 @@
 import axios from "axios";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Dropdown } from "primereact/dropdown";
 import { Calendar } from "primereact/calendar";
 import { DataTable } from "primereact/datatable";
@@ -16,146 +16,100 @@ import {
   faArrowTrendDown,
 } from "@fortawesome/free-solid-svg-icons";
 import Footer from "../components/Footer";
-const currentDate = new Date();
-
-const defaultSinceDate = new Date(currentDate.getFullYear(), 0, 1);
-
-const defaultEndDate = new Date(
-  currentDate.getFullYear(),
-  currentDate.getMonth(),
-  currentDate.getDate()
-);
-
-const formatDateForSQL = (date, endOfMonth = false) => {
-  if (!date) return null;
-  let year = date.getFullYear();
-  let month = date.getMonth();
-  let day = date.getDate();
-
-  if (endOfMonth) {
-    // Move to next month, then subtract one day
-    let lastDay = new Date(year, month + 1, 0);
-    return `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(
-      2,
-      "0"
-    )}-${String(lastDay.getDate()).padStart(2, "0")} 23:59:59`;
-  }
-
-  return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(
-    2,
-    "0"
-  )} 00:00:00`;
-};
-
-const formatMonthYear = (date) => {
-  if (!date) return "";
-  const monthTH = [
-    "ม.ค.",
-    "ก.พ.",
-    "มี.ค.",
-    "เม.ย.",
-    "พ.ค.",
-    "มิ.ย.",
-    "ก.ค.",
-    "ส.ค.",
-    "ก.ย.",
-    "ต.ค.",
-    "พ.ย.",
-    "ธ.ค.",
-  ];
-  const d = new Date(date);
-  const month = monthTH[d.getMonth()];
-  const year = d.getFullYear().toString().slice(-2); // 2025 → 25
-  return `${month} ${year}`;
-};
-
+import { formatDateForSQL, formatMonthYear } from "../utils/dateTime";
+import { sumField, exportToExcel } from "../utils/exportUtils";
 function KpiDashboard() {
   const API_BASE =
     import.meta.env.VITE_REACT_APP_API || "http://localhost:3000/api";
   const dt = useRef(null);
-  const [data, setData] = useState(null);
-  const [detail, setDetail] = useState(null);
+
+  const now = new Date();
+  const [sinceDate, setSinceDate] = useState(new Date(now.getFullYear(), 0, 1));
+  const [endDate, setEndDate] = useState(now);
+
+  const [data, setData] = useState([]);
+  const [detail, setDetail] = useState([]);
   const [dataCurrentMonth, setDataCurrentMonth] = useState([]);
-  const [selectedTypeOptions, setselectedTypeOptions] = useState("รวม");
-  const [selectedKPIName, setSelectedKPIName] = useState("1");
-  const [allKPIChoices, setAllKPIChoices] = useState([]);
+
+  const [allKPIChoices, setAllKPIChoices] = useState([]); //rename kpiOptions
+  const [selectedKPIName, setSelectedKPIName] = useState("1"); //rename selectedKPI
+  const [selectedTypeOptions, setselectedTypeOptions] = useState("รวม"); //rename selectedType
+
   const [selectedChartType, setSelectedChartType] = useState("percent");
-  const [sinceDate, setSinceDate] = useState(defaultSinceDate);
-  const [endDate, setEndDate] = useState(defaultEndDate);
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
   const selectedOptions = [
+    //rename typeOptions
     { label: "รวมทั้งหมด", value: "รวม" },
     { label: "ชาวไทย", value: "ไทย" },
     { label: "ชาวต่างชาติ", value: "ต่างชาติ" },
   ];
 
   const selectedChart = [
+    //chartOptions
     { label: "ร้อยละ", value: "percent" },
     { label: "A,B", value: "ratio" },
   ];
 
-  const fetchKPInames = async () => {
+  const fetchKPInames = useCallback(async () => {
+    //reanme fetchKpiOptions
     try {
-      const response = await axios.get(`${API_BASE}/kpi-name`);
-      const options = response.data.map((item) => ({
+      const res = await axios.get(`${API_BASE}/kpi-name`);
+      const mapped = res.data.map((item) => ({
         label: item.kpi_name,
         value: item.id.toString(),
       }));
-      setAllKPIChoices(options);
-    } catch (error) {
-      console.error("Failed to fetch KPI names:", error);
+      setAllKPIChoices(mapped);
+    } catch (err) {
+      console.error("Error fetching KPI options:", err);
+      setError("เกิดข้อผิดพลาดในการโหลดข้อมูล");
+      //เอา toast มาใส่
     }
-  };
+  }, [API_BASE]);
 
-  const fetchDepartmentState = () => {
-    const queryParams = new URLSearchParams({
+  // ✅ Build query params once
+  const getQueryParams = useCallback(() => {
+    return new URLSearchParams({
       kpi_name: selectedKPIName,
       type: selectedTypeOptions,
       chart: selectedChartType,
       since: formatDateForSQL(sinceDate),
       until: formatDateForSQL(endDate, true),
     }).toString();
-
-    axios
-      .get(`${API_BASE}/kpi-data/chart?${queryParams}`)
-      .then((response) => {
-        setData(response.data);
-      })
-      .catch((error) =>
-        console.error("Error fetching department data:", error)
-      );
-  };
-
-  const fetchDetailTable = () => {
-    const queryParams = new URLSearchParams({
-      kpi_name: selectedKPIName,
-      type: selectedTypeOptions,
-      chart: selectedChartType,
-      since: formatDateForSQL(sinceDate),
-      until: formatDateForSQL(endDate, true),
-    }).toString();
-
-    axios
-      .get(`${API_BASE}/kpi-data/detail?${queryParams}`)
-      .then((response) => {
-        setDetail(response.data);
-      })
-      .catch((error) =>
-        console.error("Error fetching department data:", error)
-      );
-  };
-
-  useEffect(() => {
-    fetchDepartmentState();
-    fetchKPInames();
-    fetchDetailTable();
-    fetchDataCurrentMonth();
   }, [
-    selectedChartType,
     selectedKPIName,
     selectedTypeOptions,
+    selectedChartType,
     sinceDate,
     endDate,
   ]);
+  const fetchDashboardData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const query = getQueryParams();
+      const [chartRes, detailRes, summaryRes] = await Promise.all([
+        axios.get(`${API_BASE}/kpi-data/chart?${query}`),
+        axios.get(`${API_BASE}/kpi-data/detail?${query}`),
+        axios.get(`${API_BASE}/kpi-data/summary?${query}`),
+      ]);
+      setData(chartRes.data || []);
+      setDetail(detailRes.data || []);
+      setDataCurrentMonth(summaryRes.data || []);
+      setError(null);
+    } catch (err) {
+      console.error("Error fetching KPI dashboard data:", err);
+      setError("เกิดข้อผิดพลาดในการโหลดข้อมูล");
+    } finally {
+      setLoading(false);
+    }
+  }, [API_BASE, getQueryParams]);
+
+  useEffect(() => {
+    fetchKPInames();
+    fetchDashboardData();
+  }, [fetchKPInames, fetchDashboardData]);
 
   const noteBodyTemplate = (rowData) => {
     const value = rowData.note;
@@ -179,23 +133,6 @@ function KpiDashboard() {
         </p>
       </div>
     );
-  };
-
-  const fetchDataCurrentMonth = () => {
-    const queryParams = new URLSearchParams({
-      kpi_name: selectedKPIName,
-      since: formatDateForSQL(sinceDate),
-      until: formatDateForSQL(endDate, true),
-    }).toString();
-
-    axios
-      .get(`${API_BASE}/kpi-data/summary?${queryParams}`)
-      .then((res) => {
-        setDataCurrentMonth(res.data);
-      })
-      .catch((error) =>
-        console.error("Error fetching department data:", error)
-      );
   };
 
   const getTrendText = (note) => {
@@ -238,14 +175,8 @@ function KpiDashboard() {
     }
   };
 
-  const totalA = detail?.reduce(
-    (sum, row) => sum + Number(row.a_value || 0),
-    0
-  );
-  const totalB = detail?.reduce(
-    (sum, row) => sum + Number(row.b_value || 0),
-    0
-  );
+  const totalA = sumField(detail, "a_value");
+  const totalB = sumField(detail, "b_value");
   const rate = totalB ? ((totalA / totalB) * 100).toFixed(2) : 0;
 
   const selectedKPINameLabel =
@@ -255,72 +186,7 @@ function KpiDashboard() {
     "";
 
   const exportExcel = () => {
-    import("xlsx").then((xlsx) => {
-      const data = [
-        ["รายการตัวชี้วัดคุณภาพในกลุ่มโรคสำคัญ ที่ผู้บริหารติดตาม"], // hard text
-        [selectedKPINameLabel], // KPI name
-        ["ประเภท", selectedTypeLabel], // type info row
-        [
-          "เดือน/ปี",
-          "A (จำนวนผู้เสียชีวิต)",
-          "B (จำนวนผู้ป่วยทุกสถานะ)",
-          "อัตราการเสียชีวิต (%)",
-          "แนวโน้ม",
-        ], // table header
-        // map your detail data to each row
-        ...detail.map((item) => [
-          item.month,
-          Number(item.a_value || 0),
-          Number(item.b_value || 0),
-          Number(item.result || 0),
-          item.note || "",
-        ]),
-        ["รวม", totalA, totalB, Number(rate), ""], // summary row
-      ];
-
-      // const worksheet = xlsx.utils.json_to_sheet(detail);
-      const worksheet = xlsx.utils.aoa_to_sheet(data);
-      worksheet["!merges"] = [
-        { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }, // merge first header row
-        { s: { r: 1, c: 0 }, e: { r: 1, c: 4 } }, // merge KPI name row
-      ];
-
-      worksheet["!cols"] = [
-        { wch: 10 },
-        { wch: 20 },
-        { wch: 25 },
-        { wch: 25 },
-        { wch: 15 },
-      ];
-
-      // const maxWidths = [10, 20, 25, 25, 15];
-      // worksheet["!cols"] = maxWidths.map((w) => ({ wch: w }));
-
-      const workbook = { Sheets: { data: worksheet }, SheetNames: ["data"] };
-      const excelBuffer = xlsx.write(workbook, {
-        bookType: "xlsx",
-        type: "array",
-      });
-      const fileName = `สรุป_${selectedKPINameLabel
-        .replace(/[\\/:*?"<>|]/g, "_")
-        .trim()}`;
-      saveAsExcelFile(excelBuffer, fileName);
-    });
-  };
-
-  const saveAsExcelFile = (buffer, fileName) => {
-    import("file-saver").then((module) => {
-      if (module && module.default) {
-        let EXCEL_TYPE =
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8";
-        let EXCEL_EXTENSION = ".xlsx";
-        const data = new Blob([buffer], {
-          type: EXCEL_TYPE,
-        });
-
-        module.default.saveAs(data, `${fileName}${EXCEL_EXTENSION}`);
-      }
-    });
+    exportToExcel(detail, selectedKPINameLabel, selectedTypeLabel);
   };
 
   const header = (

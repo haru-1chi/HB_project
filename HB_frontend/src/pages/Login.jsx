@@ -20,7 +20,7 @@ function Login() {
       return;
     }
 
-    setLoading(true); // ⏳ start loading
+    setLoading(true);
     setError("");
 
     try {
@@ -40,7 +40,6 @@ function Login() {
 
   return (
     <div className="h-dvh bg-linear-65 from-indigo-400 to-cyan-300 flex justify-center items-center">
-      {/* from-sky-300 to-teal-300  */}
       <div className="w-88 card justify-content-center bg-white p-5 rounded-xl shadow-md">
         <div className="flex items-center pb-3 border-b-1 border-gray-300 ">
           <img className="w-13 mr-3" src={Logo} alt="" />

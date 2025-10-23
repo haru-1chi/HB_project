@@ -25,7 +25,7 @@ import {
   faXmark,
   faSave,
   faMagnifyingGlass,
-  faFileImport
+  faFileImport,
 } from "@fortawesome/free-solid-svg-icons";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -273,6 +273,14 @@ function KpiFormPage() {
       detail: msg,
       life: 3000,
     });
+  const showInfo = (msg) =>
+    toast.current.show({
+      severity: "info",
+      summary: "สำเร็จ",
+      detail: msg,
+      life: 3000,
+    });
+
   const showError = (msg) =>
     toast.current.show({
       severity: "error",
@@ -563,13 +571,18 @@ function KpiFormPage() {
 
   const submitRows = useCallback(async () => {
     try {
-      if (rows.some((r) => !r.kpi_name || !r.a_value || !r.b_value)) {
+      if (
+        rows.some((r) => !r.kpi_name || !r.a_value || !r.b_value || !r.type)
+      ) {
         showError("กรุณากรอกข้อมูลให้ครบ");
         return;
       }
 
       const payload = buildPayload();
-
+      if (payload.length === 0) {
+        showError("กรุณาเพิ่มข้อมูลอย่างน้อย 1 แถว");
+        return;
+      }
       const res = await axiosInstance.post(
         `${API_BASE}/kpi-data/check-duplicates`,
         payload,
@@ -661,6 +674,13 @@ function KpiFormPage() {
         });
       }
 
+      if (payload.length === 0) {
+        showInfo("ไม่มีข้อมูลใหม่ที่จะเพิ่ม");
+        setDialogVisible(false);
+        setShowDuplicateDialog(false);
+        return;
+      }
+
       const mode = choice === "overwrite" ? "overwrite" : "skip";
       console.log("confirm payload", payload);
       try {
@@ -685,11 +705,14 @@ function KpiFormPage() {
     },
     [API_BASE, token, buildPayload, showError, showSuccess]
   );
-
+  const chooseOptions = {
+    icon: <FontAwesomeIcon icon={faFileImport} />,
+    className: "gap-3",
+  };
   const dialogFooterTemplate = (
     <div className="flex justify-between border-t-1 pt-3 border-gray-300">
       <FileUpload
-        icon={<FontAwesomeIcon icon={faFileImport} />}
+        chooseOptions={chooseOptions}
         ref={fileUploadRef}
         mode="basic"
         name="kpiFile"
