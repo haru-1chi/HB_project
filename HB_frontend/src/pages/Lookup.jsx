@@ -1,5 +1,5 @@
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
-import React, { useState, useEffect, useRef } from "react";
 import { Button } from "primereact/button";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
@@ -7,9 +7,9 @@ import { InputText } from "primereact/inputtext";
 import { ConfirmDialog, confirmDialog } from "primereact/confirmdialog";
 import { Toast } from "primereact/toast";
 import { Dialog } from "primereact/dialog";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { IconField } from "primereact/iconfield";
 import { InputIcon } from "primereact/inputicon";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faTrash,
   faEdit,
@@ -21,28 +21,27 @@ import {
 import Footer from "../components/Footer";
 
 function Lookup() {
+  const API_BASE =
+    import.meta.env.VITE_REACT_APP_API || "http://localhost:3000/api";
+
   const [searchTerm, setSearchTerm] = useState("");
   const [dialogVisible, setDialogVisible] = useState(false);
-  const [allKPIChoices, setAllKPIChoices] = useState([]);
-  const [filteredKPIChoices, setFilteredKPIChoices] = useState([]);
+  const [allKPIChoices, setAllKPIChoices] = useState([]); //rename
 
   const [formValues, setFormValues] = useState({
     kpi_name: "",
     a_name: "",
     b_name: "",
   });
-  const [formErrors, setFormErrors] = useState({});
-
   const [editRowId, setEditRowId] = useState(null);
   const [editValues, setEditValues] = useState({
     kpi_name: "",
     a_name: "",
     b_name: "",
   });
+  const [formErrors, setFormErrors] = useState({});
 
   const toast = useRef(null);
-  const API_BASE =
-    import.meta.env.VITE_REACT_APP_API || "http://localhost:3000/api";
   const token = localStorage.getItem("token");
 
   const showToast = (severity, summary, detail) => {
@@ -54,42 +53,32 @@ function Lookup() {
     });
   };
 
-  const fetchKPInames = async () => {
+  const fetchKPInames = useCallback(async () => {
     try {
-      const response = await axios.get(`${API_BASE}/kpi-name`);
-      setAllKPIChoices(response.data);
-    } catch (error) {
-      console.error("Failed to fetch KPI names:", error);
+      const res = await axios.get(`${API_BASE}/kpi-name`);
+      setAllKPIChoices(res.data);
+    } catch (err) {
+      showToast("error", "ผิดพลาด", "ไม่สามารถดึงข้อมูลได้");
+      console.error(err);
     }
-  };
-
-  useEffect(() => {
-    fetchKPInames();
   }, []);
 
   useEffect(() => {
-    const filtered = allKPIChoices.filter((item) => {
-      const search = searchTerm.toLowerCase();
-      return (
-        item.kpi_name?.toLowerCase().includes(search) ||
-        item.a_name?.toLowerCase().includes(search) ||
-        item.b_name?.toLowerCase().includes(search)
-      );
-    });
-    setFilteredKPIChoices(filtered);
-  }, [searchTerm, allKPIChoices]);
+    fetchKPInames();
+  }, [fetchKPInames]);
 
-  const validateForm = () => {
+  const validate = (values) => {
     const errors = {};
-    if (!formValues.kpi_name.trim()) errors.kpi_name = "กรุณากรอกชื่อตัวชี้วัด";
-    if (!formValues.a_name.trim()) errors.a_name = "กรุณากรอกชื่อตัวตั้ง";
-    if (!formValues.b_name.trim()) errors.b_name = "กรุณากรอกชื่อตัวหาร";
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
+    if (!values.kpi_name?.trim()) errors.kpi_name = "กรุณากรอกชื่อตัวชี้วัด";
+    if (!values.a_name?.trim()) errors.a_name = "กรุณากรอกชื่อตัวตั้ง";
+    if (!values.b_name?.trim()) errors.b_name = "กรุณากรอกชื่อตัวหาร";
+    return errors;
   };
 
   const handleAdd = async () => {
-    if (!validateForm()) return;
+    const errors = validate(formValues);
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) return;
 
     try {
       await axios.post(`${API_BASE}/kpi-name`, [formValues], {
@@ -98,28 +87,11 @@ function Lookup() {
       showToast("success", "สำเร็จ", "บันทึกรายการเรียบร้อยแล้ว");
       fetchKPInames();
       setFormValues({ kpi_name: "", a_name: "", b_name: "" });
-      setFormErrors({});
       setDialogVisible(false);
     } catch (error) {
       showToast("error", "ผิดพลาด", "ไม่สามารถเพิ่มข้อมูลได้");
       console.error("Failed to add KPI:", error);
     }
-  };
-
-  const validateEditForm = () => {
-    const errors = {};
-    if (!editValues.kpi_name || !editValues.kpi_name.trim()) {
-      errors.kpi_name = "กรุณากรอกชื่อตัวชี้วัด";
-    }
-    if (!editValues.a_name || !editValues.a_name.trim()) {
-      errors.a_name = "กรุณากรอกชื่อตัวตั้ง";
-    }
-    if (!editValues.b_name || !editValues.b_name.trim()) {
-      errors.b_name = "กรุณากรอกชื่อตัวหาร";
-    }
-
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
   };
 
   const handleEditSave = async (id) => {
@@ -150,7 +122,9 @@ function Lookup() {
   };
 
   const confirmSave = (id) => {
-    if (!validateEditForm()) {
+    const errors = validate(editValues);
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) {
       showToast("warn", "คำเตือน", "กรุณากรอกข้อมูลให้ครบทุกช่อง");
       return;
     }
@@ -169,6 +143,21 @@ function Lookup() {
       acceptClassName: "p-button-danger",
       accept: () => handleDelete(id),
     });
+
+  const cancelEdit = () => {
+    setEditRowId(null);
+    setEditValues({ kpi_name: "", a_name: "", b_name: "" });
+    setFormErrors({});
+  };
+
+  const filteredList = allKPIChoices.filter((item) => {
+    const term = searchTerm.toLowerCase();
+    return (
+      item.kpi_name?.toLowerCase().includes(term) ||
+      item.a_name?.toLowerCase().includes(term) ||
+      item.b_name?.toLowerCase().includes(term)
+    );
+  });
 
   const editActionBody = (rowData) =>
     editRowId === rowData.id ? (
@@ -221,32 +210,29 @@ function Lookup() {
 
   const kpiNameBody = (rowData) =>
     editRowId === rowData.id ? (
-      <div className="flex flex-col gap-2">
-        {["kpi_name", "a_name", "b_name"].map((field, idx) => (
-          <>
-            <InputText
-              key={idx}
-              value={editValues[field]}
-              onChange={(e) =>
-                setEditValues({ ...editValues, [field]: e.target.value })
-              }
-              placeholder={
-                field === "kpi_name"
-                  ? "ชื่อตัวชี้วัด"
-                  : field === "a_name"
-                  ? "ค่าตัวตั้ง"
-                  : "ค่าตัวหาร"
-              }
-              className={`w-full ${formErrors[field] ? "p-invalid" : ""}`}
-            />
-            {formErrors[field] && (
-              <small className="p-error">{formErrors[field]}</small>
-            )}
-          </>
-        ))}
-      </div>
+      ["kpi_name", "a_name", "b_name"].map((field) => (
+        <div key={field} className="mb-2">
+          <InputText
+            value={editValues[field]}
+            onChange={(e) =>
+              setEditValues({ ...editValues, [field]: e.target.value })
+            }
+            className={`w-full ${formErrors[field] ? "p-invalid" : ""}`}
+            placeholder={
+              field === "kpi_name"
+                ? "ชื่อตัวชี้วัด"
+                : field === "a_name"
+                ? "ตัวตั้ง"
+                : "ตัวหาร"
+            }
+          />
+          {formErrors[field] && (
+            <small className="p-error">{formErrors[field]}</small>
+          )}
+        </div>
+      ))
     ) : (
-      <div>
+      <>
         <p>
           <b>ชื่อ:</b> {rowData.kpi_name}
         </p>
@@ -256,13 +242,8 @@ function Lookup() {
         <p>
           <b>ตัวหาร:</b> {rowData.b_name}
         </p>
-      </div>
+      </>
     );
-
-  const cancelEdit = () => {
-    setEditRowId(null);
-    setEditValues({ kpi_name: "", a_name: "", b_name: "" });
-  };
 
   const header = (
     <div className="flex items-end justify-between">
@@ -298,7 +279,7 @@ function Lookup() {
         <div>
           <DataTable
             header={header}
-            value={filteredKPIChoices}
+            value={filteredList}
             tableStyle={{ minWidth: "50rem" }}
             emptyMessage="ไม่พบข้อมูล"
             paginator

@@ -343,6 +343,8 @@ exports.getKPIData = async (req, res) => {
             params.push(`%${search}%`, `%${search}%`, `%${search}%`);
         }
 
+        query += ` ORDER BY d.report_date ASC`;
+
         const data = await new Promise((resolve, reject) => {
             db.query(query, params, (err, results) => {
                 if (err) reject(err);
@@ -511,6 +513,7 @@ exports.getKPIName = async (req, res) => {
       deleted_at
     FROM kpi_name
     ${includeDeleted ? "" : "WHERE deleted_at IS NULL"}
+    order by deleted_at asc
   `;
 
         const result = await new Promise((resolve, reject) => {

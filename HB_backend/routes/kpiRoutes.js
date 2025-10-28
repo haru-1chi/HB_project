@@ -3,7 +3,7 @@ const router = express.Router();
 const kpiController = require('../controllers/kpiController');
 const { auth } = require("../middleware/auth")
 
-router.post('/create', auth, kpiController.createdata); //ไม่ใช้แล้ว
+router.post('/kpi-data/create', auth, kpiController.createdata); //ไม่ใช้แล้ว
 router.post('/kpi-data/check-duplicates', auth, kpiController.checkDuplicates);
 router.post('/kpi-data', auth, kpiController.createOrUpdate);
 router.put('/kpi-data', auth, kpiController.updateKPIData);

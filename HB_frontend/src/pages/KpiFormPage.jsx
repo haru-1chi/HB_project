@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { classNames } from "primereact/utils";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 import { debounce } from "lodash";
+import { classNames } from "primereact/utils";
 import { Button } from "primereact/button";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
@@ -14,45 +16,43 @@ import { Dialog } from "primereact/dialog";
 import { IconField } from "primereact/iconfield";
 import { InputIcon } from "primereact/inputicon";
 import { Checkbox } from "primereact/checkbox";
+import { Skeleton } from "primereact/skeleton";
 import { ScrollTop } from "primereact/scrolltop";
 import { FileUpload } from "primereact/fileupload";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faTrash,
   faEdit,
-  faPlus,
   faCheck,
   faXmark,
-  faSave,
   faMagnifyingGlass,
   faFileImport,
 } from "@fortawesome/free-solid-svg-icons";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
 import Footer from "../components/Footer";
+import KpiFormDialog from "../components/KpiFormDialog";
+import DuplicateDialog from "../components/DuplicateDialog";
 import axiosInstance, { setAuthErrorInterceptor } from "../utils/axiosInstance";
-const API_BASE =
-  import.meta.env.VITE_REACT_APP_API || "http://localhost:3000/api";
-import * as XLSX from "xlsx";
 
+import { handleFileUpload } from "../utils/importUtils";
 function KpiFormPage() {
+  const API_BASE =
+    import.meta.env.VITE_REACT_APP_API || "http://localhost:3000/api";
   const { logout } = useAuth();
   const navigate = useNavigate();
-  const fileUploadRef = useRef(null);
   const token = localStorage.getItem("token");
+
   const toast = useRef(null);
+  const fileUploadRef = useRef(null);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
-
   const [dialogVisible, setDialogVisible] = useState(false);
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
 
-  const [kpiNamesActive, setKpiNamesActive] = useState([]);
   const [kpiNames, setKpiNames] = useState([]);
-
+  const [kpiNamesActive, setKpiNamesActive] = useState([]);
   const [selectedKpi, setSelectedKpi] = useState(null);
   const [kpiData, setKpiData] = useState([]);
-
   const [duplicatePairs, setDuplicatePairs] = useState([]);
 
   const [editRowId, setEditRowId] = useState(null);
@@ -63,128 +63,14 @@ function KpiFormPage() {
     toast.current?.show({ severity, summary, detail, life: 3000 });
   }, []);
 
-  const parseExcelDate = (value) => {
-    if (!value) return null;
-    if (value instanceof Date) return value;
-
-    if (typeof value === "number") {
-      const date = XLSX.SSF.parse_date_code(value);
-      return date ? new Date(date.y, date.m - 1, date.d) : null;
-    }
-
-    if (typeof value === "string") {
-      const parts = value.split("/");
-      if (parts.length === 3) {
-        const [day, month, year] = parts.map(Number);
-        if (day && month && year) return new Date(year, month - 1, day);
-      }
-    }
-
-    return null;
-  };
-
-  const handleFileUpload = (event) => {
-    const file = event.files?.[0];
-    if (!file) return;
-    const validExtensions = ["xls", "xlsx", "csv"];
-    const fileExtension = file.name.split(".").pop().toLowerCase();
-
-    if (!validExtensions.includes(fileExtension)) {
-      showToast(
-        "warn",
-        "ประเภทไฟล์ไม่ถูกต้อง",
-        "กรุณาอัปโหลดไฟล์ Excel (.xls, .xlsx, .csv) เท่านั้น"
-      );
-      fileUploadRef.current?.clear();
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = ({ target }) => {
-      const workbook = XLSX.read(target.result, { type: "binary" });
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-      if (!jsonData?.length || jsonData.length <= 1) {
-        showToast(
-          "warn",
-          "ไม่พบข้อมูล",
-          "ไฟล์ Excel ว่างหรือไม่มีข้อมูลให้นำเข้า"
-        );
-        fileUploadRef.current?.clear();
-        return;
-      }
-
-      const importedRows = [];
-
-      for (let i = 1; i < jsonData.length; i++) {
-        const row = jsonData[i];
-        if (!row || !row.length) continue;
-
-        // Skip truly empty rows
-        const hasData = row.some(
-          (cell) => cell != null && String(cell).trim() !== ""
-        );
-        if (!hasData) continue;
-
-        // Excel structure: ลำดับ, ตัวชี้วัด, ตัวตั้ง, ตัวหาร, เดือน/ปี, ค่าตัวตั้ง, ค่าตัวหาร, ประเภท
-        const [, kpiLabel, , , dateVal, a_value = "", b_value = "", type = ""] =
-          row;
-
-        // Try to match KPI label → ID
-        const matchedKpi = kpiNamesActive.find(
-          (k) => k.label.trim() === String(kpiLabel || "").trim()
-        );
-
-        const report_date = parseExcelDate(dateVal);
-
-        importedRows.push({
-          id: importedRows.length + 1,
-          kpi_name: matchedKpi ? matchedKpi.value : null,
-          a_name: matchedKpi?.a_name || "",
-          b_name: matchedKpi?.b_name || "",
-          report_date: report_date || null,
-          a_value: a_value || "",
-          b_value: b_value || "",
-          type: type || "",
-        });
-      }
-
-      if (!importedRows.length) {
-        showToast(
-          "warn",
-          "ข้อมูลไม่ถูกต้อง",
-          "ไม่พบข้อมูลที่มีรูปแบบถูกต้องให้นำเข้า"
-        );
-        fileUploadRef.current?.clear();
-        return;
-      }
-
-      setRows((prev) => {
-        const existing = prev.filter(
-          (r) =>
-            r.kpi_name ||
-            r.a_name ||
-            r.b_name ||
-            r.a_value ||
-            r.b_value ||
-            r.type ||
-            r.report_date
-        );
-
-        const startId = existing.length + 1;
-        const merged = [
-          ...existing,
-          ...importedRows.map((r, i) => ({ ...r, id: startId + i })),
-        ];
-
-        return merged;
-      });
-
-      showToast("success", "สำเร็จ", "นำเข้าข้อมูลเรียบร้อยแล้ว");
-      fileUploadRef.current?.clear();
-    };
-
-    reader.readAsBinaryString(file);
+  const onFileUpload = (event) => {
+    handleFileUpload({
+      event,
+      kpiNamesActive,
+      showToast,
+      fileUploadRef,
+      setRows,
+    });
   };
 
   //เรียกดูข้อมูลตามชื่อตัวชี้วัด
@@ -265,29 +151,6 @@ function KpiFormPage() {
       setSelectedRows(allNewRows);
     }
   }, [showDuplicateDialog, duplicatePairs]);
-
-  const showSuccess = (msg) =>
-    toast.current.show({
-      severity: "success",
-      summary: "สำเร็จ",
-      detail: msg,
-      life: 3000,
-    });
-  const showInfo = (msg) =>
-    toast.current.show({
-      severity: "info",
-      summary: "สำเร็จ",
-      detail: msg,
-      life: 3000,
-    });
-
-  const showError = (msg) =>
-    toast.current.show({
-      severity: "error",
-      summary: "ผิดพลาด",
-      detail: msg,
-      life: 3000,
-    });
 
   // start editing a row
   const startEditRow = useCallback((row) => {
@@ -574,13 +437,13 @@ function KpiFormPage() {
       if (
         rows.some((r) => !r.kpi_name || !r.a_value || !r.b_value || !r.type)
       ) {
-        showError("กรุณากรอกข้อมูลให้ครบ");
+        showToast("error", "ผิดพลาด", "กรุณากรอกข้อมูลให้ครบ");
         return;
       }
 
       const payload = buildPayload();
       if (payload.length === 0) {
-        showError("กรุณาเพิ่มข้อมูลอย่างน้อย 1 แถว");
+        showToast("error", "ผิดพลาด", "กรุณาเพิ่มข้อมูลอย่างน้อย 1 แถว");
         return;
       }
       const res = await axiosInstance.post(
@@ -605,7 +468,7 @@ function KpiFormPage() {
           { data: payload, mode: "skip" },
           { headers: { token } }
         );
-        showSuccess("เพิ่มข้อมูลเรียบร้อยแล้ว");
+        showToast("success", "สำเร็จ", "เพิ่มข้อมูลเรียบร้อยแล้ว");
         fetchKpiData(selectedKpi);
         resetRows();
         setDialogVisible(false);
@@ -617,8 +480,7 @@ function KpiFormPage() {
     rows,
     API_BASE,
     token,
-    showError,
-    showSuccess,
+    showToast,
     fetchKpiData,
     selectedKpi,
     buildPayload,
@@ -675,9 +537,11 @@ function KpiFormPage() {
       }
 
       if (payload.length === 0) {
-        showInfo("ไม่มีข้อมูลใหม่ที่จะเพิ่ม");
+        showToast("info", "สำเร็จ", "ไม่มีข้อมูลใหม่ที่จะเพิ่ม");
         setDialogVisible(false);
         setShowDuplicateDialog(false);
+        fetchKpiData(selectedKpi);
+        resetRows();
         return;
       }
 
@@ -689,7 +553,9 @@ function KpiFormPage() {
           { data: payload, mode },
           { headers: { token } }
         );
-        showSuccess(
+        showToast(
+          "success",
+          "สำเร็จ",
           mode === "overwrite"
             ? "เขียนทับข้อมูลเรียบร้อยแล้ว"
             : "เพิ่มข้อมูลที่ไม่ซ้ำเรียบร้อยแล้ว"
@@ -700,15 +566,27 @@ function KpiFormPage() {
         setShowDuplicateDialog(false);
       } catch (err) {
         console.error(err);
-        showError("ไม่สามารถดำเนินการได้");
+        showToast("error", "ผิดพลาด", "ไม่สามารถดำเนินการได้");
       }
     },
-    [API_BASE, token, buildPayload, showError, showSuccess]
+    [
+      API_BASE,
+      token,
+      buildPayload,
+      duplicatePairs,
+      selectedRows,
+      fetchKpiData,
+      resetRows,
+      showToast,
+      normalizeDate,
+    ]
   );
+
   const chooseOptions = {
     icon: <FontAwesomeIcon icon={faFileImport} />,
     className: "gap-3",
   };
+
   const dialogFooterTemplate = (
     <div className="flex justify-between border-t-1 pt-3 border-gray-300">
       <FileUpload
@@ -721,7 +599,7 @@ function KpiFormPage() {
         auto
         chooseLabel="Import Excel"
         customUpload
-        uploadHandler={handleFileUpload}
+        uploadHandler={onFileUpload}
       />
       <Button label="บันทึกข้อมูล" severity="success" onClick={submitRows} />
     </div>
@@ -901,240 +779,26 @@ function KpiFormPage() {
         </div>
       </div>
 
-      <Dialog
-        header="เพิ่มข้อมูล"
-        visible={dialogVisible}
-        style={{ width: "75vw" }}
-        maximizable
-        modal
-        onHide={() => setDialogVisible(false)}
-        footer={dialogFooterTemplate}
-        contentStyle={{ minHeight: "500px" }}
-      >
-        <DataTable
-          value={rows}
-          showGridlines
-          tableStyle={{ minWidth: "60rem" }}
-          size="small"
-        >
-          <Column
-            header="ลำดับ"
-            body={(_, opt) => opt.rowIndex + 1}
-            style={{ width: "50px" }}
-            align="center"
-          />
+      <KpiFormDialog
+        dialogVisible={dialogVisible}
+        setDialogVisible={() => setDialogVisible(false)}
+        kpiNamesActive={kpiNamesActive}
+        rows={rows}
+        handleInputChange={handleInputChange}
+        addRow={addRow}
+        removeRow={removeRow}
+        dialogFooterTemplate={dialogFooterTemplate}
+      />
 
-          <Column
-            field="kpi_name"
-            header="ชื่อตัวชี้วัด"
-            className="w-75"
-            body={(row, opt) => (
-              <Dropdown
-                value={row.kpi_name}
-                options={kpiNamesActive}
-                placeholder="เลือก KPI"
-                className="w-75"
-                onChange={(e) => {
-                  const selectedId = e.value;
-                  const selectedOption = kpiNamesActive.find(
-                    (o) => o.value === selectedId
-                  );
+      <DuplicateDialog
+        showDuplicateDialog={showDuplicateDialog}
+        setShowDuplicateDialog={() => setShowDuplicateDialog(false)}
+        duplicatePairs={duplicatePairs}
+        selectedRows={selectedRows}
+        setSelectedRows={setSelectedRows}
+        dialogFooterDuplicate={dialogFooterDuplicate}
+      />
 
-                  handleInputChange(opt.rowIndex, "kpi_name", selectedId);
-                  handleInputChange(
-                    opt.rowIndex,
-                    "a_name",
-                    selectedOption?.a_name || ""
-                  );
-                  handleInputChange(
-                    opt.rowIndex,
-                    "b_name",
-                    selectedOption?.b_name || ""
-                  );
-                }}
-                optionLabel="label"
-              />
-            )}
-          />
-
-          <Column
-            field="a_name"
-            header="ชื่อตัวตั้ง"
-            body={(row) => <p>{row.a_name || "-"}</p>}
-          />
-          <Column
-            field="b_name"
-            header="ชื่อตัวหาร"
-            body={(row) => <p>{row.b_name || "-"}</p>}
-          />
-          <Column
-            field="report_date"
-            header="เดือน/ปี"
-            style={{ width: "160px" }}
-            body={(row, opt) => (
-              <Calendar
-                value={row.report_date}
-                onChange={(e) =>
-                  handleInputChange(opt.rowIndex, "report_date", e.value)
-                }
-                view="month"
-                dateFormat="mm/yy"
-                showIcon
-              />
-            )}
-          />
-
-          <Column
-            field="a_value"
-            header="ค่าตัวตั้ง"
-            style={{ width: "120px" }}
-            body={(row, opt) => (
-              <InputText
-                value={row.a_value}
-                onChange={(e) =>
-                  handleInputChange(opt.rowIndex, "a_value", e.target.value)
-                }
-                className="w-full"
-              />
-            )}
-          />
-
-          <Column
-            field="b_value"
-            header="ค่าตัวหาร"
-            style={{ width: "120px" }}
-            body={(row, opt) => (
-              <InputText
-                value={row.b_value}
-                onChange={(e) =>
-                  handleInputChange(opt.rowIndex, "b_value", e.target.value)
-                }
-                className="w-full"
-              />
-            )}
-          />
-
-          <Column
-            field="type"
-            header="ประเภท"
-            style={{ width: "150px" }}
-            body={(row, opt) => (
-              <Dropdown
-                value={row.type}
-                options={[
-                  { label: "ไทย", value: "ไทย" },
-                  { label: "ต่างชาติ", value: "ต่างชาติ" },
-                ]}
-                onChange={(e) =>
-                  handleInputChange(opt.rowIndex, "type", e.value)
-                }
-                placeholder="เลือกประเภท"
-                className="w-full"
-              />
-            )}
-          />
-          <Column
-            align="center"
-            header="ลบ"
-            style={{ width: "50px" }}
-            body={(row, opt) => (
-              <Button
-                icon={<FontAwesomeIcon icon={faXmark} />}
-                severity="danger"
-                rounded
-                text
-                aria-label="Cancel"
-                onClick={() => removeRow(opt.rowIndex)}
-              />
-            )}
-          />
-        </DataTable>
-        <div className="flex justify-end mt-3">
-          <Button
-            label="+ เพิ่มแถว"
-            onClick={addRow}
-            className="mr-2"
-            size="small"
-          />
-        </div>
-      </Dialog>
-
-      <Dialog
-        header="พบข้อมูลซ้ำ!"
-        visible={showDuplicateDialog}
-        style={{ width: "75vw" }}
-        maximizable
-        modal
-        onHide={() => setShowDuplicateDialog(false)}
-        footer={dialogFooterDuplicate}
-      >
-        <DataTable
-          value={duplicatePairs}
-          showGridlines
-          size="small"
-          tableStyle={{ minWidth: "60rem" }}
-          rowClassName={(rowData) => ({
-            "new-row": rowData[0].status === "ใหม่",
-            "old-row": rowData[0].status === "เดิม",
-          })}
-          selection={selectedRows}
-          onSelectionChange={(e) => setSelectedRows(e.value)}
-        >
-          <Column
-            headerStyle={{ width: "3rem", textAlign: "center" }}
-            bodyStyle={{ textAlign: "center" }}
-            body={(rowData) =>
-              rowData.status === "ใหม่" ? (
-                <Checkbox
-                  checked={selectedRows.some((r) => r.id === rowData.id)}
-                  onChange={(e) => {
-                    setSelectedRows((prev) =>
-                      e.checked
-                        ? [...prev, rowData]
-                        : prev.filter((r) => r.id !== rowData.id)
-                    );
-                  }}
-                />
-              ) : (
-                <span>—</span>
-              )
-            }
-          />
-
-          <Column
-            sortable
-            field="status"
-            header="สถานะ"
-            style={{ width: "8rem" }}
-          />
-          <Column sortable field="kpi_label" header="ตัวชี้วัด" />
-          <Column
-            sortable
-            field="a_value"
-            header="ค่าตัวตั้ง"
-            bodyClassName={(rowData) =>
-              classNames({
-                "old-cell": rowData[0].status === "เดิม",
-                "new-cell": rowData[0].status === "ใหม่",
-              })
-            }
-          />
-
-          <Column
-            sortable
-            field="b_value"
-            header="ค่าตัวหาร"
-            bodyClassName={(rowData) =>
-              classNames({
-                "old-cell": rowData[0].status === "เดิม",
-                "new-cell": rowData[0].status === "ใหม่",
-              })
-            }
-          />
-          <Column sortable field="report_date" header="เดือน/ปี" />
-          <Column sortable field="type" header="ประเภท" />
-        </DataTable>
-      </Dialog>
       <Footer />
     </div>
   );
