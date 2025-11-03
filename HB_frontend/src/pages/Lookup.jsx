@@ -9,6 +9,7 @@ import { Toast } from "primereact/toast";
 import { Dialog } from "primereact/dialog";
 import { IconField } from "primereact/iconfield";
 import { InputIcon } from "primereact/inputicon";
+import { InputNumber } from "primereact/inputnumber";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faTrash,
@@ -32,12 +33,14 @@ function Lookup() {
     kpi_name: "",
     a_name: "",
     b_name: "",
+    max_value: "",
   });
   const [editRowId, setEditRowId] = useState(null);
   const [editValues, setEditValues] = useState({
     kpi_name: "",
     a_name: "",
     b_name: "",
+    max_value: "",
   });
   const [formErrors, setFormErrors] = useState({});
 
@@ -86,7 +89,7 @@ function Lookup() {
       });
       showToast("success", "สำเร็จ", "บันทึกรายการเรียบร้อยแล้ว");
       fetchKPInames();
-      setFormValues({ kpi_name: "", a_name: "", b_name: "" });
+      setFormValues({ kpi_name: "", a_name: "", b_name: "", max_value: "" });
       setDialogVisible(false);
     } catch (error) {
       showToast("error", "ผิดพลาด", "ไม่สามารถเพิ่มข้อมูลได้");
@@ -146,7 +149,7 @@ function Lookup() {
 
   const cancelEdit = () => {
     setEditRowId(null);
-    setEditValues({ kpi_name: "", a_name: "", b_name: "" });
+    setEditValues({ kpi_name: "", a_name: "", b_name: "", max_value: "" });
     setFormErrors({});
   };
 
@@ -155,7 +158,8 @@ function Lookup() {
     return (
       item.kpi_name?.toLowerCase().includes(term) ||
       item.a_name?.toLowerCase().includes(term) ||
-      item.b_name?.toLowerCase().includes(term)
+      item.b_name?.toLowerCase().includes(term) ||
+      item.max_value?.toLowerCase().includes(term)
     );
   });
 
@@ -190,6 +194,7 @@ function Lookup() {
               kpi_name: rowData.kpi_name,
               a_name: rowData.a_name,
               b_name: rowData.b_name,
+              max_value: rowData.max_value,
             });
           }}
         />
@@ -210,27 +215,41 @@ function Lookup() {
 
   const kpiNameBody = (rowData) =>
     editRowId === rowData.id ? (
-      ["kpi_name", "a_name", "b_name"].map((field) => (
-        <div key={field} className="mb-2">
-          <InputText
-            value={editValues[field]}
-            onChange={(e) =>
-              setEditValues({ ...editValues, [field]: e.target.value })
+      <>
+        {["kpi_name", "a_name", "b_name"].map((field) => (
+          <div key={field} className="mb-2">
+            <InputText
+              value={editValues[field]}
+              onChange={(e) =>
+                setEditValues({ ...editValues, [field]: e.target.value })
+              }
+              className={`w-full ${formErrors[field] ? "p-invalid" : ""}`}
+              placeholder={
+                field === "kpi_name"
+                  ? "ชื่อตัวชี้วัด"
+                  : field === "a_name"
+                  ? "ตัวตั้ง"
+                  : "ตัวหาร"
+              }
+            />
+            {formErrors[field] && (
+              <small className="p-error">{formErrors[field]}</small>
+            )}
+          </div>
+        ))}
+        <div className="mb-2">
+          <InputNumber
+            inputId="max_value"
+            value={editValues.max_value || ""}
+            onValueChange={(e) =>
+              setEditValues({ ...editValues, max_value: e.value })
             }
-            className={`w-full ${formErrors[field] ? "p-invalid" : ""}`}
-            placeholder={
-              field === "kpi_name"
-                ? "ชื่อตัวชี้วัด"
-                : field === "a_name"
-                ? "ตัวตั้ง"
-                : "ตัวหาร"
-            }
+            maxFractionDigits={2}
+            className="w-full"
+            placeholder="ค่าเป้าหมาย (%)"
           />
-          {formErrors[field] && (
-            <small className="p-error">{formErrors[field]}</small>
-          )}
         </div>
-      ))
+      </>
     ) : (
       <>
         <p>
@@ -241,6 +260,9 @@ function Lookup() {
         </p>
         <p>
           <b>ตัวหาร:</b> {rowData.b_name}
+        </p>
+        <p>
+          <b>ค่าเป้าหมาย (%):</b> {rowData.max_value || "-"}
         </p>
       </>
     );
@@ -345,6 +367,20 @@ function Lookup() {
               )}
             </div>
           ))}
+
+          <div className="mt-3">
+            <label htmlFor="max_value">ค่าเป้าหมาย (%)</label>
+            <InputNumber
+              inputId="max_value"
+              value={formValues.max_value}
+              onValueChange={(e) =>
+                setFormValues({ ...formValues, max_value: e.value })
+              }
+              maxFractionDigits={2}
+              placeholder="0.00"
+              className="w-full"
+            />
+          </div>
 
           <div className="flex justify-end mt-6">
             <Button

@@ -8,7 +8,8 @@ import {
   faArrowRightFromBracket,
   faChevronLeft,
   faChevronRight,
-  faMarker
+  faMarker,
+  faUser,
 } from "@fortawesome/free-solid-svg-icons";
 import { Button } from "primereact/button";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -84,7 +85,7 @@ function SideBarMenu({ collapsed, setCollapsed }) {
           }`}
         >
           {!collapsed ? (
-            "ตัวชี้วัดอัตราการเสียชีวิต"
+            "Quality & Safety"
           ) : (
             <div className="text-center">
               <FontAwesomeIcon icon={faChartLine} />
@@ -128,9 +129,25 @@ function SideBarMenu({ collapsed, setCollapsed }) {
       </div>
 
       <div className="mt-auto px-2 py-4">
-        {!collapsed && user && (
-          <div className="p-3 mb-2 border-b border-gray-300">{user.name}</div>
-        )}
+        <Link
+          to="/Profile"
+          className={`p-3 rounded-lg block mb-3 ${
+            isActive("/Profile")
+              ? "text-white font-bold bg-teal-500"
+              : "text-gray-700 hover:text-teal-500"
+          }`}
+        >
+          {!collapsed && user ? (
+            <div className="flex items-center">
+              <FontAwesomeIcon icon={faUser} />
+              <p className="ml-3">{user.name}</p>
+            </div>
+          ) : (
+            <div className="text-center">
+              <FontAwesomeIcon icon={faUser} />
+            </div>
+          )}
+        </Link>
         <Button
           icon={<FontAwesomeIcon icon={faArrowRightFromBracket} />}
           label={!collapsed ? "ออกจากระบบ" : ""}

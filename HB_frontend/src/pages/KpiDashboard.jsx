@@ -7,6 +7,7 @@ import { Column } from "primereact/column";
 import { ColumnGroup } from "primereact/columngroup";
 import { Row } from "primereact/row";
 import { Button } from "primereact/button";
+import GaugeChart from "../components/GaugeChart";
 import KPILineChart from "../components/KPILineChart";
 import BarChart from "../components/BarChart";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -14,6 +15,7 @@ import {
   faFileExport,
   faArrowTrendUp,
   faArrowTrendDown,
+  faLessThanEqual,
 } from "@fortawesome/free-solid-svg-icons";
 import Footer from "../components/Footer";
 import { formatDateForSQL, formatMonthYear } from "../utils/dateTime";
@@ -50,8 +52,23 @@ function KpiDashboard() {
   const selectedChart = [
     //chartOptions
     { label: "ร้อยละ", value: "percent" },
-    { label: "A,B", value: "ratio" },
+    { label: "เทียบไทย/ต่างชาติ", value: "ratio" },
   ];
+
+  const order = ["thai_rate", "foreigner_rate", "sum_rate"];
+  const sortedData = [...dataCurrentMonth].sort(
+    (a, b) => order.indexOf(a.type) - order.indexOf(b.type)
+  );
+
+  const selectedKPINameLabel =
+    allKPIChoices.find((item) => item.value === selectedKPIName)?.label || "";
+  const selectedTypeLabel =
+    selectedOptions.find((item) => item.value === selectedTypeOptions)?.label ||
+    "";
+
+  const exportExcel = () => {
+    exportToExcel(detail, selectedKPINameLabel, selectedTypeLabel, sortedData);
+  };
 
   const fetchKPInames = useCallback(async () => {
     //reanme fetchKpiOptions
@@ -97,6 +114,7 @@ function KpiDashboard() {
       setData(chartRes.data || []);
       setDetail(detailRes.data || []);
       setDataCurrentMonth(summaryRes.data || []);
+      console.log(summaryRes.data);
       setError(null);
     } catch (err) {
       console.error("Error fetching KPI dashboard data:", err);
@@ -134,27 +152,29 @@ function KpiDashboard() {
       </div>
     );
   };
-
-  const getTrendText = (note) => {
-    if (!note || note === "null") return null;
+  const [value, setValue] = useState(0);
+  const getTrendText = (type) => {
+    if (!type || type === "null") return null;
 
     const isPositive = true;
     // const isPositive = note.startsWith("+");
-    return (
-      <span
-        className={`w-fit flex items-center px-2 py-1 gap-2 rounded-md ${
-          isPositive ? "bg-red-100" : "bg-green-100"
-        }`}
-      >
-        <FontAwesomeIcon
-          icon={isPositive ? faArrowTrendUp : faArrowTrendDown}
-          className={isPositive ? "text-red-500" : "text-green-500"}
-        />
-        เกินเป้าหมาย 1.5%
-        {/* {isPositive ? `เพิ่มขึ้นจากเดือนก่อนหน้า` : `ลดลงจากเดือนก่อนหน้า`}{" "}
-        {note} */}
-      </span>
-    );
+
+    switch (type) {
+      case "sum_rate":
+        return <GaugeChart value={41.49} target={10} />;
+      case "thai_rate":
+        return <GaugeChart value={41.49} target={10} />;
+      default:
+        return (
+          <span
+            className={`w-fit flex items-center px-2 py-1 gap-2 rounded-md bg-green-100`}
+          >
+            <FontAwesomeIcon icon={faLessThanEqual} className="text-green-500" /> ค่าเป้าหมาย 50%
+            {/* {" "}<FontAwesomeIcon icon={faLessThanEqual} className="text-blue-500" />{" "} */}
+           
+          </span>
+        );
+    }
   };
   const getTitle = (type) => {
     const startLabel = formatMonthYear(sinceDate);
@@ -175,23 +195,9 @@ function KpiDashboard() {
     }
   };
 
-  const totalA = sumField(detail, "a_value");
-  const totalB = sumField(detail, "b_value");
-  const rate = totalB ? ((totalA / totalB) * 100).toFixed(2) : 0;
-
-  const selectedKPINameLabel =
-    allKPIChoices.find((item) => item.value === selectedKPIName)?.label || "";
-  const selectedTypeLabel =
-    selectedOptions.find((item) => item.value === selectedTypeOptions)?.label ||
-    "";
-
-  const exportExcel = () => {
-    exportToExcel(detail, selectedKPINameLabel, selectedTypeLabel);
-  };
-
   const header = (
     <div className="flex items-center justify-between">
-      <h1 className="text-lg">อัตราการเสียชีวิต</h1>
+      <h1 className="text-lg">{selectedKPINameLabel}</h1>
       <Button
         type="button"
         label="Export to Excel"
@@ -210,9 +216,9 @@ function KpiDashboard() {
     <ColumnGroup>
       <Row>
         <Column footer="รวม" />
-        <Column footer={totalA?.toLocaleString()} />
-        <Column footer={totalB?.toLocaleString()} />
-        <Column footer={rate} />
+        {sortedData.map((item, index) => (
+          <Column key={index} footer={item.value?.toLocaleString()} />
+        ))}
         <Column />
       </Row>
     </ColumnGroup>
@@ -225,7 +231,7 @@ function KpiDashboard() {
       >
         <div className="flex items-center mb-4">
           <h5 className="text-2xl font-semibold">
-            แผนผังตัวชี้วัดอัตราการเสียชีวิต
+            คุณภาพและความปลอดภัยในการดูแลผู้ป่วยโรคสำคัญ
           </h5>
         </div>
 
@@ -252,16 +258,18 @@ function KpiDashboard() {
                 className="mr-5"
               />
             </div>
-            <div className="hidden sm:block">
-              <Dropdown
-                value={selectedTypeOptions}
-                onChange={(e) => setselectedTypeOptions(e.value)}
-                options={selectedOptions}
-                optionLabel="label"
-                checkmark={true}
-                className="mr-5"
-              />
-            </div>
+            {selectedChartType === "percent" && (
+              <div className="hidden sm:block">
+                <Dropdown
+                  value={selectedTypeOptions}
+                  onChange={(e) => setselectedTypeOptions(e.value)}
+                  options={selectedOptions}
+                  optionLabel="label"
+                  checkmark={true}
+                  className="mr-5"
+                />
+              </div>
+            )}
           </div>
           <div className="flex items-center">
             <p className="mr-3">ช่วงเวลา</p>
@@ -322,10 +330,19 @@ function KpiDashboard() {
             footerColumnGroup={footerGroup}
           >
             <Column field="month" header="เดือน-ปี"></Column>
-            <Column field="a_value" header="A (จำนวนผู้เสียชีวิต)"></Column>
-            <Column field="b_value" header="B (จำนวนผู้ป่วยทุกสถานะ)"></Column>
-            <Column field="result" header="อัตราการเสียชีวิต (%)"></Column>
-            <Column header="หมายเหตุ" body={noteBodyTemplate}></Column>
+            <Column
+              field="result_thai"
+              header="อัตราการเสียชีวิตชาวไทย (%)"
+            ></Column>
+            <Column
+              field="result_foreign"
+              header="อัตราการเสียชีวิตชาวต่างชาติ (%)"
+            ></Column>
+            <Column
+              field="result_total"
+              header="อัตราการเสียชีวิตรวม (%)"
+            ></Column>
+            <Column header="แนวโน้ม" body={noteBodyTemplate}></Column>
           </DataTable>
         </div>
       </div>

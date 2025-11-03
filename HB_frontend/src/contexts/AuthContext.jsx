@@ -45,7 +45,8 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = useCallback(() => { // 💡 Wrap in useCallback
+  const logout = useCallback(() => {
+    // 💡 Wrap in useCallback
     localStorage.removeItem("token");
     setToken(null);
     setUser(null);
@@ -86,7 +87,9 @@ export const AuthProvider = ({ children }) => {
   }, [logout, navigate]);
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading }}>
+    <AuthContext.Provider
+      value={{ user, setUser, token, setToken, login, logout, loading }}
+    >
       {loading ? (
         <div className="flex items-center justify-center h-screen">
           <p>Loading...</p>

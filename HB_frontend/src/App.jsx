@@ -8,6 +8,7 @@ import KpiDashboard from "./pages/KpiDashboard";
 import Lookup from "./pages/Lookup";
 import KpiFormPage from "./pages/KpiFormPage";
 import Login from "./pages/Login";
+import Profile from "./pages/Profile";
 import ProtectedRoute from "./contexts/ProtectedRoute";
 import Layout from "./contexts/Layout";
 import { AuthProvider } from "./contexts/AuthContext";
@@ -42,6 +43,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <KpiFormPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/Profile"
+                element={
+                  <ProtectedRoute>
+                    <Profile />
                   </ProtectedRoute>
                 }
               />

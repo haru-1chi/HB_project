@@ -7,43 +7,47 @@ export const sumField = (data = [], field) => {
   return data.reduce((sum, row) => sum + Number(row[field] || 0), 0);
 };
 
-export const createExcelData = (detail, kpiLabel, typeLabel) => {
-  const totalA = sumField(detail, "a_value");
-  const totalB = sumField(detail, "b_value");
-  const rate = totalB ? ((totalA / totalB) * 100).toFixed(2) : 0;
+export const createExcelData = (detail, kpiLabel, typeLabel, sortedData) => {
+  const findValue = (type) => {
+    const item = sortedData.find((d) => d.type === type);
+    return item ? Number(item.value || 0) : 0;
+  };
+
+  const thai_rate = findValue("thai_rate");
+  const foreigner_rate = findValue("foreigner_rate");
+  const sum_rate = findValue("sum_rate");
 
   const headerTitle = ["รายการตัวชี้วัดคุณภาพในกลุ่มโรคสำคัญ ที่ผู้บริหารติดตาม"];
   const headerInfo = [kpiLabel];
-  const typeRow = ["ประเภท", typeLabel];
   const tableHeader = [
     "เดือน/ปี",
-    "A (จำนวนผู้เสียชีวิต)",
-    "B (จำนวนผู้ป่วยทุกสถานะ)",
-    "อัตราการเสียชีวิต (%)",
+    "อัตราการเสียชีวิตชาวไทย (%)",
+    "อัตราการเสียชีวิตชาวต่างชาติ (%)",
+    "อัตราการเสียชีวิตรวม (%)",
     "แนวโน้ม",
   ];
 
   const rows = detail.map((item) => [
     item.month,
-    Number(item.a_value || 0),
-    Number(item.b_value || 0),
-    Number(item.result || 0),
+    Number(item.result_thai || 0),
+    Number(item.result_foreign || 0),
+    Number(item.result_total || 0),
     item.note || "",
   ]);
 
-  const summary = ["รวม", totalA, totalB, Number(rate), ""];
+  const summary = ["รวม", thai_rate, foreigner_rate, sum_rate, ""];
 
-  return [headerTitle, headerInfo, typeRow, tableHeader, ...rows, summary];
+  return [headerTitle, headerInfo, tableHeader, ...rows, summary];
 };
 
-export const exportToExcel = async (detail, kpiLabel, typeLabel) => {
+export const exportToExcel = async (detail, kpiLabel, typeLabel, sortedData) => {
   try {
     const [{ utils, write }, fileSaver] = await Promise.all([
       import("xlsx"),
       import("file-saver"),
     ]);
 
-    const data = createExcelData(detail, kpiLabel, typeLabel);
+    const data = createExcelData(detail, kpiLabel, typeLabel, sortedData);
     const worksheet = utils.aoa_to_sheet(data);
 
     worksheet["!merges"] = [

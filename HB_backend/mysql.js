@@ -1,6 +1,6 @@
 // mysql.js
 require('dotenv').config();
-const mysql = require('mysql');
+const mysql = require('mysql'); //แก้เป็น mysql2
 
 const pool = mysql.createPool({
   connectionLimit: 10,
