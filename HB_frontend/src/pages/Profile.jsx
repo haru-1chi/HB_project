@@ -1,17 +1,17 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import axios from "axios";
 import { Button } from "primereact/button";
-import { DataTable } from "primereact/datatable";
-import { Column } from "primereact/column";
 import { InputText } from "primereact/inputtext";
 import { ConfirmDialog, confirmDialog } from "primereact/confirmdialog";
 import { Toast } from "primereact/toast";
-import { FloatLabel } from "primereact/floatlabel";
 import { Dialog } from "primereact/dialog";
 import { Password } from "primereact/password";
-import { IconField } from "primereact/iconfield";
-import { InputIcon } from "primereact/inputicon";
-import { InputNumber } from "primereact/inputnumber";
 import { Message } from "primereact/message";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -26,8 +26,10 @@ import Footer from "../components/Footer";
 import { useAuth } from "../contexts/AuthContext";
 
 function Profile() {
-  const API_BASE =
-    import.meta.env.VITE_REACT_APP_API || "http://localhost:3000/api";
+  const API_BASE = useMemo(
+    () => import.meta.env.VITE_REACT_APP_API || "http://localhost:3000/api",
+    []
+  );
   const { user, setUser, token, setToken } = useAuth();
 
   const [visible, setVisible] = useState(false);
@@ -52,7 +54,7 @@ function Profile() {
   });
 
   const [isEditMode, setIsEditMode] = useState(false);
-  const [formErrors, setFormErrors] = useState({});
+  const [formErrors, setFormErrors] = useState("");
 
   const toast = useRef(null);
 
@@ -74,7 +76,6 @@ function Profile() {
         username: user.username,
       });
     }
-    console.log(user);
   }, [user]);
 
   const handleSave = async () => {
@@ -119,14 +120,31 @@ function Profile() {
 
   const handleCreateAccout = async () => {
     const fullName =
-      `${formValues.firstname.trim()} ${formValues.lastname.trim()}`.trim();
+      `${formCreateAccount.firstname.trim()} ${formCreateAccount.lastname.trim()}`.trim();
+
+    if (
+      !formCreateAccount.username ||
+      !formCreateAccount.password ||
+      !formCreateAccount.confirm_password ||
+      !fullName
+    ) {
+      setFormErrors("กรุณากรอกข้อมูลให้ครบทุกช่อง");
+      return;
+    }
+
+    if (formCreateAccount.password !== formCreateAccount.confirm_password) {
+      setFormErrors("โปรดกรอกรหัสผ่านให้ตรงกัน");
+      return;
+    }
 
     try {
       const res = await axios.post(
         `${API_BASE}/user/create`,
         {
           username: user.username,
-          newUsername: formValues.username,
+          newUsername: formCreateAccount.username,
+          password: formCreateAccount.password,
+          confirm_password: formCreateAccount.confirm_password,
           name: fullName,
         },
         {
@@ -146,14 +164,22 @@ function Profile() {
         ...prev,
         username: res.data.data.username,
         name: res.data.data.name,
+        verify: res.data.data.verify,
       }));
-
+      setFormCreateAccount({
+        firstname: "",
+        lastname: "",
+        username: "",
+        password: "",
+        confirm_password: "",
+      });
+      setFormErrors("");
       setIsEditMode(false);
     } catch (error) {
       console.log(error);
       const msg =
         error.response?.data?.message || "เกิดข้อผิดพลาดระหว่างอัปเดตข้อมูล";
-      showToast("error", "ไม่สำเร็จ", msg);
+      setFormErrors(msg || "เกิดข้อผิดพลาดระหว่างอัปเดตข้อมูล");
     }
   };
 
@@ -164,7 +190,7 @@ function Profile() {
       !formPasswordValues.new_password ||
       !formPasswordValues.confirm_password
     ) {
-      showToast("warn", "ข้อมูลไม่ครบ", "กรุณากรอกทุกช่องให้ครบ");
+      setFormErrors("กรุณากรอกให้ครบที่ช่อง");
       return;
     }
 
@@ -195,7 +221,7 @@ function Profile() {
       setVisible(false); // close dialog if using modal
     } catch (err) {
       console.log(err);
-      showToast("error", "ไม่สำเร็จ", err.response.data.message);
+      setFormErrors(err.response.data.message || "เกิดข้อผิดพลาด");
     }
   };
 
@@ -216,7 +242,7 @@ function Profile() {
   };
 
   return (
-    <div className="Home-page overflow-hidden h-dvh flex flex-col justify-between">
+    <div className="Home-page overflow-hidden min-h-dvh flex flex-col justify-between">
       <Toast ref={toast} />
       <ConfirmDialog />
       <div
@@ -237,47 +263,39 @@ function Profile() {
           )}
           <div className="flex justify-between items-center">
             <p className="text-xl font-semibold">ข้อมูลส่วนตัว</p>
-            {user.verify === 0 ? (
-              <div>
+            {user.verify === 1 &&
+              (!isEditMode ? (
                 <Button
-                  onClick={handleCreateAccout}
-                  label="บันทึก"
-                  severity="success"
+                  onClick={handleToggleEdit}
+                  label={
+                    <>
+                      <FontAwesomeIcon icon={faEdit} className="mr-2" />
+                      แก้ไข
+                    </>
+                  }
+                  severity="warning"
                   style={{ padding: "5px 10px" }}
                 />
-              </div>
-            ) : !isEditMode ? (
-              <Button
-                onClick={handleToggleEdit}
-                label={
-                  <>
-                    <FontAwesomeIcon icon={faEdit} className="mr-2" />
-                    แก้ไข
-                  </>
-                }
-                severity="warning"
-                style={{ padding: "5px 10px" }}
-              />
-            ) : (
-              <div className="flex">
-                <div className="mr-3">
-                  <Button
-                    onClick={handleCancel}
-                    label="ยกเลิก"
-                    severity="secondary"
-                    style={{ padding: "5px 10px" }}
-                  />
+              ) : (
+                <div className="flex">
+                  <div className="mr-3">
+                    <Button
+                      onClick={handleCancel}
+                      label="ยกเลิก"
+                      severity="secondary"
+                      style={{ padding: "5px 10px" }}
+                    />
+                  </div>
+                  <div>
+                    <Button
+                      onClick={handleSave}
+                      label="บันทึก"
+                      severity="success"
+                      style={{ padding: "5px 10px" }}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <Button
-                    onClick={handleSave}
-                    label="บันทึก"
-                    severity="success"
-                    style={{ padding: "5px 10px" }}
-                  />
-                </div>
-              </div>
-            )}
+              ))}
           </div>
 
           {user.verify === 0 ? (
@@ -319,9 +337,8 @@ function Profile() {
                 <p>สิทธิ์การใช้งาน</p>
                 <div className="col-span-3">
                   <InputText
-                    value=""
+                    value={user.role_name}
                     className="w-full"
-                    placeholder="ผู้ใช้ทั่วไป"
                     variant="filled"
                     disabled
                   />
@@ -335,7 +352,10 @@ function Profile() {
                     value={formCreateAccount.username}
                     className="w-full"
                     onChange={(e) =>
-                      setFormCreateAccount({ ...formCreateAccount, username: e.target.value })
+                      setFormCreateAccount({
+                        ...formCreateAccount,
+                        username: e.target.value,
+                      })
                     }
                   />
                 </div>
@@ -352,7 +372,7 @@ function Profile() {
               </div>
               <div className="grid grid-cols-4 mt-8">
                 <p>สิทธิ์การใช้งาน</p>
-                <p className="col-span-3">ผู้ใช้ทั่วไป</p>
+                <p className="col-span-3">{user.role_name}</p>
               </div>
               <p className="text-xl font-semibold mt-8">ข้อมูลบัญชี</p>
               <div className="mt-8 grid grid-cols-4">
@@ -401,9 +421,8 @@ function Profile() {
                 <p>สิทธิ์การใช้งาน</p>
                 <div className="col-span-3">
                   <InputText
-                    value=""
+                    value={user.role_name}
                     className="w-full"
-                    placeholder="ผู้ใช้ทั่วไป"
                     variant="filled"
                     disabled
                   />
@@ -435,12 +454,15 @@ function Profile() {
                     feedback={false}
                     className="w-full"
                     onChange={(e) =>
-                      setFormCreateAccount({ ...formCreateAccount, password: e.target.value })
+                      setFormCreateAccount({
+                        ...formCreateAccount,
+                        password: e.target.value,
+                      })
                     }
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-4 mt-8 items-center">
+              <div className="grid grid-cols-4 mt-8 mb-4 items-center">
                 <p>ยืนยันรหัสผ่าน</p>
                 <div className="col-span-3">
                   <Password
@@ -457,12 +479,29 @@ function Profile() {
                   />
                 </div>
               </div>
+              {formErrors && (
+                <div className="flex justify-center">
+                  <Message
+                    severity="error"
+                    text={formErrors}
+                    className="w-full"
+                  />
+                </div>
+              )}
+              <div className="mt-4 flex justify-end">
+                <Button
+                  onClick={handleCreateAccout}
+                  label="บันทึก"
+                  severity="success"
+                  className="w-full"
+                  style={{ padding: "10px 10px" }}
+                />
+              </div>
             </>
           ) : (
             <div className="mt-8 grid grid-cols-4">
               <p>รหัสผ่าน</p>
-              <div className="col-span-3 flex justify-between">
-                <p>ไม่แสดง</p>
+              <div className="col-span-3">
                 <Button
                   onClick={() => setVisible(true)}
                   text
@@ -477,27 +516,11 @@ function Profile() {
             visible={visible}
             style={{ width: "350px" }}
             onHide={() => {
-              if (!visible) return;
-              setVisible(false);
+              if (visible) {
+                setVisible(false);
+                setFormErrors("");
+              }
             }}
-            footer={
-              <div className="flex justify-end">
-                <Button
-                  label="ยกเลิก"
-                  severity="secondary"
-                  style={{ padding: "10px 15px" }}
-                  onClick={() => {
-                    setVisible(false);
-                  }}
-                />
-                <Button
-                  label="บันทึก"
-                  severity="success"
-                  style={{ padding: "10px 15px" }}
-                  onClick={handleChangePassword}
-                />
-              </div>
-            }
           >
             <label htmlFor="">รหัสผ่านเดิม</label>
             <Password
@@ -538,6 +561,34 @@ function Profile() {
                 })
               }
             />
+
+            {formErrors && (
+              <div className="flex justify-center mt-4">
+                <Message
+                  severity="error"
+                  text={formErrors}
+                  className="w-full"
+                />
+              </div>
+            )}
+
+            <div className="flex justify-end gap-4 mt-4">
+              <Button
+                label="ยกเลิก"
+                severity="secondary"
+                style={{ padding: "10px 15px" }}
+                onClick={() => {
+                  setVisible(false);
+                  setFormErrors("");
+                }}
+              />
+              <Button
+                label="บันทึก"
+                severity="success"
+                style={{ padding: "10px 15px" }}
+                onClick={handleChangePassword}
+              />
+            </div>
           </Dialog>
         </div>
       </div>

@@ -5,6 +5,8 @@ const util = require('util');
 
 const query = util.promisify(db.query).bind(db);
 
+const JWT_SECRET = process.env.JWT_SECRET || "secret_key";
+
 exports.login = async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -26,7 +28,7 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: "รหัสผ่านไม่ถูกต้อง" });
     }
 
-    const token = jwt.sign({ username: user.username }, process.env.JWT_SECRET || 'secret_key', { expiresIn: '12h' });
+    const token = jwt.sign({ username: user.username }, JWT_SECRET, { expiresIn: '12h' });
 
     delete user.password;
 
@@ -43,7 +45,6 @@ exports.login = async (req, res) => {
   }
 };
 
-
 exports.createUser = async (req, res) => {
   try {
     const { role } = req.body;
@@ -51,13 +52,10 @@ exports.createUser = async (req, res) => {
       return res.status(400).json({ message: "กรุณาระบุสิทธิ์การใช้งาน (role)" });
     }
 
-    // ✅ Works correctly with mysql (not mysql2)
-    const result = await query(
-      "SELECT COUNT(*) AS count FROM user WHERE username LIKE 'user%'"
-    );
-    const count = result[0]?.count || 0;
+    const results = await query("SELECT id FROM user ORDER BY id DESC LIMIT 1");
+    const latest = results.length ? results[0] : null;
 
-    const nextNum = String(count + 1).padStart(2, "0");
+    const nextNum = String((latest?.id || 0) + 1).padStart(2, "0");
     const newUsername = `user${nextNum}`;
 
     const rawPassword = newUsername;
@@ -88,38 +86,84 @@ exports.createUser = async (req, res) => {
 
 exports.createAccount = async (req, res) => {
   try {
-    const { username, password, confirm_password, name, verify = 0 } = req.body;
+    const { username, newUsername, name, password, confirm_password } = req.body;
 
-    if (!username?.trim() || !password || !confirm_password || !name?.trim()) {
-      return res.status(400).json({ message: "กรุณากรอกข้อมูลให้ครบถ้วน" });
+    if (!username?.trim()) {
+      return res.status(400).json({ message: "ไม่พบ username ปัจจุบัน" });
+    }
+    if (!name?.trim()) {
+      return res.status(400).json({ message: "กรุณาระบุชื่อ" });
     }
 
-    if (password !== confirm_password) {
-      return res.status(400).json({ message: "รหัสผ่านไม่ตรงกัน" });
+    if (password.length < 8) {
+      return res.status(400).json({ message: "รหัสผ่านใหม่ต้องมีอย่างน้อย 8 ตัวอักษร" });
     }
 
-    const [existing] = await query(
-      "SELECT 1 FROM user WHERE username = ? LIMIT 1",
+    const existingResult = await query(
+      "SELECT id, username, password, role FROM user WHERE username = ? LIMIT 1",
       [username]
     );
-    if (existing) {
-      return res.status(400).json({ message: "username นี้มีอยู่แล้ว" });
+    const existingUser = existingResult.length ? existingResult[0] : null;
+
+    if (!existingUser) {
+      return res.status(404).json({ message: "ไม่พบบัญชีผู้ใช้" });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-    await query(
-      `INSERT INTO user (username, password, name, verify, role, updated_at)
-       VALUES (?, ?, ?, ?, 'user', NOW())`,
-      [username.trim(), hashedPassword, name.trim(), verify]
+    const updatedUsername = newUsername?.trim() || username;
+    const updatedName = name.trim();
+
+    if (updatedUsername !== username) {
+      const dupResult = await query(
+        "SELECT 1 FROM user WHERE username = ? LIMIT 1",
+        [updatedUsername]
+      );
+      if (dupResult.length > 0) {
+        return res.status(400).json({ message: "username นี้ถูกใช้แล้ว" });
+      }
+    }
+
+    let hashedPassword = existingUser.password;
+    if (password) {
+      if (password !== confirm_password) {
+        return res.status(400).json({ message: "รหัสผ่านไม่ตรงกัน" });
+      }
+      hashedPassword = await bcrypt.hash(password, 10);
+    }
+
+    const updateResult = await query(
+      `
+      UPDATE user
+      SET username = ?, password = ?, name = ?, verify = 1, updated_at = NOW()
+      WHERE id = ?
+      `,
+      [updatedUsername, hashedPassword, updatedName, existingUser.id]
     );
 
-    return res.status(201).json({
-      status: true,
-      message: "สร้างบัญชีผู้ใช้สำเร็จ",
-      data: { username, name, verify, role: "user" },
+    if (!updateResult.affectedRows) {
+      return res.status(500).json({ message: "อัปเดตข้อมูลไม่สำเร็จ" });
+    }
+
+    const newToken =
+      updatedUsername !== username
+        ? jwt.sign(
+          { username: updatedUsername },
+          JWT_SECRET,
+          { expiresIn: "12h" }
+        )
+        : null;
+
+    res.status(200).json({
+      message: "อัปเดตข้อมูลผู้ใช้สำเร็จ",
+      data: {
+        username: updatedUsername,
+        name: updatedName,
+        role: existingUser.role,
+        verify: 1,
+      },
+      ...(newToken && { token: newToken }),
     });
   } catch (err) {
-    console.error("createAccount error:", err);
+    console.error("updateAccount error:", err);
     res.status(500).json({ message: "เกิดข้อผิดพลาดภายในระบบ" });
   }
 };
@@ -129,14 +173,15 @@ exports.updateUser = async (req, res) => {
   try {
     const { username, newUsername, name, role } = req.body;
 
-    if (!username) {
+    if (!username?.trim()) {
       return res.status(400).json({ message: "กรุณาระบุ username" });
     }
 
-    const [user] = await query(
-      "SELECT username, name, role FROM user WHERE username = ? LIMIT 1",
+    const userResult = await query(
+      "SELECT id, username, name, role FROM user WHERE username = ? LIMIT 1",
       [username]
     );
+    const user = userResult.length ? userResult[0] : null;
 
     if (!user) {
       return res.status(404).json({ message: "ไม่พบผู้ใช้ในระบบ" });
@@ -146,40 +191,50 @@ exports.updateUser = async (req, res) => {
     const updatedName = name?.trim() || user.name;
     const updatedRole = role ?? user.role;
 
-    if (updatedUsername !== user.username || updatedName !== user.name) {
-      const [duplicate] = await query(
-        `SELECT username, name 
-         FROM user 
-         WHERE (username = ? OR name = ?) AND username != ? 
-         LIMIT 1`,
-        [updatedUsername, updatedName, username]
-      );
+    const hasChanges =
+      updatedUsername !== user.username ||
+      updatedName !== user.name ||
+      updatedRole !== user.role;
 
-      if (duplicate) {
-        if (duplicate.username === updatedUsername) {
-          return res.status(400).json({ message: "username นี้มีอยู่แล้ว" });
-        }
-        if (duplicate.name === updatedName) {
-          return res.status(400).json({ message: "ชื่อนี้มีอยู่แล้ว" });
-        }
+    if (!hasChanges) {
+      return res.status(200).json({
+        message: "ไม่มีการเปลี่ยนแปลงข้อมูล",
+        data: user,
+      });
+    }
+
+    const conflictResult = await query(
+      `SELECT username, name 
+       FROM user 
+       WHERE (username = ? OR name = ?) 
+         AND username != ? 
+       LIMIT 1`,
+      [updatedUsername, updatedName, user.username]
+    );
+    const conflict = conflictResult.length ? conflictResult[0] : null;
+
+    if (conflict) {
+      if (conflict.username === updatedUsername) {
+        return res.status(400).json({ message: "username นี้มีอยู่แล้ว" });
+      }
+      if (conflict.name === updatedName) {
+        return res.status(400).json({ message: "ชื่อนี้มีอยู่แล้ว" });
       }
     }
 
-    if (
-      updatedUsername !== user.username ||
-      updatedName !== user.name ||
-      updatedRole !== user.role
-    ) {
-      await query(
-        `UPDATE user 
-         SET username = ?, name = ?, role = ?, updated_at = NOW() 
-         WHERE username = ?`,
-        [updatedUsername, updatedName, updatedRole, username]
-      );
+    const updateResult = await query(
+      `UPDATE user 
+       SET username = ?, name = ?, role = ?, updated_at = NOW() 
+       WHERE id = ?`,
+      [updatedUsername, updatedName, updatedRole, user.id]
+    );
+
+    if (!updateResult.affectedRows) {
+      return res.status(500).json({ message: "อัปเดตข้อมูลไม่สำเร็จ" });
     }
 
     const token = updatedUsername !== user.username
-      ? jwt.sign({ username: updatedUsername }, process.env.JWT_SECRET || "secret_key", { expiresIn: "12h" })
+      ? jwt.sign({ username: updatedUsername }, JWT_SECRET, { expiresIn: "12h" })
       : null;
 
     res.status(200).json({
@@ -202,18 +257,8 @@ exports.updatePassword = async (req, res) => {
   try {
     const { username, current_password, new_password, confirm_password } = req.body;
 
-    if (!username || !current_password || !new_password || !confirm_password) {
+    if (![username, current_password, new_password, confirm_password].every(Boolean)) {
       return res.status(400).json({ message: "กรุณากรอกข้อมูลให้ครบถ้วน" });
-    }
-
-    const [user] = await query("SELECT * FROM user WHERE username = ? LIMIT 1", [username]);
-    if (!user) {
-      return res.status(404).json({ message: "ไม่พบผู้ใช้ในระบบ" });
-    }
-
-    const match = await bcrypt.compare(current_password, user.password);
-    if (!match) {
-      return res.status(400).json({ message: "รหัสผ่านปัจจุบันไม่ถูกต้อง" });
     }
 
     if (new_password !== confirm_password) {
@@ -224,11 +269,34 @@ exports.updatePassword = async (req, res) => {
       return res.status(400).json({ message: "รหัสผ่านใหม่ต้องมีอย่างน้อย 8 ตัวอักษร" });
     }
 
-    const hashedNew = await bcrypt.hash(new_password, 10);
-    await query(
-      "UPDATE user SET password = ?, updated_at = NOW() WHERE username = ?",
-      [hashedNew, username]
+    const userResult = await query(
+      "SELECT id, password FROM user WHERE username = ? LIMIT 1",
+      [username]
     );
+    const user = userResult.length ? userResult[0] : null;
+    if (!user) {
+      return res.status(404).json({ message: "ไม่พบผู้ใช้ในระบบ" });
+    }
+
+    const isMatch = await bcrypt.compare(current_password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "รหัสผ่านปัจจุบันไม่ถูกต้อง" });
+    }
+
+    const isSamePassword = await bcrypt.compare(new_password, user.password);
+    if (isSamePassword) {
+      return res.status(400).json({ message: "รหัสผ่านใหม่ต้องแตกต่างจากรหัสผ่านเดิม" });
+    }
+
+    const hashedNew = await bcrypt.hash(new_password, 10);
+    const updateResult = await query(
+      "UPDATE user SET password = ?, updated_at = NOW() WHERE id = ?",
+      [hashedNew, user.id]
+    );
+
+    if (!updateResult.affectedRows) {
+      return res.status(500).json({ message: "เปลี่ยนรหัสผ่านไม่สำเร็จ" });
+    }
 
     res.status(200).json({ message: "เปลี่ยนรหัสผ่านสำเร็จ" });
   } catch (err) {

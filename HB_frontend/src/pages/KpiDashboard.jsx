@@ -20,6 +20,8 @@ import {
 import Footer from "../components/Footer";
 import { formatDateForSQL, formatMonthYear } from "../utils/dateTime";
 import { sumField, exportToExcel } from "../utils/exportUtils";
+import { ScrollTop } from "primereact/scrolltop";
+
 function KpiDashboard() {
   const API_BASE =
     import.meta.env.VITE_REACT_APP_API || "http://localhost:3000/api";
@@ -114,7 +116,7 @@ function KpiDashboard() {
       setData(chartRes.data || []);
       setDetail(detailRes.data || []);
       setDataCurrentMonth(summaryRes.data || []);
-      console.log(summaryRes.data);
+      // console.log(summaryRes.data);
       setError(null);
     } catch (err) {
       console.error("Error fetching KPI dashboard data:", err);
@@ -152,28 +154,19 @@ function KpiDashboard() {
       </div>
     );
   };
-  const [value, setValue] = useState(0);
-  const getTrendText = (type) => {
-    if (!type || type === "null") return null;
 
-    const isPositive = true;
-    // const isPositive = note.startsWith("+");
+  const getGaugeChart = (type, value, target) => {
+    if (!type || type === "null") return null;
+    // Make sure the value is a number (assuming value is numeric already)
+    const percentage = Number(value); // Ensure value is treated as a number
 
     switch (type) {
       case "sum_rate":
-        return <GaugeChart value={41.49} target={10} />;
       case "thai_rate":
-        return <GaugeChart value={41.49} target={10} />;
+        // Pass the numeric value to the chart
+        return <GaugeChart value={percentage} target={target} />;
       default:
-        return (
-          <span
-            className={`w-fit flex items-center px-2 py-1 gap-2 rounded-md bg-green-100`}
-          >
-            <FontAwesomeIcon icon={faLessThanEqual} className="text-green-500" /> ค่าเป้าหมาย 50%
-            {/* {" "}<FontAwesomeIcon icon={faLessThanEqual} className="text-blue-500" />{" "} */}
-           
-          </span>
-        );
+        return <GaugeChart value={percentage} target={target} />;
     }
   };
   const getTitle = (type) => {
@@ -225,7 +218,8 @@ function KpiDashboard() {
   );
 
   return (
-    <div className="Home-page overflow-hidden">
+    <div className="Home-page overflow-hidden min-h-dvh flex flex-col justify-between">
+      <ScrollTop />
       <div
         className={`flex-1 transition-all duration-300 p-4 sm:p-8 pt-5 overflow-auto`}
       >
@@ -279,6 +273,7 @@ function KpiDashboard() {
               view="month"
               dateFormat="mm/yy"
               className="mr-3 w-50"
+              showIcon
             />
             <p> - </p>
             <Calendar
@@ -287,6 +282,7 @@ function KpiDashboard() {
               view="month"
               dateFormat="mm/yy"
               className="ml-3 w-50"
+              showIcon
             />
           </div>
         </div>
@@ -302,7 +298,7 @@ function KpiDashboard() {
                   {item.value}
                   <span className="text-3xl">%</span>
                 </h1>
-                {getTrendText(item.type)}
+                {getGaugeChart(item.type, item.value, item.max_value)}
               </div>
               <p>{getTitle(item.type)}</p>
             </div>

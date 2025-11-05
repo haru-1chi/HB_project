@@ -20,6 +20,7 @@ import {
   faMagnifyingGlass,
 } from "@fortawesome/free-solid-svg-icons";
 import Footer from "../components/Footer";
+import { ScrollTop } from "primereact/scrolltop";
 
 function Lookup() {
   const API_BASE =
@@ -288,8 +289,9 @@ function Lookup() {
   );
 
   return (
-    <div className="Home-page overflow-hidden">
+    <div className="Home-page overflow-hidden min-h-dvh flex flex-col justify-between">
       <Toast ref={toast} />
+      <ScrollTop />
       <ConfirmDialog />
       <div
         className={`flex-1 transition-all duration-300 p-4 sm:p-8 pt-5 overflow-auto`}

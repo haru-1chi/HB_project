@@ -39,7 +39,11 @@ export const AuthProvider = ({ children }) => {
       const profile = await profileRes.json();
       setUser(profile.data);
 
-      navigate("/");
+      if (profile.data.verify === 0) {
+        navigate("/Profile");
+      } else {
+        navigate("/");
+      }
     } catch (err) {
       throw err;
     }

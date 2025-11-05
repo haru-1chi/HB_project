@@ -137,7 +137,7 @@ function Home() {
   }, []);
 
   return (
-    <div className="Home-page overflow-hidden">
+    <div className="Home-page overflow-hidden min-h-dvh flex flex-col justify-between">
       <ScrollTop />
       <SideBarFilter
         visible={visible}

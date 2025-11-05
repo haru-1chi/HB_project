@@ -41,6 +41,9 @@ function KpiFormPage() {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
 
+  const [sinceDate, setSinceDate] = useState(null);
+  const [endDate, setEndDate] = useState(null);
+
   const toast = useRef(null);
   const fileUploadRef = useRef(null);
 
@@ -117,13 +120,25 @@ function KpiFormPage() {
     fetchKpiNames();
   }, [showToast]);
 
+  const normalizeDate = useCallback((date) => {
+    if (!(date instanceof Date)) return date;
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    return `${year}-${month}-01`;
+  }, []);
+
   const fetchKpiData = useCallback(
     async (kpiId, search = "") => {
       if (!kpiId) return;
       setLoading(true);
       try {
         const res = await axios.get(`${API_BASE}/kpi-data`, {
-          params: { kpi_name: kpiId, search },
+          params: {
+            kpi_name: kpiId,
+            search,
+            sinceDate: sinceDate ? normalizeDate(sinceDate) : "",
+            endDate: endDate ? normalizeDate(endDate) : "",
+          },
         });
         setKpiData(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
@@ -132,7 +147,7 @@ function KpiFormPage() {
         setLoading(false);
       }
     },
-    [showToast]
+    [showToast, sinceDate, endDate, normalizeDate]
   );
 
   useEffect(() => {
@@ -143,7 +158,7 @@ function KpiFormPage() {
     );
     debounced();
     return () => debounced.cancel();
-  }, [searchTerm, selectedKpi, fetchKpiData]);
+  }, [searchTerm, selectedKpi, fetchKpiData, sinceDate, endDate]);
 
   useEffect(() => {
     if (showDuplicateDialog && duplicatePairs.length > 0) {
@@ -390,13 +405,6 @@ function KpiFormPage() {
     ]);
   }, []);
 
-  const normalizeDate = useCallback((date) => {
-    if (!(date instanceof Date)) return date;
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    return `${year}-${month}-01`;
-  }, []);
-
   const buildPayload = useCallback(() => {
     return rows.map((r) => ({
       ...r,
@@ -453,14 +461,14 @@ function KpiFormPage() {
           headers: { token },
         }
       );
-      console.log("submit payload", payload);
+      // console.log("submit payload", payload);
       if (res.data.pairs.length > 0) {
         setDuplicatePairs(res.data.pairs);
 
         const allNewRows = res.data.pairs.filter((p) => p.status === "ใหม่");
         setSelectedRows(allNewRows);
 
-        console.log("submit DuplicatePairs", res.data.pairs);
+        // console.log("submit DuplicatePairs", res.data.pairs);
         setShowDuplicateDialog(true);
       } else {
         await axiosInstance.post(
@@ -505,7 +513,7 @@ function KpiFormPage() {
         .map((p) => `${p.kpi_name}_${p.type}_${normalizeDate(p.report_date)}`);
 
       if (choice === "overwrite") {
-        console.log("selectedRows", selectedRows);
+        // console.log("selectedRows", selectedRows);
         const overwriteRows = normalizeSelectedRows(selectedRows);
         const selectedKeys = selectedRows.map(
           (s) => `${s.kpi_name}_${s.type}_${normalizeDate(s.report_date)}`
@@ -546,7 +554,7 @@ function KpiFormPage() {
       }
 
       const mode = choice === "overwrite" ? "overwrite" : "skip";
-      console.log("confirm payload", payload);
+      // console.log("confirm payload", payload);
       try {
         await axiosInstance.post(
           `${API_BASE}/kpi-data`,
@@ -667,32 +675,53 @@ function KpiFormPage() {
 
   const header = (
     <div className="p-2 flex items-end justify-between">
-      <div className="block">
-        <Dropdown
-          value={selectedKpi}
-          options={kpiNames}
-          onChange={handleKpiChange}
-          optionLabel="label"
-          placeholder="เลือก KPI"
-          className="mr-5"
-        />
-      </div>
+      <Dropdown
+        value={selectedKpi}
+        options={kpiNames}
+        onChange={handleKpiChange}
+        optionLabel="label"
+        placeholder="เลือก KPI"
+        className="mr-5"
+      />
 
-      <IconField iconPosition="left">
-        <InputIcon>
-          <FontAwesomeIcon icon={faMagnifyingGlass} />
-        </InputIcon>
-        <InputText
-          placeholder="ค้นหา"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </IconField>
+      <div className="flex gap-5">
+        <div className="flex items-center">
+          <Calendar
+            value={sinceDate}
+            onChange={(e) => setSinceDate(e.value)}
+            view="month"
+            dateFormat="mm/yy"
+            className="mr-3 w-35"
+            placeholder="เริ่มต้น"
+            showIcon
+          />
+          <p> - </p>
+          <Calendar
+            value={endDate}
+            onChange={(e) => setEndDate(e.value)}
+            view="month"
+            placeholder="สิ้นสุด"
+            dateFormat="mm/yy"
+            className="ml-3 w-35"
+            showIcon
+          />
+        </div>
+        <IconField iconPosition="left">
+          <InputIcon>
+            <FontAwesomeIcon icon={faMagnifyingGlass} />
+          </InputIcon>
+          <InputText
+            placeholder="ค้นหา"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </IconField>
+      </div>
     </div>
   );
 
   return (
-    <div className="Home-page overflow-hidden">
+    <div className="Home-page overflow-hidden min-h-dvh flex flex-col justify-between">
       <ScrollTop />
       <Toast ref={toast} />
       <ConfirmDialog />

@@ -72,13 +72,13 @@ const GaugeChart = ({ value, target }) => {
         />
         {/* Needle value */}
         <text
-          x={center + (radius + 20) * Math.cos((needleAngle * Math.PI) / 180)}
+          x={center + (radius + 35) * Math.cos((needleAngle * Math.PI) / 180)}
           y={center + (radius + 20) * Math.sin((needleAngle * Math.PI) / 180)}
           textAnchor="middle"
           dominantBaseline="middle"
           className="text-sm font-bold fill-red-500"
         >
-          {clampedValue}
+          {clampedValue}%
         </text>
 
         {/* Target marker */}

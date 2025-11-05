@@ -33,7 +33,7 @@ function App() {
               <Route
                 path="/lookup"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute roles={[1, 2]}>
                     <Lookup />
                   </ProtectedRoute>
                 }
@@ -41,7 +41,7 @@ function App() {
               <Route
                 path="/KpiFormPage"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute roles={[1, 2]}>
                     <KpiFormPage />
                   </ProtectedRoute>
                 }

@@ -1,21 +1,21 @@
 const express = require('express');
 const router = express.Router();
 const kpiController = require('../controllers/kpiController');
-const { auth } = require("../middleware/auth")
+const { authAndRole } = require("../middleware/auth")
 
-router.post('/kpi-data/create', auth, kpiController.createdata); //ไม่ใช้แล้ว
-router.post('/kpi-data/check-duplicates', auth, kpiController.checkDuplicates);
-router.post('/kpi-data', auth, kpiController.createOrUpdate);
-router.put('/kpi-data', auth, kpiController.updateKPIData);
-router.delete("/kpi-data/:id", auth, kpiController.deleteKPIData);
+router.post('/kpi-data/create', authAndRole(1, 2), kpiController.createdata); //ไม่ใช้แล้ว
+router.post('/kpi-data/check-duplicates', authAndRole(1, 2), kpiController.checkDuplicates);
+router.post('/kpi-data', authAndRole(1, 2), kpiController.createOrUpdate);
+router.put('/kpi-data', authAndRole(1, 2), kpiController.updateKPIData);
+router.delete("/kpi-data/:id", authAndRole(1, 2), kpiController.deleteKPIData);
 router.get('/kpi-data', kpiController.getKPIData);
 router.get('/kpi-data/chart', kpiController.getData);
 router.get('/kpi-data/detail', kpiController.getDetail);
 router.get('/kpi-data/summary', kpiController.dataCurrentMonth);
 
-router.post('/kpi-name', auth, kpiController.createKPIName);
-router.put('/kpi-name', auth, kpiController.updateKPIName);
-router.delete('/kpi-name/:id', auth, kpiController.deleteKPIName);
+router.post('/kpi-name', authAndRole(1, 2), kpiController.createKPIName);
+router.put('/kpi-name', authAndRole(1, 2), kpiController.updateKPIName);
+router.delete('/kpi-name/:id', authAndRole(1, 2), kpiController.deleteKPIName);
 router.get('/kpi-name', kpiController.getKPIName);
 
 module.exports = router; 
@@ -33,3 +33,11 @@ module.exports = router;
 // router.delete('/deleteKPIName/:id', auth, kpiController.deleteKPIName);
 // router.get('/getKPIName', kpiController.getKPIName);
 // router.get('/getKPIData', kpiController.getKPIData);
+
+// ไว้จัดการสิทธิ์ที่มากขึ้นแบบไม่ hard code
+// const { auth } = require("../middleware/auth");
+// const { checkPermission } = require("../middleware/checkPermission");
+
+// router.post("/kpi-data", auth, checkPermission("kpi_form"), kpiController.createOrUpdate);
+// router.put("/kpi-data", auth, checkPermission("kpi_form"), kpiController.updateKPIData);
+// router.delete("/kpi-data/:id", auth, checkPermission("kpi_form"), kpiController.deleteKPIData);

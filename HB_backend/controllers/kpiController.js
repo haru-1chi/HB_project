@@ -323,14 +323,16 @@ exports.deleteKPIData = async (req, res) => {
 
 
 exports.getKPIData = async (req, res) => {
-    const { kpi_name, search } = req.query;
+    const { kpi_name, search, sinceDate, endDate } = req.query;
+
     try {
         let query = `
-    SELECT d.*, n.kpi_name AS kpi_label, n.a_name, n.b_name
-    FROM kpi_data d
-    LEFT JOIN kpi_name n ON d.kpi_name = n.id
-    WHERE 1=1
-  `;
+            SELECT d.*, n.kpi_name AS kpi_label, n.a_name, n.b_name
+            FROM kpi_data d
+            LEFT JOIN kpi_name n ON d.kpi_name = n.id
+            WHERE 1=1
+        `;
+
         const params = [];
 
         if (kpi_name) {
@@ -339,10 +341,36 @@ exports.getKPIData = async (req, res) => {
         }
 
         if (search) {
-            query += ` AND (d.a_value LIKE ? OR d.b_value LIKE ? OR d.type LIKE ?)`;
-            params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+            let formattedSearch = search;
+
+            // 🔹 Detect MM/YYYY pattern and convert to YYYY-MM
+            const match = /^(\d{2})\/(\d{4})$/.exec(search);
+            if (match) {
+                const [_, mm, yyyy] = match;
+                formattedSearch = `${yyyy}-${mm}`; // e.g. "2025-01"
+            }
+
+            query += `
+                AND (
+                    d.a_value LIKE ? OR 
+                    d.b_value LIKE ? OR 
+                    d.type LIKE ? OR 
+                    d.report_date LIKE ?
+                )
+            `;
+            params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${formattedSearch}%`);
         }
 
+        if (sinceDate && endDate) {
+            query += ` AND DATE_FORMAT(d.report_date, '%Y-%m') BETWEEN DATE_FORMAT(?, '%Y-%m') AND DATE_FORMAT(?, '%Y-%m')`;
+            params.push(sinceDate, endDate);
+        } else if (sinceDate) {
+            query += ` AND DATE_FORMAT(d.report_date, '%Y-%m') >= DATE_FORMAT(?, '%Y-%m')`;
+            params.push(sinceDate);
+        } else if (endDate) {
+            query += ` AND DATE_FORMAT(d.report_date, '%Y-%m') <= DATE_FORMAT(?, '%Y-%m')`;
+            params.push(endDate);
+        }
         query += ` ORDER BY d.report_date ASC`;
 
         const data = await new Promise((resolve, reject) => {
@@ -352,11 +380,9 @@ exports.getKPIData = async (req, res) => {
             });
         });
 
-        // ✅ Always return an array
         res.status(200).json(Array.isArray(data) ? data : []);
     } catch (err) {
         console.error("❌ Error fetching KPI data:", err);
-        // ✅ Still return an array even if error
         res.status(500).json([]);
     }
 };
@@ -736,12 +762,14 @@ exports.dataCurrentMonth = async (req, res) => {
         }
 
         const query = `
-      SELECT
-        ROUND(SUM(a_value)/NULLIF(SUM(b_value),0)*100, 2) AS sum_rate,
-        ROUND(SUM(CASE WHEN type='ไทย' THEN a_value ELSE 0 END)/NULLIF(SUM(CASE WHEN type='ไทย' THEN b_value ELSE 0 END),0)*100, 2) AS thai_rate,
-        ROUND(SUM(CASE WHEN type='ต่างชาติ' THEN a_value ELSE 0 END)/NULLIF(SUM(CASE WHEN type='ต่างชาติ' THEN b_value ELSE 0 END),0)*100, 2) AS foreigner_rate
-      FROM kpi_data
-      WHERE kpi_name = ? AND report_date BETWEEN ? AND ?;
+ SELECT
+        ROUND(SUM(d.a_value)/NULLIF(SUM(d.b_value),0)*100, 2) AS sum_rate,
+        ROUND(SUM(CASE WHEN d.type='ไทย' THEN d.a_value ELSE 0 END)/NULLIF(SUM(CASE WHEN d.type='ไทย' THEN d.b_value ELSE 0 END),0)*100, 2) AS thai_rate,
+        ROUND(SUM(CASE WHEN d.type='ต่างชาติ' THEN d.a_value ELSE 0 END)/NULLIF(SUM(CASE WHEN d.type='ต่างชาติ' THEN d.b_value ELSE 0 END),0)*100, 2) AS foreigner_rate,
+				n.max_value
+      FROM kpi_data d
+			left JOIN kpi_name n on d.kpi_name = n.id
+      WHERE d.kpi_name = ? AND d.report_date BETWEEN ? AND ?;
     `;
 
         const params = [kpi_name, since, until];
@@ -753,9 +781,9 @@ exports.dataCurrentMonth = async (req, res) => {
 
         const row = result[0] || {};
         res.json([
-            { type: "sum_rate", value: row.sum_rate || 0 },
-            { type: "thai_rate", value: row.thai_rate || 0 },
-            { type: "foreigner_rate", value: row.foreigner_rate || 0 },
+            { type: "sum_rate", value: row.sum_rate || 0, max_value: row.max_value || 0 },
+            { type: "thai_rate", value: row.thai_rate || 0, max_value: row.max_value || 0 },
+            { type: "foreigner_rate", value: row.foreigner_rate || 0, max_value: row.max_value || 0 },
         ]);
 
     } catch (error) {
