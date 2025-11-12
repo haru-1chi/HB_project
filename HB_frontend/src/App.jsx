@@ -6,7 +6,9 @@ import "./App.css";
 import Home from "./pages/Home";
 import KpiDashboard from "./pages/KpiDashboard";
 import Lookup from "./pages/Lookup";
+import LookupMedError from "./pages/LookupMedError";
 import KpiFormPage from "./pages/KpiFormPage";
+import KpiMedFormPage from "./pages/KpiMedFormPage";
 import Login from "./pages/Login";
 import Profile from "./pages/Profile";
 import ProtectedRoute from "./contexts/ProtectedRoute";
@@ -39,10 +41,26 @@ function App() {
                 }
               />
               <Route
+                path="/lookupMedError"
+                element={
+                  <ProtectedRoute roles={[1, 2]}>
+                    <LookupMedError />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/KpiFormPage"
                 element={
                   <ProtectedRoute roles={[1, 2]}>
                     <KpiFormPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/KpiMedFormPage"
+                element={
+                  <ProtectedRoute roles={[1, 2]}>
+                    <KpiMedFormPage />
                   </ProtectedRoute>
                 }
               />

@@ -112,7 +112,22 @@ function SideBarMenu({ collapsed, setCollapsed }) {
                     </div>
                   )}
                 </Link>
-
+                <Link
+                  to="/lookupMedError"
+                  className={`p-3 rounded-lg block mb-3 ${
+                    isActive("/lookupMedError")
+                      ? "text-white font-bold bg-teal-500"
+                      : "text-gray-700 hover:text-teal-500"
+                  }`}
+                >
+                  {!collapsed ? (
+                    "จัดการชื่อตัวชี้วัดความเสี่ยง"
+                  ) : (
+                    <div className="text-center">
+                      <FontAwesomeIcon icon={faMarker} />
+                    </div>
+                  )}
+                </Link>
                 <Link
                   to="/KpiFormPage"
                   className={`p-3 rounded-lg block mb-3 ${
@@ -123,6 +138,22 @@ function SideBarMenu({ collapsed, setCollapsed }) {
                 >
                   {!collapsed ? (
                     "จัดการข้อมูลตัวชี้วัด"
+                  ) : (
+                    <div className="text-center">
+                      <FontAwesomeIcon icon={faFilePen} />
+                    </div>
+                  )}
+                </Link>
+                <Link
+                  to="/KpiMedFormPage"
+                  className={`p-3 rounded-lg block mb-3 ${
+                    isActive("/KpiMedFormPage")
+                      ? "text-white font-bold bg-teal-500"
+                      : "text-gray-700 hover:text-teal-500"
+                  }`}
+                >
+                  {!collapsed ? (
+                    "จัดการข้อมูลตัวชี้วัดความเสี่ยง"
                   ) : (
                     <div className="text-center">
                       <FontAwesomeIcon icon={faFilePen} />

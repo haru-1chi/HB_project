@@ -7,4 +7,6 @@ router.post('/user/create', authController.createAccount);
 router.put('/user/update', authAndRole(), authController.updateUser);
 router.put('/user/password', authController.updatePassword);
 router.post('/me', authAndRole(), authController.getMe); //แก้ให้เป็น get
+router.post("/reset-password", authAndRole(1), authController.resetPassword);
+
 module.exports = router

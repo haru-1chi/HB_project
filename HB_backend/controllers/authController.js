@@ -305,6 +305,57 @@ exports.updatePassword = async (req, res) => {
   }
 };
 
+exports.resetPassword = async (req, res) => {
+  try {
+    const { username } = req.body;
+
+    // ✅ Verify admin permission (role = 1)
+    const currentUser = req.user; // from authAndRole middleware
+    if (!currentUser || currentUser.role !== 1) {
+      return res.status(403).json({ message: "คุณไม่มีสิทธิ์รีเซ็ตรหัสผ่านผู้ใช้" });
+    }
+
+    if (!username?.trim()) {
+      return res.status(400).json({ message: "กรุณาระบุชื่อผู้ใช้ (username)" });
+    }
+
+    // ✅ Check if target user exists
+    const [user] = await query(
+      "SELECT id, username FROM user WHERE username = ? LIMIT 1",
+      [username]
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: "ไม่พบผู้ใช้ในระบบ" });
+    }
+
+    // ✅ Default password = same as username
+    const defaultPassword = user.username;
+    const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+
+    // ✅ Update password
+    const result = await query(
+      "UPDATE user SET password = ?, updated_at = NOW() WHERE id = ?",
+      [hashedPassword, user.id]
+    );
+
+    if (!result.affectedRows) {
+      return res.status(500).json({ message: "รีเซ็ตรหัสผ่านไม่สำเร็จ" });
+    }
+
+    res.status(200).json({
+      message: `รีเซ็ตรหัสผ่านสำเร็จ (รหัสผ่านใหม่คือ '${defaultPassword}')`,
+      data: {
+        username: user.username,
+        default_password: defaultPassword
+      }
+    });
+  } catch (err) {
+    console.error("resetPassword error:", err);
+    res.status(500).json({ message: "เกิดข้อผิดพลาดภายในระบบ" });
+  }
+};
+
 exports.getMe = (req, res) => {
   if (!req.user) {
     return res.status(401).json({ message: "Unauthorized" });

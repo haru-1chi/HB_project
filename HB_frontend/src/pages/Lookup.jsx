@@ -8,6 +8,7 @@ import { ConfirmDialog, confirmDialog } from "primereact/confirmdialog";
 import { Toast } from "primereact/toast";
 import { Dialog } from "primereact/dialog";
 import { IconField } from "primereact/iconfield";
+import { Dropdown } from "primereact/dropdown";
 import { InputIcon } from "primereact/inputicon";
 import { InputNumber } from "primereact/inputnumber";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -34,6 +35,9 @@ function Lookup() {
     kpi_name: "",
     a_name: "",
     b_name: "",
+    unit_type: "",
+    unit_value: "",
+    unit_label: "",
     max_value: "",
   });
   const [editRowId, setEditRowId] = useState(null);
@@ -41,6 +45,9 @@ function Lookup() {
     kpi_name: "",
     a_name: "",
     b_name: "",
+    unit_type: "",
+    unit_value: "",
+    unit_label: "",
     max_value: "",
   });
   const [formErrors, setFormErrors] = useState({});
@@ -76,6 +83,28 @@ function Lookup() {
     if (!values.kpi_name?.trim()) errors.kpi_name = "กรุณากรอกชื่อตัวชี้วัด";
     if (!values.a_name?.trim()) errors.a_name = "กรุณากรอกชื่อตัวตั้ง";
     if (!values.b_name?.trim()) errors.b_name = "กรุณากรอกชื่อตัวหาร";
+    if (!values.unit_type?.trim()) {
+      errors.unit_type = "กรุณาเลือกประเภทหน่วย";
+    } else {
+      if (values.unit_type === "ratio") {
+        if (
+          values.unit_value === null ||
+          values.unit_value === undefined ||
+          values.unit_value === ""
+        )
+          errors.unit_value = "กรุณากรอกค่าตัวคูณ";
+
+        if (!values.unit_label?.trim())
+          errors.unit_label = "กรุณากรอกชื่อหน่วย";
+      }
+
+      if (values.unit_type === "percent") {
+        if (values.unit_value !== 100)
+          errors.unit_value = "ค่าตัวคูณต้องเป็น 100 สำหรับร้อยละ";
+        if (values.unit_label !== "ราย")
+          errors.unit_label = "ชื่อหน่วยต้องเป็น 'ราย' สำหรับร้อยละ";
+      }
+    }
     return errors;
   };
 
@@ -90,7 +119,15 @@ function Lookup() {
       });
       showToast("success", "สำเร็จ", "บันทึกรายการเรียบร้อยแล้ว");
       fetchKPInames();
-      setFormValues({ kpi_name: "", a_name: "", b_name: "", max_value: "" });
+      setFormValues({
+        kpi_name: "",
+        a_name: "",
+        b_name: "",
+        unit_type: "",
+        unit_value: "",
+        unit_label: "",
+        max_value: "",
+      });
       setDialogVisible(false);
     } catch (error) {
       showToast("error", "ผิดพลาด", "ไม่สามารถเพิ่มข้อมูลได้");
@@ -150,7 +187,15 @@ function Lookup() {
 
   const cancelEdit = () => {
     setEditRowId(null);
-    setEditValues({ kpi_name: "", a_name: "", b_name: "", max_value: "" });
+    setEditValues({
+      kpi_name: "",
+      a_name: "",
+      b_name: "",
+      unit_type: "",
+      unit_value: "",
+      unit_label: "",
+      max_value: "",
+    });
     setFormErrors({});
   };
 
@@ -195,6 +240,9 @@ function Lookup() {
               kpi_name: rowData.kpi_name,
               a_name: rowData.a_name,
               b_name: rowData.b_name,
+              unit_type: rowData.unit_type,
+              unit_value: rowData.unit_value,
+              unit_label: rowData.unit_label,
               max_value: rowData.max_value,
             });
           }}
@@ -238,6 +286,77 @@ function Lookup() {
             )}
           </div>
         ))}
+        <div className="flex mb-2">
+          <div className="w-full mr-3">
+            <Dropdown
+              value={editValues.unit_type}
+              onChange={(e) => {
+                const value = e.value;
+                if (value === "percent") {
+                  setEditValues({
+                    ...editValues,
+                    unit_type: value,
+                    unit_value: 100,
+                    unit_label: "ราย",
+                  });
+                  setFormErrors({
+                    ...formErrors,
+                    unit_value: "",
+                    unit_label: "",
+                  });
+                } else {
+                  setEditValues({
+                    ...editValues,
+                    unit_type: value,
+                    unit_value: null,
+                    unit_label: "",
+                  });
+                }
+              }}
+              options={[
+                { label: "ร้อยละ", value: "percent" },
+                { label: "ตัวคูณกำหนดเอง", value: "ratio" },
+              ]}
+              placeholder="เลือกประเภทหน่วย"
+              optionLabel="label"
+              checkmark
+              className={`w-full ${formErrors.unit_type ? "p-invalid" : ""}`}
+            />
+            {formErrors.unit_type && (
+              <small className="p-error">{formErrors.unit_type}</small>
+            )}
+          </div>
+          <div className="w-full mr-3">
+            <InputNumber
+              inputId="unit_value"
+              value={editValues.unit_value || ""}
+              onValueChange={(e) =>
+                setEditValues({ ...editValues, unit_value: e.value })
+              }
+              className={`w-full ${formErrors.unit_label ? "p-invalid" : ""}`}
+              placeholder=" ค่าตัวคูณ (เช่น ต่อ 1,000 หรือ ต่อ 10,000)"
+              disabled={editValues.unit_type === "percent"}
+            />
+            {formErrors.unit_value && (
+              <small className="p-error">{formErrors.unit_value}</small>
+            )}
+          </div>
+          <div className="w-full">
+            <InputText
+              value={editValues.unit_label || ""}
+              onChange={(e) =>
+                setEditValues({ ...editValues, unit_label: e.target.value })
+              }
+              className={`w-full ${formErrors.unit_label ? "p-invalid" : ""}`}
+              placeholder="ชื่อหน่วย (เช่น ราย, ทารกเกิดมีชีพ)"
+              disabled={editValues.unit_type === "percent"}
+            />
+            {formErrors.unit_label && (
+              <small className="p-error">{formErrors.unit_label}</small>
+            )}
+          </div>
+        </div>
+
         <div className="mb-2">
           <InputNumber
             inputId="max_value"
@@ -247,7 +366,7 @@ function Lookup() {
             }
             maxFractionDigits={2}
             className="w-full"
-            placeholder="ค่าเป้าหมาย (%)"
+            placeholder="ค่าเป้าหมาย"
           />
         </div>
       </>
@@ -263,7 +382,13 @@ function Lookup() {
           <b>ตัวหาร:</b> {rowData.b_name}
         </p>
         <p>
-          <b>ค่าเป้าหมาย (%):</b> {rowData.max_value || "-"}
+          <b>หน่วย:</b>{" "}
+          {rowData.unit_type === "percent"
+            ? "ร้อยละ (%)"
+            : `ต่อ ${rowData.unit_value} ${rowData.unit_label}`}
+        </p>
+        <p>
+          <b>ค่าเป้าหมาย:</b> {rowData.max_value || "-"}
         </p>
       </>
     );
@@ -369,9 +494,84 @@ function Lookup() {
               )}
             </div>
           ))}
-
+          <div className="w-full flex my-3">
+            <div className="w-full mr-3">
+              <label htmlFor="unit_type">เลือกประเภทหน่วย</label>
+              <Dropdown
+                value={formValues.unit_type}
+                onChange={(e) => {
+                  const value = e.value;
+                  if (value === "percent") {
+                    setFormValues({
+                      ...formValues,
+                      unit_type: value,
+                      unit_value: 100,
+                      unit_label: "ราย",
+                    });
+                    setFormErrors({
+                      ...formErrors,
+                      unit_value: "",
+                      unit_label: "",
+                    });
+                  } else {
+                    setFormValues({
+                      ...formValues,
+                      unit_type: value,
+                      unit_value: null,
+                      unit_label: "",
+                    });
+                  }
+                }}
+                options={[
+                  { label: "ร้อยละ", value: "percent" },
+                  { label: "ตัวคูณกำหนดเอง", value: "ratio" },
+                ]}
+                placeholder="เลือกประเภทหน่วย"
+                optionLabel="label"
+                checkmark
+                className={`w-full ${formErrors.unit_type ? "p-invalid" : ""}`}
+              />
+              {formErrors.unit_type && (
+                <small className="p-error">{formErrors.unit_type}</small>
+              )}
+            </div>
+            <div className="w-full mr-3">
+              <label htmlFor="unit_value">
+                ค่าตัวคูณ (เช่น ต่อ 1,000 หรือ ต่อ 10,000)
+              </label>
+              <InputNumber
+                value={formValues.unit_value}
+                onValueChange={(e) =>
+                  setFormValues({ ...formValues, unit_value: e.value })
+                }
+                className={`w-full ${formErrors.unit_value ? "p-invalid" : ""}`}
+                placeholder="ค่าตัวคูณ"
+                disabled={formValues.unit_type === "percent"}
+              />
+              {formErrors.unit_value && (
+                <small className="p-error">{formErrors.unit_value}</small>
+              )}
+            </div>
+            <div className="w-full">
+              <label htmlFor="unit_label">
+                ชื่อหน่วย (เช่น ราย, ทารกเกิดมีชีพ)
+              </label>
+              <InputText
+                value={formValues.unit_label}
+                onChange={(e) =>
+                  setFormValues({ ...formValues, unit_label: e.target.value })
+                }
+                className={`w-full ${formErrors.unit_label ? "p-invalid" : ""}`}
+                placeholder="ราย"
+                disabled={formValues.unit_type === "percent"}
+              />
+              {formErrors.unit_label && (
+                <small className="p-error">{formErrors.unit_label}</small>
+              )}
+            </div>
+          </div>
           <div className="mt-3">
-            <label htmlFor="max_value">ค่าเป้าหมาย (%)</label>
+            <label htmlFor="max_value">ค่าเป้าหมาย</label>
             <InputNumber
               inputId="max_value"
               value={formValues.max_value}
