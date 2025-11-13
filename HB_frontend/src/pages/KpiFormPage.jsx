@@ -17,6 +17,9 @@ import { IconField } from "primereact/iconfield";
 import { InputIcon } from "primereact/inputicon";
 import { Checkbox } from "primereact/checkbox";
 import { Skeleton } from "primereact/skeleton";
+import { InputTextarea } from "primereact/inputtextarea";
+import { Panel } from "primereact/panel";
+import { Divider } from "primereact/divider";
 import { ScrollTop } from "primereact/scrolltop";
 import { FileUpload } from "primereact/fileupload";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -35,6 +38,8 @@ import axiosInstance, { setAuthErrorInterceptor } from "../utils/axiosInstance";
 
 import { handleFileUpload } from "../utils/importUtils";
 function KpiFormPage() {
+    const [value, setValue] = useState('');
+
   const API_BASE =
     import.meta.env.VITE_REACT_APP_API || "http://localhost:3000/api";
   const { logout } = useAuth();
@@ -49,6 +54,7 @@ function KpiFormPage() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
+  const [dialogQualityVisible, setDialogQualityVisible] = useState(false);
   const [dialogVisible, setDialogVisible] = useState(false);
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
 
@@ -730,11 +736,18 @@ function KpiFormPage() {
       >
         <div className="flex justify-between items-center mb-3">
           <h5 className="text-2xl font-semibold">จัดการข้อมูลตัวชี้วัด</h5>
-          <Button
-            label="+ เพิ่มข้อมูล"
-            onClick={() => setDialogVisible(true)}
-            severity="success"
-          />
+          <div className="flex justify-between gap-3">
+            <Button
+              label="+ เพิ่มข้อมูลตัวชี้วัด"
+              onClick={() => setDialogVisible(true)}
+              severity="success"
+            />
+            <Button
+              label="+ เพิ่มประเด็นปัญหา/ข้อเสนอแนะ"
+              onClick={() => setDialogQualityVisible(true)}
+              severity="success"
+            />
+          </div>
         </div>
 
         <div className="">
@@ -827,6 +840,78 @@ function KpiFormPage() {
         setSelectedRows={setSelectedRows}
         dialogFooterDuplicate={dialogFooterDuplicate}
       />
+
+      <Dialog
+        header="ประเด็นปัญหา/ข้อเสนอแนะ"
+        visible={dialogQualityVisible}
+        style={{ width: "50vw" }}
+        onHide={() => {
+          if (!dialogQualityVisible) return;
+          setDialogQualityVisible(false);
+        }}
+      >
+        <Calendar
+          view="month"
+          dateFormat="mm/yy"
+          placeholder="เดือน/ปี"
+          className="mr-5"
+          showIcon
+        />
+        <Dropdown
+          onChange={handleKpiChange}
+          optionLabel="label"
+          placeholder="ไทย"
+          className="mr-5"
+        />
+        <div className="flex mt-5">
+          <Panel
+            header="ปัญหาและอุปสรรค"
+            pt={{
+              header: {
+                style: {
+                  backgroundColor: "oklch(93.6% 0.032 17.717)",
+                },
+              },
+            }}
+            className="w-full"
+          >
+            <InputTextarea
+               className="w-full"
+             value={value}
+              onChange={(e) => setValue(e.target.value)}
+              rows={5}
+              cols={30}
+            />
+          </Panel>
+          <Divider layout="vertical" />
+          <Panel
+            header="สิ่งที่ต้องการสนับสนุนให้บรรลุเป้าหมาย"
+               className="w-full"
+            pt={{
+              header: {
+                style: {
+                  backgroundColor: "oklch(96.2% 0.044 156.743)",
+                },
+              },
+            }}
+          >
+            <InputTextarea
+          className="w-full"
+             value={value}
+              onChange={(e) => setValue(e.target.value)}
+              rows={5}
+              cols={30}
+            />
+          </Panel>
+        </div>
+        <div className="flex justify-end w-full mt-5">
+          <Button
+            label="บันทึกข้อมูล"
+            onClick={() => setDialogQualityVisible(true)}
+            severity="success"
+          />
+        </div>
+      </Dialog>
 
       <Footer />
     </div>

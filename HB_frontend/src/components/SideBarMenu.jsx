@@ -24,7 +24,8 @@ function SideBarMenu({ collapsed, setCollapsed }) {
 
   return (
     <div
-      className={`sm:fixed sm:top-0 sm:left-0 sm:h-dvh bg-white flex flex-col transition-all duration-300 pt-5`}
+      // className={`sm:fixed sm:top-0 sm:left-0 sm:h-dvh bg-white flex flex-col transition-all duration-300 pt-5`}
+      className={`sm:fixed sm:top-0 sm:left-0 sm:h-dvh bg-grey-900 flex flex-col transition-all duration-300 pt-5`}
       style={{ width: collapsed ? "4rem" : "18.75rem" }}
     >
       {!collapsed ? (
@@ -97,6 +98,22 @@ function SideBarMenu({ collapsed, setCollapsed }) {
             {user?.role !== 3 && (
               <>
                 <Link
+                  to="/lookupOPD"
+                  className={`p-3 rounded-lg block mb-3 ${
+                    isActive("/lookupOPD")
+                      ? "text-white font-bold bg-teal-500"
+                      : "text-gray-700 hover:text-teal-500"
+                  }`}
+                >
+                  {!collapsed ? (
+                    "จัดการชื่อ OPD"
+                  ) : (
+                    <div className="text-center">
+                      <FontAwesomeIcon icon={faMarker} />
+                    </div>
+                  )}
+                </Link>
+                <Link
                   to="/lookup"
                   className={`p-3 rounded-lg block mb-3 ${
                     isActive("/lookup")
@@ -112,6 +129,7 @@ function SideBarMenu({ collapsed, setCollapsed }) {
                     </div>
                   )}
                 </Link>
+
                 <Link
                   to="/lookupMedError"
                   className={`p-3 rounded-lg block mb-3 ${

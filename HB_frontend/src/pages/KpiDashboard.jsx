@@ -7,6 +7,9 @@ import { Column } from "primereact/column";
 import { ColumnGroup } from "primereact/columngroup";
 import { Row } from "primereact/row";
 import { Button } from "primereact/button";
+import { Fieldset } from "primereact/fieldset";
+import { Card } from "primereact/card";
+import { Panel } from "primereact/panel";
 import GaugeChart from "../components/GaugeChart";
 import KPILineChart from "../components/KPILineChart";
 import BarChart from "../components/BarChart";
@@ -217,6 +220,12 @@ function KpiDashboard() {
     </ColumnGroup>
   );
 
+  const legendTemplate = (
+    <div className="bg-red-700 flex align-items-center gap-2 px-2">
+      <span className="font-bold">ปัญหาและอุปสรรค</span>
+    </div>
+  );
+
   return (
     <div className="Home-page overflow-hidden min-h-dvh flex flex-col justify-between">
       <ScrollTop />
@@ -292,6 +301,7 @@ function KpiDashboard() {
             <div
               key={`${item.type}-${index}`}
               className="bg-white shadow-md border-1 border-gray-200 h-[100px] md:h-[136px] p-3 md:p-5 rounded-xl flex flex-col justify-between"
+              // className="bg-grey-900 shadow-md border-1 border-gray-200 h-[100px] md:h-[136px] p-3 md:p-5 rounded-xl flex flex-col justify-between"
             >
               <div className="flex items-center justify-between">
                 <h1 className="text-5xl font-semibold">
@@ -304,8 +314,8 @@ function KpiDashboard() {
             </div>
           ))}
         </div>
-
         <div className="bg-white p-4 my-7 w-full rounded-xl shadow-md h-auto border-1 border-gray-200">
+          {/* <div className="bg-grey-900 p-4 my-7 w-full rounded-xl shadow-md h-auto border-1 border-gray-200"> */}
           {data?.length > 0 ? (
             selectedChartType === "percent" ? (
               <KPILineChart data={data} />
@@ -317,7 +327,139 @@ function KpiDashboard() {
           )}
         </div>
 
-        <div className="bg-white p-4 my-7 w-full rounded-xl shadow-md h-auto border-1 border-gray-200">
+        <div className="flex gap-5">
+          <Card
+            title="ปัญหาและอุปสรรค"
+            className="w-full"
+            style={{
+              backgroundColor: "oklch(97.1% 0.013 17.38)",
+            }}
+          >
+            <p className="m-0">
+              - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
+            </p>
+            <p className="m-0">
+              - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
+            </p>
+            <p className="m-0">
+              - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
+            </p>
+          </Card>
+          <Card
+            title="สิ่งที่ต้องการสนับสนุนให้บรรลุเป้าหมาย"
+            className="w-full"
+            style={{
+              backgroundColor: "oklch(98.2% 0.018 155.826)",
+            }}
+          >
+            <p className="m-0">
+              - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
+            </p>
+            <p className="m-0">
+              - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
+            </p>
+            <p className="m-0">
+              - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
+            </p>
+          </Card>
+        </div>
+
+        {/* <div className="flex gap-5">
+          <Panel
+            header="ปัญหาและอุปสรรค"
+            className="w-full"
+            pt={{
+              header: {
+                style: {
+                  backgroundColor: "oklch(93.6% 0.032 17.717)",
+                },
+              },
+            }}
+          >
+            <p className="m-0">
+              - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
+            </p>
+            <p className="m-0">
+              - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
+            </p>
+            <p className="m-0">
+              - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
+            </p>
+          </Panel>
+          <Panel
+            header="สิ่งที่ต้องการสนับสนุนให้บรรลุเป้าหมาย"
+            className="w-full"
+            pt={{
+              header: {
+                style: {
+                  backgroundColor: "oklch(96.2% 0.044 156.743)",
+                },
+              },
+            }}
+          >
+            <p className="m-0">
+              - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
+            </p>
+            <p className="m-0">
+              - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
+            </p>
+            <p className="m-0">
+              - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
+            </p>
+          </Panel>
+        </div> */}
+
+        {/* <div className="flex gap-5">
+          <Fieldset
+            className="w-full"
+            legend="ปัญหาและอุปสรรค"
+            pt={{
+              legend: {
+                style: {
+                  backgroundColor: "oklch(93.6% 0.032 17.717)",
+                },
+              },
+            }}
+          >
+            <p className="m-0">
+              - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
+              <p className="m-0">
+                - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed
+                do
+              </p>
+              <p className="m-0">
+                - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed
+                do
+              </p>
+            </p>
+          </Fieldset>
+          <Fieldset
+            className="w-full"
+            legend="สิ่งที่ต้องการสนับสนุนให้บรรลุเป้าหมาย"
+            pt={{
+              legend: {
+                style: {
+                  backgroundColor: "oklch(96.2% 0.044 156.743)",
+                },
+              },
+            }}
+          >
+            <p className="m-0">
+              - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
+            </p>
+            <p className="m-0">
+              - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
+            </p>
+            <p className="m-0">
+              - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
+            </p>
+            <p className="m-0">
+              - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
+            </p>
+          </Fieldset>
+        </div> */}
+
+        <div className="bg-grey-900 p-4 my-7 w-full rounded-xl shadow-md h-auto border-1 border-gray-200">
           <DataTable
             ref={dt}
             header={header}

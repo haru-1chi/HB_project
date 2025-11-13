@@ -167,21 +167,15 @@ exports.getKPIMedName = async (req, res) => {
     try {
         const includeDeleted = req.query.includeDeleted === "true";
 
-        const query = `
-    SELECT 
-     *
-    FROM kpi_name_med
-    where deleted_at is null
-  `;
+        const sql = `
+      SELECT *
+      FROM kpi_name_med
+      ${includeDeleted ? "" : "WHERE deleted_at IS NULL"}
+    `;
 
-        const result = await new Promise((resolve, reject) => {
-            db.query(query, (err, rows) => {
-                if (err) reject(err);
-                else resolve(rows);
-            });
-        });
+        const result = await query(sql);
 
-        res.status(200).json(Array.isArray(result) ? result : []);
+        res.status(200).json(result || []);
     } catch (err) {
         console.error("❌ Error fetching KPI names:", err);
         res.status(500).json({
@@ -189,5 +183,138 @@ exports.getKPIMedName = async (req, res) => {
             message: "Failed to fetch KPI names",
             error: err.message,
         });
+    }
+};
+
+//--------------------------------------
+exports.createKPIMedError = async (req, res) => {
+    try {
+        const dataArray = req.body;
+        if (!Array.isArray(dataArray) || dataArray.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Data must be a non-empty array",
+            });
+        }
+
+        const createdBy = req.user?.name || "Unknown User";
+
+        // ✅ Map input data into array-of-arrays for bulk insert
+        const values = dataArray.map((item) => [
+            item.kpi_id,
+            item.opd_id,
+            item.A || 0,
+            item.B || 0,
+            item.C || 0,
+            item.D || 0,
+            item.E || 0,
+            item.F || 0,
+            item.G || 0,
+            item.H || 0,
+            item.I || 0,
+            item.report_date,
+        ]);
+
+        const sql = `
+      INSERT INTO kpi_med_error 
+      (
+        kpi_id, opd_id, 
+        A, B, C, D, E, F, G, H, I, 
+        report_date
+      ) 
+      VALUES ?
+    `;
+
+        const result = await query(sql, [values]);
+
+        res.status(201).json({
+            success: true,
+            message: `Inserted ${result.affectedRows} record(s) successfully.`,
+            inserted: result.affectedRows,
+        });
+    } catch (err) {
+        console.error("❌ Error inserting KPI medication error data:", err);
+        res.status(500).json({
+            success: false,
+            message: "Failed to insert KPI medication error data",
+            error: err.message,
+        });
+    }
+};
+
+exports.getKPIMedData = async (req, res) => {
+    const { kpi_id,
+        opd_id,
+        search, sinceDate, endDate } = req.query;
+
+    try {
+        let sql = `
+          SELECT 
+            e.*, 
+            n.kpi_name AS kpi_label, 
+            d.opd_name
+          FROM kpi_med_error e
+          LEFT JOIN kpi_name_med n ON e.kpi_id = n.id
+          LEFT JOIN opd_name d ON e.opd_id = d.id
+          WHERE 1=1
+        `;
+        const params = [];
+
+        // ✅ Filter by KPI ID
+        if (kpi_id) {
+            sql += ` AND e.kpi_id = ?`;
+            params.push(kpi_id);
+        }
+
+        // ✅ Filter by Department
+        if (opd_id) {
+            sql += ` AND e.opd_id = ?`;
+            params.push(opd_id);
+        }
+
+        // ✅ Search filter (text or MM/YYYY date)
+        if (search) {
+            let formattedSearch = search;
+
+            // convert MM/YYYY → YYYY-MM
+            const match = /^(\d{2})\/(\d{4})$/.exec(search);
+            if (match) {
+                const [_, mm, yyyy] = match;
+                formattedSearch = `${yyyy}-${mm}`;
+            }
+
+            sql += `
+                AND (
+                  n.kpi_name LIKE ? OR
+                  d.opd_name LIKE ? OR
+                  e.report_date LIKE ?
+                )
+              `;
+            params.push(`%${search}%`, `%${search}%`, `%${formattedSearch}%`);
+        }
+
+
+        // ✅ Date range filter
+        if (sinceDate && endDate) {
+            sql += ` AND DATE_FORMAT(e.report_date, '%Y-%m') BETWEEN DATE_FORMAT(?, '%Y-%m') AND DATE_FORMAT(?, '%Y-%m')`;
+            params.push(sinceDate, endDate);
+        } else if (sinceDate) {
+            sql += ` AND DATE_FORMAT(e.report_date, '%Y-%m') >= DATE_FORMAT(?, '%Y-%m')`;
+            params.push(sinceDate);
+        } else if (endDate) {
+            sql += ` AND DATE_FORMAT(e.report_date, '%Y-%m') <= DATE_FORMAT(?, '%Y-%m')`;
+            params.push(endDate);
+        }
+
+        // ✅ Order by date
+        sql += ` ORDER BY e.report_date ASC`;
+
+        // Run query
+        const results = await query(sql, params);
+        res.status(200).json(Array.isArray(results) ? results : []);
+    } catch (err) {
+        console.error("❌ Error fetching KPI MED data:", err);
+        res.status(500).json({ error: 'Error fetching KPI MED data', message: err.message });
+
     }
 };

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const kpiController = require('../controllers/kpiController');
 const kpiMedController = require('../controllers/kpiMedController');
+const opdController = require('../controllers/opdController');
 const { authAndRole } = require("../middleware/auth")
 
 router.post('/kpi-data/create', authAndRole(1, 2), kpiController.createdata); //ไม่ใช้แล้ว
@@ -23,6 +24,14 @@ router.post('/kpi-name-med', authAndRole(1, 2), kpiMedController.createKPINameMe
 router.put('/kpi-name-med', authAndRole(1, 2), kpiMedController.updateKPINameMed);
 router.get('/kpi-name-med', kpiMedController.getKPIMedName);
 router.delete('/kpi-name-med/:id', authAndRole(1, 2), kpiMedController.deleteKPINameMed);
+
+router.post('/kpi-data-med', authAndRole(1, 2), kpiMedController.createKPIMedError); //ไม่ใช้แล้ว
+router.get('/kpi-data-med', kpiMedController.getKPIMedData);
+
+router.post('/opd-name', authAndRole(1, 2), opdController.createOPDName);
+router.put('/opd-name', authAndRole(1, 2), opdController.updateOPDName);
+router.delete('/opd-name/:id', authAndRole(1, 2), opdController.deleteOPDName);
+router.get('/opd-name', opdController.getOPDName);
 module.exports = router;
 
 // router.post('/create', auth, kpiController.createdata);

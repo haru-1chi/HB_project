@@ -1,5 +1,6 @@
 import React from "react";
-import "primereact/resources/themes/lara-light-blue/theme.css";
+import "primereact/resources/themes/lara-dark-blue/theme.css";
+// import "primereact/resources/themes/lara-light-blue/theme.css";
 import "primereact/resources/primereact.min.css";
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import "./App.css";
@@ -7,6 +8,7 @@ import Home from "./pages/Home";
 import KpiDashboard from "./pages/KpiDashboard";
 import Lookup from "./pages/Lookup";
 import LookupMedError from "./pages/LookupMedError";
+import LookupOPD from "./pages/LookupOPD";
 import KpiFormPage from "./pages/KpiFormPage";
 import KpiMedFormPage from "./pages/KpiMedFormPage";
 import Login from "./pages/Login";
@@ -19,7 +21,8 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <div className="bg-[#F2F8FD]">
+          <div className="bg-[#191b24]">
+        {/* <div className="bg-[#F2F8FD]"> */}
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route element={<Layout />}>
@@ -37,6 +40,14 @@ function App() {
                 element={
                   <ProtectedRoute roles={[1, 2]}>
                     <Lookup />
+                  </ProtectedRoute>
+                }
+              />
+                 <Route
+                path="/lookupOPD"
+                element={
+                  <ProtectedRoute roles={[1, 2]}>
+                    <LookupOPD />
                   </ProtectedRoute>
                 }
               />
