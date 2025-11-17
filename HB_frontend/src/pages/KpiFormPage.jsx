@@ -38,7 +38,7 @@ import axiosInstance, { setAuthErrorInterceptor } from "../utils/axiosInstance";
 
 import { handleFileUpload } from "../utils/importUtils";
 function KpiFormPage() {
-    const [value, setValue] = useState('');
+  const [value, setValue] = useState("");
 
   const API_BASE =
     import.meta.env.VITE_REACT_APP_API || "http://localhost:3000/api";
@@ -876,8 +876,8 @@ function KpiFormPage() {
             className="w-full"
           >
             <InputTextarea
-               className="w-full"
-             value={value}
+              className="w-full"
+              value={value}
               onChange={(e) => setValue(e.target.value)}
               rows={5}
               cols={30}
@@ -886,7 +886,7 @@ function KpiFormPage() {
           <Divider layout="vertical" />
           <Panel
             header="สิ่งที่ต้องการสนับสนุนให้บรรลุเป้าหมาย"
-               className="w-full"
+            className="w-full"
             pt={{
               header: {
                 style: {
@@ -896,8 +896,8 @@ function KpiFormPage() {
             }}
           >
             <InputTextarea
-          className="w-full"
-             value={value}
+              className="w-full"
+              value={value}
               onChange={(e) => setValue(e.target.value)}
               rows={5}
               cols={30}

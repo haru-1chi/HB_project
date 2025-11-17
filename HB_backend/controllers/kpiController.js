@@ -404,13 +404,14 @@ exports.createKPIName = async (req, res) => {
             item.unit_type ?? null,
             item.unit_value ?? null,
             item.unit_label ?? null,
+            item.target_direction ?? null,
             item.max_value ?? null,
             userName,
         ]);
 
         const sql = `
       INSERT INTO kpi_name
-      (kpi_name, a_name, b_name, unit_type, unit_value, unit_label, max_value, created_by) 
+      (kpi_name, a_name, b_name, unit_type, unit_value, unit_label, target_direction, max_value, created_by) 
       VALUES ?
     `;
 
@@ -440,7 +441,7 @@ exports.updateKPIName = async (req, res) => {
         }
 
         // Prepare fields for CASE WHEN update
-        const fields = ["kpi_name", "a_name", "b_name", "unit_type", "unit_value", "unit_label", "max_value"];
+        const fields = ["kpi_name", "a_name", "b_name", "unit_type", "unit_value", "unit_label", "target_direction", "max_value"];
         const cases = {};
         fields.forEach(f => (cases[f] = []));
 
@@ -543,6 +544,7 @@ exports.getKPIName = async (req, res) => {
       unit_type,
       unit_value,
       unit_label,
+      target_direction,
       max_value,
       deleted_at
     FROM kpi_name

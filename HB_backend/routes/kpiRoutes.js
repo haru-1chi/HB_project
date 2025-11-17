@@ -25,8 +25,10 @@ router.put('/kpi-name-med', authAndRole(1, 2), kpiMedController.updateKPINameMed
 router.get('/kpi-name-med', kpiMedController.getKPIMedName);
 router.delete('/kpi-name-med/:id', authAndRole(1, 2), kpiMedController.deleteKPINameMed);
 
-router.post('/kpi-data-med', authAndRole(1, 2), kpiMedController.createKPIMedError); //ไม่ใช้แล้ว
+router.post('/kpi-data-med', authAndRole(1, 2), kpiMedController.createKPIMedError);
+router.put('/kpi-data-med', authAndRole(1, 2), kpiMedController.updateKPIMedError);
 router.get('/kpi-data-med', kpiMedController.getKPIMedData);
+router.delete('/kpi-data-med/:id', authAndRole(1, 2), kpiMedController.deleteKPIMedError);
 
 router.post('/opd-name', authAndRole(1, 2), opdController.createOPDName);
 router.put('/opd-name', authAndRole(1, 2), opdController.updateOPDName);

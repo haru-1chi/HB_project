@@ -19,7 +19,10 @@ import {
   faCheck,
   faXmark,
   faMagnifyingGlass,
+  faGreaterThanEqual,
+  faLessThanEqual,
 } from "@fortawesome/free-solid-svg-icons";
+
 import Footer from "../components/Footer";
 import { ScrollTop } from "primereact/scrolltop";
 
@@ -38,6 +41,7 @@ function Lookup() {
     unit_type: "",
     unit_value: "",
     unit_label: "",
+    target_direction: "",
     max_value: "",
   });
   const [editRowId, setEditRowId] = useState(null);
@@ -48,6 +52,7 @@ function Lookup() {
     unit_type: "",
     unit_value: "",
     unit_label: "",
+    target_direction: "",
     max_value: "",
   });
   const [formErrors, setFormErrors] = useState({});
@@ -105,6 +110,8 @@ function Lookup() {
           errors.unit_label = "ชื่อหน่วยต้องเป็น 'ราย' สำหรับร้อยละ";
       }
     }
+    if (!values.target_direction?.trim())
+      errors.target_direction = "กรุณาเลือกเกณฑ์เป้าหมาย";
     return errors;
   };
 
@@ -126,6 +133,7 @@ function Lookup() {
         unit_type: "",
         unit_value: "",
         unit_label: "",
+        target_direction: "",
         max_value: "",
       });
       setDialogVisible(false);
@@ -194,6 +202,7 @@ function Lookup() {
       unit_type: "",
       unit_value: "",
       unit_label: "",
+      target_direction: "",
       max_value: "",
     });
     setFormErrors({});
@@ -243,6 +252,7 @@ function Lookup() {
               unit_type: rowData.unit_type,
               unit_value: rowData.unit_value,
               unit_label: rowData.unit_label,
+              target_direction: rowData.target_direction,
               max_value: rowData.max_value,
             });
           }}
@@ -333,7 +343,7 @@ function Lookup() {
               onValueChange={(e) =>
                 setEditValues({ ...editValues, unit_value: e.value })
               }
-              className={`w-full ${formErrors.unit_label ? "p-invalid" : ""}`}
+              className={`w-full ${formErrors.unit_value ? "p-invalid" : ""}`}
               placeholder=" ค่าตัวคูณ (เช่น ต่อ 1,000 หรือ ต่อ 10,000)"
               disabled={editValues.unit_type === "percent"}
             />
@@ -356,18 +366,51 @@ function Lookup() {
             )}
           </div>
         </div>
-
-        <div className="mb-2">
-          <InputNumber
-            inputId="max_value"
-            value={editValues.max_value || ""}
-            onValueChange={(e) =>
-              setEditValues({ ...editValues, max_value: e.value })
-            }
-            maxFractionDigits={2}
-            className="w-full"
-            placeholder="ค่าเป้าหมาย"
-          />
+        <div className="flex mb-2">
+          <div className="w-full mr-3">
+            <Dropdown
+              value={editValues.target_direction}
+              options={unitOptions}
+              onChange={(e) => {
+                setEditValues({
+                  ...editValues,
+                  target_direction: e.target.value,
+                });
+              }}
+              placeholder="เลือกเกณฑ์เป้าหมาย"
+              itemTemplate={(option) => (
+                <div className="flex items-center gap-2 text-sm">
+                  {option.label}
+                </div>
+              )}
+              valueTemplate={(option, props) => {
+                if (!option || !option.value) {
+                  return <span>{props.placeholder}</span>;
+                }
+                return (
+                  <div className="flex items-center gap-2">{option.label}</div>
+                );
+              }}
+              className={`w-full ${
+                formErrors.target_direction ? "p-invalid" : ""
+              }`}
+            />
+            {formErrors.target_direction && (
+              <small className="p-error">{formErrors.target_direction}</small>
+            )}
+          </div>
+          <div className="w-full ">
+            <InputNumber
+              inputId="max_value"
+              value={editValues.max_value || ""}
+              onValueChange={(e) =>
+                setEditValues({ ...editValues, max_value: e.value })
+              }
+              maxFractionDigits={2}
+              className="w-full"
+              placeholder="ค่าเป้าหมาย"
+            />
+          </div>
         </div>
       </>
     ) : (
@@ -385,10 +428,16 @@ function Lookup() {
           <b>หน่วย:</b>{" "}
           {rowData.unit_type === "percent"
             ? "ร้อยละ (%)"
-            : `ต่อ ${rowData.unit_value} ${rowData.unit_label}`}
+            : `ต่อ ${rowData.unit_value.toLocaleString()} ${
+                rowData.unit_label
+              }`}
         </p>
         <p>
-          <b>ค่าเป้าหมาย:</b> {rowData.max_value || "-"}
+          <b>ค่าเป้าหมาย:</b>{" "}
+          {rowData.target_direction === "less_than"
+            ? "ต้องน้อยกว่า"
+            : `ต้องมากกว่า`}{" "}
+          {rowData.max_value ? rowData.max_value.toLocaleString() : "-"}
         </p>
       </>
     );
@@ -412,6 +461,25 @@ function Lookup() {
       />
     </div>
   );
+
+  const unitOptions = [
+    {
+      label: (
+        <>
+          ต้องน้อยกว่า <FontAwesomeIcon icon={faLessThanEqual} />
+        </>
+      ),
+      value: "less_than",
+    },
+    {
+      label: (
+        <>
+          ต้องมากกว่า <FontAwesomeIcon icon={faGreaterThanEqual} />
+        </>
+      ),
+      value: "more_than",
+    },
+  ];
 
   return (
     <div className="Home-page overflow-hidden min-h-dvh flex flex-col justify-between">
@@ -570,18 +638,55 @@ function Lookup() {
               )}
             </div>
           </div>
-          <div className="mt-3">
-            <label htmlFor="max_value">ค่าเป้าหมาย</label>
-            <InputNumber
-              inputId="max_value"
-              value={formValues.max_value}
-              onValueChange={(e) =>
-                setFormValues({ ...formValues, max_value: e.value })
-              }
-              maxFractionDigits={2}
-              placeholder="0.00"
-              className="w-full"
-            />
+          <div className="w-full flex my-3">
+            <div className="w-full mr-3">
+              <label htmlFor="max_value">เกณฑ์เป้าหมาย</label>
+              <Dropdown
+                value={formValues.target_direction}
+                options={unitOptions}
+                onChange={(e) => {
+                  setFormValues({
+                    ...formValues,
+                    target_direction: e.target.value,
+                  });
+                }}
+                placeholder="เลือกเกณฑ์เป้าหมาย"
+                itemTemplate={(option) => (
+                  <div className="flex items-center gap-2 text-sm">
+                    {option.label}
+                  </div>
+                )}
+                valueTemplate={(option, props) => {
+                  if (!option || !option.value) {
+                    return <span>{props.placeholder}</span>;
+                  }
+                  return (
+                    <div className="flex items-center gap-2">
+                      {option.label}
+                    </div>
+                  );
+                }}
+                className={`w-full ${
+                  formErrors.target_direction ? "p-invalid" : ""
+                }`}
+              />
+              {formErrors.target_direction && (
+                <small className="p-error">{formErrors.target_direction}</small>
+              )}
+            </div>
+            <div className="w-full">
+              <label htmlFor="max_value">ค่าเป้าหมาย</label>
+              <InputNumber
+                inputId="max_value"
+                value={formValues.max_value}
+                onValueChange={(e) =>
+                  setFormValues({ ...formValues, max_value: e.value })
+                }
+                maxFractionDigits={2}
+                placeholder="0.00"
+                className="w-full"
+              />
+            </div>
           </div>
 
           <div className="flex justify-end mt-6">
