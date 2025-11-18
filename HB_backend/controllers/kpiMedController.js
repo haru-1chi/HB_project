@@ -410,7 +410,6 @@ exports.deleteKPIMedError = async (req, res) => {
 exports.getKPIMedData = async (req, res) => {
     try {
         const month = req.query.month?.trim(); // expected format: "YYYY-MM"
-
         const sql = `
       SELECT 
         e.*, 
@@ -428,7 +427,7 @@ exports.getKPIMedData = async (req, res) => {
 
         if (month) {
             // ✅ Calculate start and end of the month
-            const startDate = `${month}-01`;
+            const startDate = `${month}`;
             const [year, mon] = month.split("-");
             const nextMonth = (Number(mon) === 12)
                 ? `${Number(year) + 1}-01-01`

@@ -83,56 +83,6 @@ function KpiMedFormPage() {
     toast.current?.show({ severity, summary, detail, life: 3000 });
   }, []);
 
-  useEffect(() => {
-    const fetchKpiNames = async () => {
-      try {
-        const res = await axios.get(`${API_BASE}/kpi-name-med`, {
-          params: { includeDeleted: true },
-        });
-
-        const options = res.data.map((item) => ({
-          label: item.kpi_name,
-          value: item.id,
-          created_by: item.created_by,
-          deleted: item.deleted_at !== null,
-        }));
-
-        const active = options.filter((opt) => !opt.deleted);
-        setKpiNames(active);
-
-        const resOPD = await axios.get(`${API_BASE}/opd-name`, {
-          params: { includeDeleted: true },
-        });
-
-        const optionsresOPD = resOPD.data.map((item) => ({
-          label: item.opd_name,
-          value: item.id,
-          deleted: item.deleted_at !== null,
-        }));
-
-        const activeresOPD = optionsresOPD.filter((opt) => !opt.deleted);
-        setOPDNames(activeresOPD);
-
-        if (active.length > 0) {
-          const first = active[0].value;
-          setSelectedKpi(first);
-
-          // 👉 fetch latest month automatically
-          const today = new Date();
-          const yyyy = today.getFullYear();
-          const mm = String(today.getMonth() + 1).padStart(2, "0");
-
-          fetchKpiData(`${yyyy}-${mm}-01`);
-        }
-      } catch (err) {
-        showToast("error", "ผิดพลาด", err.message || "โหลดชื่อ KPI ล้มเหลว");
-        console.error(err);
-      }
-    };
-
-    fetchKpiNames();
-  }, []);
-
   // 🟢 Fetch KPI data (your KPI detail endpoint)
   const fetchKpiData = useCallback(
     async (month) => {
@@ -151,8 +101,57 @@ function KpiMedFormPage() {
         setLoading(false);
       }
     },
-    [showToast]
+    [API_BASE, showToast]
   );
+
+  useEffect(() => {
+    const fetchNames = async () => {
+      try {
+        const [resKpi, resOPD] = await Promise.all([
+          axios.get(`${API_BASE}/kpi-name-med`, {
+            params: { includeDeleted: true },
+          }),
+          axios.get(`${API_BASE}/opd-name`, {
+            params: { includeDeleted: true },
+          }),
+        ]);
+
+        const processData = (data, labelKey) =>
+          data
+            .filter((item) => !item.deleted_at) // filter active items
+            .map((item) => ({
+              label: item[labelKey],
+              value: item.id,
+              created_by: item.created_by,
+            }));
+
+        const activeKpi = processData(resKpi.data, "kpi_name");
+        const activeOPD = processData(resOPD.data, "opd_name");
+
+        setKpiNames(activeKpi);
+        setOPDNames(activeOPD);
+
+        if (activeKpi.length > 0) {
+          setSelectedKpi(activeKpi[0].value);
+
+          // 👉 Fetch latest month automatically
+          const today = new Date();
+          const yyyy = today.getFullYear();
+          const mm = String(today.getMonth() + 1).padStart(2, "0");
+          fetchKpiData(`${yyyy}-${mm}-01`);
+        }
+      } catch (err) {
+        showToast(
+          "error",
+          "ผิดพลาด",
+          err.message || "โหลดชื่อ KPI หรือ OPD ล้มเหลว"
+        );
+        console.error(err);
+      }
+    };
+
+    fetchNames();
+  }, [API_BASE, fetchKpiData, showToast]);
 
   // const fetchKpiData = useCallback(
   //   async (kpiId, search = "") => {
@@ -191,7 +190,6 @@ function KpiMedFormPage() {
     if (!date) return;
     const yyyy = date.getFullYear();
     const mm = String(date.getMonth() + 1).padStart(2, "0");
-    // send YYYY-MM-01
     const monthString = `${yyyy}-${mm}-01`;
     fetchKpiData(monthString);
   };
@@ -204,30 +202,22 @@ function KpiMedFormPage() {
   //*สำหรับ filter header
 
   //*สำหรับ form
-  const handleKpiFormChange = (e) => setSelectedKpiForm(e.value);
+  const fields = useMemo(
+    () => ["A", "B", "C", "D", "E", "F", "G", "H", "I"],
+    []
+  );
 
-  const handleInputChange = useCallback((rowIndex, field, value) => {
-    setRows((prev) =>
-      prev.map((row, idx) => {
-        if (idx !== rowIndex) return row;
-        const updated = { ...row, [field]: Number(value) || 0 };
-        const total =
-          updated.A +
-          updated.B +
-          updated.C +
-          updated.D +
-          updated.E +
-          updated.F +
-          updated.G +
-          updated.H +
-          updated.I;
-        return { ...updated, total };
-      })
-    );
-  }, []);
-  //*สำหรับ form
+  const createEmptyRow = (id) =>
+    fields.reduce((acc, f) => ({ ...acc, [f]: 0 }), {
+      id,
+      kpi_id: null,
+      opd_id: null,
+      opd_label: "",
+      total: 0,
+    });
 
-  //add rows //////////////////////////////////////////////////////////////
+  // -------------------------
+  // Helper: normalize date
   const normalizeDate = useCallback((date) => {
     if (!(date instanceof Date)) return date;
     const year = date.getFullYear();
@@ -235,84 +225,72 @@ function KpiMedFormPage() {
     return `${year}-${month}-01`;
   }, []);
 
-  const [rows, setRows] = useState([
-    {
-      id: 1,
-      kpi_id: null,
-      A: 0,
-      B: 0,
-      C: 0,
-      D: 0,
-      E: 0,
-      F: 0,
-      G: 0,
-      H: 0,
-      I: 0,
-      total: 0,
-    },
-  ]);
+  // -------------------------
+  // Memoized OPD map for fast lookup
+  const OPDMap = useMemo(
+    () => new Map(OPDNames.map((o) => [o.value, o.label])),
+    [OPDNames]
+  );
 
-  const addRow = useCallback(() => {
-    setRows((prev) => [
-      ...prev,
-      {
-        id: prev.length + 1,
-        kpi_id: null,
-        A: 0,
-        B: 0,
-        C: 0,
-        D: 0,
-        E: 0,
-        F: 0,
-        G: 0,
-        H: 0,
-        I: 0,
-        total: 0,
-      },
-    ]);
+  // -------------------------
+  // Update single row efficiently
+  const handleInputChange = useCallback((rowIndex, field, value) => {
+    setRows((prev) => {
+      const newRows = [...prev];
+      const row = { ...newRows[rowIndex] };
+
+      if (fields.includes(field)) {
+        row[field] = Number(value) || 0;
+        // total computed once per row
+        row.total = fields.reduce((sum, f) => sum + row[f], 0);
+      } else {
+        row[field] = value; // opd_id or label
+      }
+
+      newRows[rowIndex] = row;
+      return newRows;
+    });
   }, []);
+  //*สำหรับ form
 
-  const removeRow = useCallback((rowIndex) => {
-    setRows((prev) => prev.filter((_, i) => i !== rowIndex));
-  }, []);
+  //add rows //////////////////////////////////////////////////////////////
+  const [rows, setRows] = useState([createEmptyRow(1)]);
 
-  const handleSave = async () => {
+  const addRow = useCallback(
+    () => setRows((prev) => [...prev, createEmptyRow(prev.length + 1)]),
+    []
+  );
+
+  const removeRow = useCallback(
+    (rowIndex) => setRows((prev) => prev.filter((_, i) => i !== rowIndex)),
+    []
+  );
+
+  const resetRows = useCallback(() => setRows([createEmptyRow(1)]), []);
+
+  const handleSave = useCallback(async () => {
     if (!reportDateForm) {
       showToast("warn", "ข้อมูลไม่ครบ", "กรุณาเลือกเดือน/ปี");
       return;
     }
-
-    // Validate rows
-    if (rows.length === 0) {
+    if (!rows.length) {
       showToast("error", "ผิดพลาด", "กรุณาเพิ่มข้อมูลอย่างน้อย 1 แถว");
       return;
     }
-
     if (rows.some((r) => !r.opd_id)) {
       showToast("error", "ผิดพลาด", "กรุณาเลือก OPD ให้ครบทุกแถว");
       return;
     }
 
-    // ✅ Build payload per row
     const payload = rows.map((r) => ({
       opd_id: r.opd_id,
-      kpi_id: selectedKpiForm, // OPD / department
-      A: Number(r.A) || 0,
-      B: Number(r.B) || 0,
-      C: Number(r.C) || 0,
-      D: Number(r.D) || 0,
-      E: Number(r.E) || 0,
-      F: Number(r.F) || 0,
-      G: Number(r.G) || 0,
-      H: Number(r.H) || 0,
-      I: Number(r.I) || 0,
+      kpi_id: selectedKpiForm,
       report_date: normalizeDate(reportDateForm),
+      ...fields.reduce((acc, f) => ({ ...acc, [f]: Number(r[f] || 0) }), {}),
     }));
 
     try {
       setLoading(true);
-
-      // ✅ POST as array (backend expects req.body to be an array)
       const res = await axios.post(`${API_BASE}/kpi-data-med`, payload, {
         headers: { token },
       });
@@ -322,92 +300,80 @@ function KpiMedFormPage() {
         "สำเร็จ",
         res.data.message || "เพิ่มข้อมูลเรียบร้อยแล้ว"
       );
-
-      setDialogVisible(false);
-      fetchKpiData(selectedKpi); // refresh
       resetRows();
+      fetchKpiData(selectedKpi); //ดึงข้อมูล response เดือนที่เพิ่ม
+      setDialogVisible(false);
     } catch (err) {
       console.error("❌ Error saving KPI MED Error:", err);
       showToast("error", "ผิดพลาด", err.response?.data?.message || err.message);
     } finally {
       setLoading(false);
     }
-  };
-
-  const resetRows = useCallback(() => {
-    setRows([
-      {
-        id: 1,
-        kpi_id: null,
-        A: 0,
-        B: 0,
-        C: 0,
-        D: 0,
-        E: 0,
-        F: 0,
-        G: 0,
-        H: 0,
-        I: 0,
-        total: 0,
-      },
-    ]);
-  }, []);
+  }, [
+    rows,
+    selectedKpiForm,
+    reportDateForm,
+    API_BASE,
+    token,
+    fetchKpiData,
+    normalizeDate,
+    resetRows,
+    selectedKpi,
+    showToast,
+    setDialogVisible,
+  ]);
 
   //*for edit mode//////////////////////////////////////////////////////////////
   const startEditRow = useCallback((rowNode) => {
-    if (rowNode.children && rowNode.children.length > 0) return;
-
+    if (rowNode.children?.length) return; // parent row cannot edit
     setEditRowId(rowNode.key);
     setEditRowData(rowNode.data);
-    setPreviousValues({
-      report_date: rowNode.data.report_date,
-      type: rowNode.data.type,
-    });
+    setPreviousValues(rowNode.data);
   }, []);
 
   const cancelEdit = useCallback(() => {
+    if (editRowId && previousValues) {
+      setKpiData((prev) =>
+        prev.map((r) => (r.id === editRowId ? previousValues : r))
+      );
+    }
     setEditRowId(null);
     setEditRowData({});
-  }, []);
+    setPreviousValues(null);
+  }, [editRowId, previousValues]);
 
   const confirmSaveRow = useCallback(async () => {
+    if (!editRowId) return;
+
     confirmDialog({
       message: "ต้องการบันทึกรายการนี้หรือไม่",
       header: "บันทึกรายการ",
       acceptClassName: "p-button-success",
       accept: async () => {
         try {
-          // make sure required fields exist
-          const payload = {
-            id: editRowId,
-            kpi_id: editRowData.kpi_id, // add this
-            opd_id: editRowData.opd_id, // add this
-            A: parseInt(editRowData.A) || 0,
-            B: parseInt(editRowData.B) || 0,
-            C: parseInt(editRowData.C) || 0,
-            D: parseInt(editRowData.D) || 0,
-            E: parseInt(editRowData.E) || 0,
-            F: parseInt(editRowData.F) || 0,
-            G: parseInt(editRowData.G) || 0,
-            H: parseInt(editRowData.H) || 0,
-            I: parseInt(editRowData.I) || 0,
-          };
+          const payload = { id: editRowId };
+          fields.forEach((f) => (payload[f] = parseInt(editRowData[f]) || 0));
+          payload.kpi_id = editRowData.kpi_id;
+          payload.opd_id = editRowData.opd_id;
 
           await axios.put(`${API_BASE}/kpi-data-med`, payload, {
             headers: { token },
           });
 
           setKpiData((prev) =>
-            prev.map((row) =>
-              row.id === editRowId ? { ...row, ...payload } : row
-            )
+            prev.map((r) => (r.id === editRowId ? { ...r, ...payload } : r))
           );
 
           showToast("success", "สำเร็จ", "อัพเดตข้อมูลเรียบร้อยแล้ว");
           cancelEdit();
         } catch (err) {
-          if (err.response?.status === 409) {
-            showToast("warn", "ข้อมูลซ้ำ", err.response.data.message);
+          const isConflict = err.response?.status === 409;
+          showToast(
+            isConflict ? "warn" : "error",
+            isConflict ? "ข้อมูลซ้ำ" : "ผิดพลาด",
+            err.response?.data?.message || err.message
+          );
+          if (isConflict) {
             setEditRowData((prev) => ({
               ...prev,
               report_date: previousValues.report_date,
@@ -415,17 +381,25 @@ function KpiMedFormPage() {
               isInvalid: true,
             }));
             fetchKpiData(selectedKpi);
-          } else {
-            showToast("error", "ผิดพลาด", err.message || "การอัพเดตล้มเหลว");
           }
         }
       },
     });
-  }, [editRowData, editRowId, token, cancelEdit, showToast]);
+  }, [
+    editRowData,
+    editRowId,
+    cancelEdit,
+    previousValues,
+    token,
+    showToast,
+    fetchKpiData,
+    selectedKpi,
+    fields,
+  ]);
 
   const renderInputCell = useCallback(
     (field, width) => (rowNode) => {
-      const isParent = rowNode.children && rowNode.children.length > 0;
+      const isParent = rowNode.children?.length > 0;
       if (isParent) return rowNode.data[field]; // parent always read-only
 
       if (editRowId !== rowNode.key) return rowNode.data[field]; // only active row
@@ -433,58 +407,77 @@ function KpiMedFormPage() {
       return (
         <InputText
           style={{ width }}
-          value={editRowData[field] || ""}
+          value={editRowData[field] ?? ""}
           onChange={(e) => {
             const value = e.target.value;
+
             if (value === "") {
               setEditRowData((prev) => ({ ...prev, [field]: "" }));
               return;
             }
             if (!/^\d+$/.test(value)) return;
 
-            setEditRowData((prev) => {
-              const updated = { ...prev, [field]: parseInt(value) || 0 };
+            const numericValue = parseInt(value) || 0;
 
-              // recalc row total
-              const rowTotal = [
-                "A",
-                "B",
-                "C",
-                "D",
-                "E",
-                "F",
-                "G",
-                "H",
-                "I",
-              ].reduce((sum, key) => sum + (parseInt(updated[key]) || 0), 0);
+            // Update the row and parent totals
+            setKpiData((prevData) => {
+              let parentTotals = {}; // store sums per kpi_id
 
-              updated.total = rowTotal;
-
-              // recalc parent totals live
-              setKpiData((prevData) =>
-                prevData.map((row) =>
-                  row.id === rowNode.key
-                    ? updated
-                    : row.kpi_id === rowNode.data.kpi_id
-                    ? { ...row } // leave other children
-                    : row
-                )
+              // 1️⃣ Compute new row total
+              const updatedRow = prevData.find((r) => r.id === rowNode.key);
+              const updated = { ...updatedRow, [field]: numericValue };
+              updated.total = fields.reduce(
+                (sum, f) =>
+                  sum +
+                  (parseInt(f === field ? numericValue : updatedRow[f]) || 0),
+                0
               );
 
+              // 2️⃣ Compute new parent totals for this KPI
+              prevData.forEach((r) => {
+                if (r.kpi_id === updated.kpi_id && r.id !== updated.id) {
+                  // sum other children
+                  fields.forEach((f) => {
+                    parentTotals[f] =
+                      (parentTotals[f] || 0) + (parseInt(r[f]) || 0);
+                  });
+                  parentTotals.total =
+                    (parentTotals.total || 0) + (parseInt(r.total) || 0);
+                }
+              });
+
+              // 3️⃣ Apply updated row and parent totals
+              return prevData.map((r) => {
+                if (r.id === updated.id) return updated;
+                if (r.kpi_id === updated.kpi_id && r.children?.length === 0)
+                  return r; // child untouched
+                if (r.kpi_id === updated.kpi_id && r.children?.length > 0) {
+                  // parent row
+                  return { ...r, ...parentTotals };
+                }
+                return r;
+              });
+            });
+
+            // Update editRowData for active row inputs
+            setEditRowData((prev) => {
+              const updated = { ...prev, [field]: numericValue };
+              updated.total = fields.reduce(
+                (sum, f) => sum + (updated[f] != null ? updated[f] : 0),
+                0
+              );
               return updated;
             });
           }}
         />
       );
     },
-    [editRowId, editRowData]
+    [editRowId, editRowData, fields]
   );
 
   const renderActionCell = useCallback(
     (rowNode) => {
-      if (rowNode.children && rowNode.children.length > 0) return null; // parent row
-
-      const row = rowNode.data;
+      if (rowNode.children?.length) return null;
 
       return editRowId === rowNode.key ? (
         <div className="flex justify-center gap-2">
@@ -513,107 +506,6 @@ function KpiMedFormPage() {
     [editRowId, confirmSaveRow, cancelEdit, startEditRow]
   );
 
-  const renderDateCell = (row) =>
-    editRowId === row.id ? (
-      <Calendar
-        className={editRowData.isInvalid ? "p-invalid" : ""}
-        value={
-          editRowData.report_date ? new Date(editRowData.report_date) : null
-        }
-        onChange={(e) => {
-          const newDate = e.value;
-          const formatted = newDate
-            ? `${newDate.getFullYear()}-${String(
-                newDate.getMonth() + 1
-              ).padStart(2, "0")}-01`
-            : null;
-
-          // Check duplicate
-          const duplicate = kpiData.some(
-            (r) =>
-              r.id !== editRowData.id &&
-              r.kpi_name === editRowData.kpi_name &&
-              r.type === editRowData.type &&
-              r.report_date?.slice(0, 7) === formatted?.slice(0, 7)
-          );
-
-          if (duplicate) {
-            showToast(
-              "warn",
-              "ไม่สามารถเปลี่ยนแปลงได้",
-              "ข้อมูลจะซ้ำกับแถวอื่น"
-            );
-            // revert
-            setEditRowData((prev) => ({
-              ...prev,
-              report_date: previousValues.report_date,
-            }));
-            return;
-          }
-
-          setEditRowData((prev) => ({ ...prev, report_date: formatted }));
-        }}
-        view="month"
-        dateFormat="mm/yy"
-        showIcon
-      />
-    ) : row.report_date ? (
-      new Date(row.report_date).toLocaleDateString("en-GB", {
-        month: "2-digit",
-        year: "numeric",
-      })
-    ) : (
-      "-"
-    );
-
-  const renderDropdownCell = useCallback(
-    (row) =>
-      editRowId === row.id ? (
-        <Dropdown
-          className={editRowData.isInvalid ? "p-invalid" : ""}
-          value={editRowData.opd_id} // 👈 assuming your field is opd_id
-          options={OPDNames} // 👈 now using dynamic options
-          onChange={(e) => {
-            const newOpdId = e.value;
-
-            // check for duplicate by OPD and date (optional)
-            const duplicate = kpiData.some(
-              (r) =>
-                r.id !== editRowData.id &&
-                r.kpi_name === editRowData.kpi_name &&
-                r.report_date?.slice(0, 7) ===
-                  (editRowData.report_date
-                    ? editRowData.report_date.slice(0, 7)
-                    : "") &&
-                r.opd_id === newOpdId
-            );
-
-            if (duplicate) {
-              showToast(
-                "warn",
-                "ไม่สามารถเปลี่ยนแปลงได้",
-                "ข้อมูลจะซ้ำกับแถวอื่น"
-              );
-
-              setEditRowData((prev) => ({
-                ...prev,
-                opd_id: previousValues.opd_id,
-              }));
-              return;
-            }
-
-            setEditRowData((prev) => ({ ...prev, opd_id: newOpdId }));
-          }}
-          placeholder="เลือก OPD"
-          style={{ width: "160px" }}
-        />
-      ) : (
-        // display OPD name instead of ID when not editing
-        OPDNames.find((o) => o.value === row.opd_id)?.label || "-"
-      ),
-    [editRowId, editRowData, OPDNames]
-  );
-
   //for deleted////////////////////////////////////
   const handleDelete = useCallback(
     async (id) => {
@@ -622,20 +514,26 @@ function KpiMedFormPage() {
           headers: { token },
         });
 
-        setKpiData((prev) => {
-          const updated = prev.filter((row) => row.id !== id);
+        setKpiData((prevData) => {
+          // 1️⃣ Remove deleted row
+          const updatedData = prevData.filter((row) => row.id !== id);
 
-          // collapse parents with no children left
+          // 2️⃣ Compute all parent keys with remaining children
+          const childrenCount = updatedData.reduce((acc, row) => {
+            acc[row.kpi_id] = (acc[row.kpi_id] || 0) + 1;
+            return acc;
+          }, {});
+
+          // 3️⃣ Update expandedKeys in one go
           setExpandedKeys((prevExp) => {
-            const newExp = { ...prevExp };
-            for (const key in newExp) {
-              const hasChild = updated.some((r) => r.kpi_id == key);
-              if (!hasChild) delete newExp[key];
+            const newExp = {};
+            for (const key in prevExp) {
+              if (childrenCount[key]) newExp[key] = true; // keep only parents with children
             }
             return newExp;
           });
 
-          return updated;
+          return updatedData;
         });
 
         showToast("success", "Success", "Deleted successfully");
@@ -663,11 +561,7 @@ function KpiMedFormPage() {
 
   const renderDeleteButton = useCallback(
     (rowNode) => {
-      const isParent = rowNode.children && rowNode.children.length > 0;
-
-      // ❌ Parent -> no delete button
-      if (isParent) return null;
-
+      if (rowNode.children?.length) return null;
       return (
         <Button
           icon={<FontAwesomeIcon icon={faTrash} />}
@@ -724,121 +618,97 @@ function KpiMedFormPage() {
     </div>
   );
 
-  const headerForm = (
-    <div className="p-2 flex items-end justify-start">
-      <Dropdown
-        value={selectedKpiForm}
-        options={kpiNames}
-        optionLabel="label"
-        placeholder="เลือก KPI"
-        className="min-w-xs mr-3"
-        onChange={handleKpiFormChange}
-      />
-
-      <Calendar
-        value={reportDateForm}
-        onChange={(e) => setReportDateForm(e.value)}
-        view="month"
-        dateFormat="mm/yy"
-        placeholder="เดือน/ปี"
-        className="w-50"
-        showIcon
-      />
-    </div>
+  const headerForm = useMemo(
+    () => (
+      <div className="p-2 flex items-end justify-start">
+        <Dropdown
+          value={selectedKpiForm}
+          options={kpiNames}
+          optionLabel="label"
+          placeholder="เลือก KPI"
+          className="min-w-xs mr-3"
+          onChange={(e) => setSelectedKpiForm(e.value)}
+        />
+        <Calendar
+          value={reportDateForm}
+          onChange={(e) => setReportDateForm(e.value)}
+          view="month"
+          dateFormat="mm/yy"
+          placeholder="เดือน/ปี"
+          className="w-50"
+          showIcon
+        />
+      </div>
+    ),
+    [selectedKpiForm, reportDateForm, kpiNames]
   );
 
   const totals = useMemo(() => {
-    const sumField = (field) =>
-      rows.reduce((sum, row) => sum + (Number(row[field]) || 0), 0);
-
-    return {
-      A: sumField("A"),
-      B: sumField("B"),
-      C: sumField("C"),
-      D: sumField("D"),
-      E: sumField("E"),
-      F: sumField("F"),
-      G: sumField("G"),
-      H: sumField("H"),
-      I: sumField("I"),
-      total: sumField("total"),
-    };
+    const sums = {};
+    fields.forEach((f) => {
+      sums[f] = rows.reduce((acc, r) => acc + (r[f] || 0), 0);
+    });
+    sums.total = rows.reduce((acc, r) => acc + (r.total || 0), 0);
+    return sums;
   }, [rows]);
 
-  const footerGroup = (
-    <ColumnGroup>
-      <Row>
-        <Column />
-        <Column footer="รวม" />
-        <Column footer={totals.A} />
-        <Column footer={totals.B} />
-        <Column footer={totals.C} />
-        <Column footer={totals.D} />
-        <Column footer={totals.E} />
-        <Column footer={totals.F} />
-        <Column footer={totals.G} />
-        <Column footer={totals.H} />
-        <Column footer={totals.I} />
-        <Column footer={totals.total} />
-        <Column />
-      </Row>
-    </ColumnGroup>
+  const footerGroup = useMemo(
+    () => (
+      <ColumnGroup>
+        <Row>
+          <Column />
+          <Column footer="รวม" />
+          {fields.map((f) => (
+            <Column key={f} footer={totals[f]} />
+          ))}
+          <Column footer={totals.total} />
+          <Column />
+        </Row>
+      </ColumnGroup>
+    ),
+    [totals]
   );
 
   const [expandedKeys, setExpandedKeys] = useState({});
 
-  const nodes = Object.values(
-    kpiData.reduce((acc, row) => {
-      if (!acc[row.kpi_id]) {
-        acc[row.kpi_id] = {
-          kpi_id: row.kpi_id,
-          kpi_label: row.kpi_label,
-          A: 0,
-          B: 0,
-          C: 0,
-          D: 0,
-          E: 0,
-          F: 0,
-          G: 0,
-          H: 0,
-          I: 0,
-          total: 0,
-          details: [],
-        };
+  const nodes = useMemo(() => {
+    const map = new Map();
+
+    kpiData.forEach((row) => {
+      if (!map.has(row.kpi_id)) {
+        map.set(row.kpi_id, {
+          key: row.kpi_id,
+          data: {
+            kpi_label: row.kpi_label,
+            A: 0,
+            B: 0,
+            C: 0,
+            D: 0,
+            E: 0,
+            F: 0,
+            G: 0,
+            H: 0,
+            I: 0,
+            total: 0,
+          },
+          children: [],
+        });
       }
 
-      acc[row.kpi_id].details.push(row);
+      const parent = map.get(row.kpi_id);
 
-      // sum children for parent
-      ["A", "B", "C", "D", "E", "F", "G", "H", "I", "total"].forEach(
-        (key) => (acc[row.kpi_id][key] += parseInt(row[key]) || 0)
-      );
+      parent.children.push({
+        key: row.id,
+        data: { ...row, opd_name: row.opd_name },
+      });
 
-      return acc;
-    }, {})
-  ).map((kpi) => ({
-    key: kpi.kpi_id,
-    data: {
-      kpi_label: kpi.kpi_label,
-      A: kpi.A,
-      B: kpi.B,
-      C: kpi.C,
-      D: kpi.D,
-      E: kpi.E,
-      F: kpi.F,
-      G: kpi.G,
-      H: kpi.H,
-      I: kpi.I,
-      total: kpi.total,
-    },
-    children: kpi.details.map((opd) => ({
-      key: opd.id,
-      data: {
-        ...opd, // include id, kpi_id, opd_id, totals
-        opd_name: opd.opd_name,
-      },
-    })),
-  }));
+      fields.concat("total").forEach((f) => {
+        parent.data[f] += parseInt(row[f]) || 0;
+      });
+    });
+
+    return Array.from(map.values());
+  }, [kpiData, fields]);
 
   return (
     <div className="Home-page overflow-hidden min-h-dvh flex flex-col justify-between">
@@ -905,73 +775,6 @@ function KpiMedFormPage() {
               align="center"
             />
           </TreeTable>
-
-          {/* <DataTable
-            header={header}
-            value={kpiData}
-            editMode="row"
-            dataKey="id"
-            showGridlines
-            paginator
-            rows={10}
-            // rowsPerPageOptions={[10, 25, 50]}
-            tableStyle={{ minWidth: "60rem" }}
-            size="small"
-            emptyMessage="ไม่พบข้อมูล"
-          >
-            <Column
-              header="ลำดับ"
-              body={(rowData) => kpiData.indexOf(rowData) + 1}
-              sortable
-              field="id"
-              style={{ width: "5%" }}
-              align="center"
-            />
-            <Column
-              field="report_date"
-              header="เดือน/ปี"
-              body={renderDateCell}
-              sortable
-              style={{ width: "160px" }}
-            />
-            <Column
-              field="opd_name"
-              header="OPD"
-              body={renderDropdownCell}
-              sortable
-              style={{ width: "160px" }}
-            />
-            <Column field="A" header="A" body={renderInputCell("A", "80px")} />
-            <Column field="B" header="B" body={renderInputCell("B", "80px")} />
-            <Column field="C" header="C" body={renderInputCell("C", "80px")} />
-            <Column field="D" header="D" body={renderInputCell("D", "80px")} />
-            <Column field="E" header="E" body={renderInputCell("E", "80px")} />
-            <Column field="F" header="F" body={renderInputCell("F", "80px")} />
-            <Column field="G" header="G" body={renderInputCell("G", "80px")} />
-            <Column field="H" header="H" body={renderInputCell("H", "80px")} />
-            <Column field="I" header="I" body={renderInputCell("I", "80px")} />
-            <Column
-              field="total"
-              header="รวม"
-              body={(row) =>
-                editRowId === row.id ? editRowData.total || 0 : row.total || 0
-              }
-            />
-
-            <Column
-              header="แก้ไข"
-              body={renderActionCell}
-              style={{ width: "130px" }}
-              align="center"
-            />
-
-            <Column
-              header="ลบ"
-              body={renderDeleteButton}
-              style={{ width: "80px", textAlign: "center" }}
-              align="center"
-            />
-          </DataTable> */}
         </div>
       </div>
 
@@ -1009,14 +812,11 @@ function KpiMedFormPage() {
                 options={OPDNames}
                 onChange={(e) => {
                   const selectedId = e.value;
-                  const selectedOption = OPDNames.find(
-                    (o) => o.value === selectedId
-                  );
                   handleInputChange(opt.rowIndex, "opd_id", selectedId);
                   handleInputChange(
                     opt.rowIndex,
                     "opd_label",
-                    selectedOption?.label || ""
+                    OPDMap.get(selectedId) || ""
                   );
                 }}
                 optionLabel="label"
@@ -1026,7 +826,7 @@ function KpiMedFormPage() {
             )}
           />
 
-          {["A", "B", "C", "D", "E", "F", "G", "H", "I"].map((field) => (
+          {fields.map((field) => (
             <Column
               key={field}
               field={field}
