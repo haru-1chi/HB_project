@@ -24,7 +24,7 @@ ChartJS.register(
   ChartDataLabels
 );
 
-const BarChart = ({ data, type }) => {
+const BarChart = ({ data, type, unitLabel }) => {
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -41,7 +41,7 @@ const BarChart = ({ data, type }) => {
     labels = data.map((item) => item.month);
     datasets = [
       {
-        label: "อัตราการเสียชีวิตชาวไทย",
+        label: "ไทย",
         data: data.map((item) => item.percent_th),
         backgroundColor: "rgba(54, 162, 235, 0.6)",
         borderColor: "rgba(54, 162, 235, 1)",
@@ -50,7 +50,7 @@ const BarChart = ({ data, type }) => {
         type: "bar",
       },
       {
-        label: "อัตราการเสียชีวิตชาวต่างชาติ",
+        label: "ต่างชาติ",
         data: data.map((item) => item.percent_en),
         backgroundColor: "rgba(255, 206, 86, 0.6)",
         borderColor: "rgba(255, 206, 86, 1)",
@@ -121,7 +121,7 @@ const BarChart = ({ data, type }) => {
             let label = tooltipItem.dataset.label || "";
             if (label) label += ": ";
             label += tooltipItem.raw;
-            return label;
+            return type === "kpi" ? `${label} ${unitLabel}` : `${label}`;
           },
         },
       },
@@ -129,15 +129,16 @@ const BarChart = ({ data, type }) => {
         color: "#555555",
         anchor: "end",
         align: "end",
-        formatter: (value) => type === "kpi" ? `${value}%` : value,
+        formatter: (value) => `${value}`,
         font: { weight: "bold" },
       },
     },
     scales: {
       y: {
         beginAtZero: true,
-        title: { display: type === "kpi", text: "Result / Max Value" },
+        title: { display: type === "kpi", text: `ผลลัพธ์ (${unitLabel})` },
       },
+      x: { title: { display: type === "kpi", text: "เดือน" } },
     },
   };
 

@@ -21,9 +21,9 @@ export const createExcelData = (detail, kpiLabel, typeLabel, sortedData) => {
   const headerInfo = [kpiLabel];
   const tableHeader = [
     "เดือน/ปี",
-    "อัตราการเสียชีวิตชาวไทย (%)",
-    "อัตราการเสียชีวิตชาวต่างชาติ (%)",
-    "อัตราการเสียชีวิตรวม (%)",
+    "ไทย (%)",
+    "ต่างชาติ (%)",
+    "รวม (%)",
     "แนวโน้ม",
   ];
 

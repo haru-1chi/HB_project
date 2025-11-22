@@ -52,6 +52,8 @@ export default function KpiFormDialog({
               options={kpiNamesActive}
               placeholder="เลือก KPI"
               className="w-75"
+              filter
+              filterDelay={400}
               onChange={(e) => {
                 const selectedId = e.value;
                 const selectedOption = kpiNamesActive.find(

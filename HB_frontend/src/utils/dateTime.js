@@ -46,3 +46,16 @@ export const formatMonthYear = (date) => {
   const year = d.getFullYear().toString().slice(-2); // 2025 → 25
   return `${month} ${year}`;
 };
+
+export const multiplierToThaiUnit = (multiplier) => {
+  const map = {
+    1: "ต่อราย",
+    10: "ต่อสิบ",
+    100: "%",
+    1000: "ต่อพัน",
+    10000: "ต่อหมื่น",
+    100000: "ต่อแสน",
+    1000000: "ต่อล้าน"
+  };
+  return map[multiplier] || "";
+}

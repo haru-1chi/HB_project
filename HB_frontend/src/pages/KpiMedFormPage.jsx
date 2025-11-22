@@ -613,6 +613,8 @@ function KpiMedFormPage() {
           optionLabel="label"
           placeholder="เลือก KPI"
           className="mr-5"
+          filter
+          filterDelay={400}
         />
       )}
     </div>
@@ -628,6 +630,8 @@ function KpiMedFormPage() {
           placeholder="เลือก KPI"
           className="min-w-xs mr-3"
           onChange={(e) => setSelectedKpiForm(e.value)}
+          filter
+          filterDelay={400}
         />
         <Calendar
           value={reportDateForm}
@@ -822,6 +826,8 @@ function KpiMedFormPage() {
                 optionLabel="label"
                 placeholder="เลือก OPD"
                 className="w-full"
+                filter
+                filterDelay={400}
               />
             )}
           />

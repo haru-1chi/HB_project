@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -37,9 +43,7 @@ import DuplicateDialog from "../components/DuplicateDialog";
 import axiosInstance, { setAuthErrorInterceptor } from "../utils/axiosInstance";
 
 import { handleFileUpload } from "../utils/importUtils";
-function KpiFormPage() {
-  const [value, setValue] = useState("");
-
+function KpiFormQualityPage() {
   const API_BASE =
     import.meta.env.VITE_REACT_APP_API || "http://localhost:3000/api";
   const { logout } = useAuth();
@@ -64,10 +68,53 @@ function KpiFormPage() {
   const [kpiData, setKpiData] = useState([]);
   const [duplicatePairs, setDuplicatePairs] = useState([]);
 
+  const [isEditMode, setIsEditMode] = useState(false);
   const [editRowId, setEditRowId] = useState(null);
   const [editRowData, setEditRowData] = useState({});
   const [previousValues, setPreviousValues] = useState({});
 
+  //////////////
+  const initialForm = {
+    selectedKpiQuality: selectedKpi,
+    aName: "",
+    bName: "",
+    aValue: "",
+    bValue: "",
+    reportDate: null,
+    selectedType: null,
+    issueDetails: "",
+    supportDetails: "",
+  };
+  const [form, setForm] = useState(initialForm);
+
+  const updateField = (key, value) =>
+    setForm((prev) => ({ ...prev, [key]: value }));
+
+  const selectedKPIObj = useMemo(() => {
+    return (
+      kpiNamesActive.find((k) => k.value === form.selectedKpiQuality) || {}
+    );
+  }, [form.selectedKpiQuality, kpiNamesActive]);
+
+  useEffect(() => {
+    updateField("aName", selectedKPIObj.a_name || "");
+    updateField("bName", selectedKPIObj.b_name || "");
+  }, [selectedKPIObj]);
+
+  const resetForm = () => setForm(initialForm);
+
+  // const [selectedKpiQuality, setSelectedKpiQuality] = useState(null);
+  // const [aName, setAName] = useState("");
+  // const [bName, setBName] = useState("");
+
+  // const [aValue, setAValue] = useState("");
+  // const [bValue, setBValue] = useState("");
+  // const [reportDate, setReportDate] = useState(null);
+  // const [selectedType, setSelectedType] = useState(null);
+
+  // const [issueDetails, setIssueDetails] = useState("");
+  // const [supportDetails, setSupportDetails] = useState("");
+  //////////////
   const showToast = useCallback((severity, summary, detail) => {
     toast.current?.show({ severity, summary, detail, life: 3000 });
   }, []);
@@ -139,7 +186,7 @@ function KpiFormPage() {
 
         const optionsActive = options.filter((item) => !item.deleted);
         setKpiNamesActive(optionsActive);
-
+        // console.log(kpiNamesActive);
         if (options.length > 0) {
           const firstKpi = options[0].value;
           setSelectedKpi(firstKpi);
@@ -175,12 +222,22 @@ function KpiFormPage() {
 
   // start editing a row
   const startEditRow = useCallback((row) => {
-    setEditRowId(row.id);
-    setEditRowData(row);
-    setPreviousValues({
-      report_date: row.report_date,
-      type: row.type,
+    setIsEditMode(true);
+    setDialogQualityVisible(true);
+
+    setForm({
+      selectedKpiQuality: row.kpi_name,
+      aName: row.a_name,
+      bName: row.b_name,
+      aValue: row.a_value,
+      bValue: row.b_value,
+      reportDate: new Date(row.report_date),
+      selectedType: row.type,
+      issueDetails: row.issue_details,
+      supportDetails: row.support_details,
     });
+
+    setEditRowId(row.id);
   }, []);
 
   // cancel edit
@@ -236,63 +293,62 @@ function KpiFormPage() {
   }, [editRowData, editRowId, token, cancelEdit, showToast]);
 
   const renderDateCell = (row) =>
-    editRowId === row.id ? (
-      <Calendar
-        className={editRowData.isInvalid ? "p-invalid" : ""}
-        value={
-          editRowData.report_date ? new Date(editRowData.report_date) : null
-        }
-        onChange={(e) => {
-          const newDate = e.value;
-          const formatted = newDate
-            ? `${newDate.getFullYear()}-${String(
-                newDate.getMonth() + 1
-              ).padStart(2, "0")}-01`
-            : null;
+    // editRowId === row.id ? (
+    //   <Calendar
+    //     className={editRowData.isInvalid ? "p-invalid" : ""}
+    //     value={
+    //       editRowData.report_date ? new Date(editRowData.report_date) : null
+    //     }
+    //     onChange={(e) => {
+    //       const newDate = e.value;
+    //       const formatted = newDate
+    //         ? `${newDate.getFullYear()}-${String(
+    //             newDate.getMonth() + 1
+    //           ).padStart(2, "0")}-01`
+    //         : null;
 
-          // Check duplicate
-          const duplicate = kpiData.some(
-            (r) =>
-              r.id !== editRowData.id &&
-              r.kpi_name === editRowData.kpi_name &&
-              r.type === editRowData.type &&
-              r.report_date?.slice(0, 7) === formatted?.slice(0, 7)
-          );
+    //       // Check duplicate
+    //       const duplicate = kpiData.some(
+    //         (r) =>
+    //           r.id !== editRowData.id &&
+    //           r.kpi_name === editRowData.kpi_name &&
+    //           r.type === editRowData.type &&
+    //           r.report_date?.slice(0, 7) === formatted?.slice(0, 7)
+    //       );
 
-          if (duplicate) {
-            showToast(
-              "warn",
-              "ไม่สามารถเปลี่ยนแปลงได้",
-              "ข้อมูลจะซ้ำกับแถวอื่น"
-            );
-            // revert
-            setEditRowData((prev) => ({
-              ...prev,
-              report_date: previousValues.report_date,
-            }));
-            return;
-          }
+    //       if (duplicate) {
+    //         showToast(
+    //           "warn",
+    //           "ไม่สามารถเปลี่ยนแปลงได้",
+    //           "ข้อมูลจะซ้ำกับแถวอื่น"
+    //         );
+    //         // revert
+    //         setEditRowData((prev) => ({
+    //           ...prev,
+    //           report_date: previousValues.report_date,
+    //         }));
+    //         return;
+    //       }
 
-          setEditRowData((prev) => ({ ...prev, report_date: formatted }));
-        }}
-        view="month"
-        dateFormat="mm/yy"
-        showIcon
-      />
-    ) : row.report_date ? (
-      new Date(row.report_date).toLocaleDateString("en-GB", {
-        month: "2-digit",
-        year: "numeric",
-      })
-    ) : (
-      "-"
-    );
-
+    //       setEditRowData((prev) => ({ ...prev, report_date: formatted }));
+    //     }}
+    //     view="month"
+    //     dateFormat="mm/yy"
+    //     showIcon
+    //   />
+    // ) : row.report_date ? (
+    new Date(row.report_date).toLocaleDateString("en-GB", {
+      month: "2-digit",
+      year: "numeric",
+    });
+  // ) : (
+  //   "-"
+  // )
   const renderInputCell = useCallback(
     (field, width) => (row) =>
       editRowId === row.id ? (
         <InputText
-          style={{ width }}
+          className="w-full"
           value={editRowData[field] || ""}
           onChange={(e) =>
             setEditRowData((prev) => ({ ...prev, [field]: e.target.value }))
@@ -354,30 +410,31 @@ function KpiFormPage() {
   );
 
   const renderActionCell = useCallback(
-    (row) =>
-      editRowId === row.id ? (
-        <div className="flex justify-center gap-2">
-          <Button
-            rounded
-            icon={<FontAwesomeIcon icon={faCheck} />}
-            className="p-button-success p-button-sm"
-            onClick={confirmSaveRow}
-          />
-          <Button
-            rounded
-            icon={<FontAwesomeIcon icon={faXmark} />}
-            className="p-button-secondary p-button-sm"
-            onClick={cancelEdit}
-          />
-        </div>
-      ) : (
-        <Button
-          rounded
-          icon={<FontAwesomeIcon icon={faEdit} />}
-          className="p-button-warning p-button-sm"
-          onClick={() => startEditRow(row)}
-        />
-      ),
+    (row) => (
+      // editRowId === row.id ? (
+      //   <div className="flex justify-center gap-2">
+      //     <Button
+      //       rounded
+      //       icon={<FontAwesomeIcon icon={faCheck} />}
+      //       className="p-button-success p-button-sm"
+      //       onClick={confirmSaveRow}
+      //     />
+      //     <Button
+      //       rounded
+      //       icon={<FontAwesomeIcon icon={faXmark} />}
+      //       className="p-button-secondary p-button-sm"
+      //       onClick={cancelEdit}
+      //     />
+      //   </div>
+      // ) : (
+      <Button
+        rounded
+        icon={<FontAwesomeIcon icon={faEdit} />}
+        className="p-button-warning p-button-sm"
+        onClick={() => startEditRow(row)}
+      />
+    ),
+    // )
     [editRowId, confirmSaveRow, cancelEdit, startEditRow]
   );
 
@@ -679,6 +736,73 @@ function KpiFormPage() {
     [confirmDelete]
   );
 
+  //qualityForm
+  const handleQualitySubmit = async () => {
+    const payload = {
+      kpi_id: form.selectedKpiQuality,
+      a_value: form.aValue,
+      b_value: form.bValue,
+      report_date: normalizeDate(form.reportDate),
+      type: form.selectedType,
+      issue_details: form.issueDetails,
+      support_details: form.supportDetails,
+    };
+
+    try {
+      const res = await axios.post(`${API_BASE}/kpi-quality`, payload, {
+        headers: { token },
+      });
+
+      if (res.data.success) {
+        showToast("success", "สำเร็จ", "บันทึกข้อมูลสำเร็จ");
+        fetchKpiData(selectedKpi);
+        resetForm();
+        setDialogQualityVisible(false);
+      }
+    } catch (err) {
+      console.error("❌ Error:", err);
+      showToast("error", "Error", err.message || "บันทึกข้อมูลไม่สำเร็จ");
+    }
+  };
+
+  const updateQualityData = async () => {
+    const payload = {
+      kpi_id: form.selectedKpiQuality,
+      a_value: form.aValue,
+      b_value: form.bValue,
+      report_date: normalizeDate(form.reportDate),
+      type: form.selectedType,
+      issue_details: form.issueDetails,
+      support_details: form.supportDetails,
+    };
+
+    console.log(payload);
+    try {
+      const res = await axios.put(
+        `${API_BASE}/kpi-quality/${editRowId}`,
+        payload,
+        {
+          headers: { token },
+        }
+      );
+
+      showToast("success", "Updated", "Data updated successfully");
+      setDialogQualityVisible(false);
+      resetForm();
+      setIsEditMode(false);
+      fetchKpiData(selectedKpi);
+    } catch (err) {
+      console.error(err);
+      showToast("error", "Error", err.message);
+    }
+  };
+
+  const openAddDialog = () => {
+    resetForm();
+    setIsEditMode(false);
+    setDialogQualityVisible(true);
+  };
+
   const header = (
     <div className="p-2 flex items-end justify-between">
       <Dropdown
@@ -739,9 +863,14 @@ function KpiFormPage() {
         <div className="flex justify-between items-center mb-3">
           <h5 className="text-2xl font-semibold">จัดการข้อมูลตัวชี้วัด</h5>
           <div className="flex justify-between gap-3">
-            <Button
+            {/* <Button
               label="+ เพิ่มข้อมูลตัวชี้วัด"
               onClick={() => setDialogVisible(true)}
+              severity="success"
+            /> */}
+            <Button
+              label="+ เพิ่มข้อมูลตัวชี้วัด"
+              onClick={() => openAddDialog(true)}
               severity="success"
             />
           </div>
@@ -769,49 +898,59 @@ function KpiFormPage() {
               style={{ width: "5%" }}
               align="center"
             />
-            <Column field="kpi_label" header="ตัวชี้วัด" sortable />
-            <Column field="a_name" header="ตัวตั้ง" sortable />
-            <Column field="b_name" header="ตัวหาร" sortable />
+
             <Column
               field="report_date"
               header="เดือน/ปี"
               body={renderDateCell}
               sortable
-              style={{ width: "160px" }}
+              style={{ width: "10%" }}
             />
             <Column
               field="a_value"
               header="ค่าตัวตั้ง"
-              body={renderInputCell("a_value", "120px")}
+              // body={renderInputCell("a_value", "120px")}
               sortable
-              style={{ width: "120px" }}
+              style={{ width: "10%" }}
             />
             <Column
               field="b_value"
               header="ค่าตัวหาร"
-              body={renderInputCell("b_value", "120px")}
+              // body={renderInputCell("b_value", "120px")}
               sortable
-              style={{ width: "120px" }}
+              style={{ width: "10%" }}
             />
 
             <Column
               field="type"
               header="ประเภท"
-              body={renderDropdownCell}
+              // body={renderDropdownCell}
+              sortable
+              style={{ width: "10%" }}
+            />
+            <Column
+              field="issue_details"
+              header="ปัญหาและอุปสรรค"
+              sortable
+              style={{ width: "150px" }}
+            />
+            <Column
+              field="support_details"
+              header="สิ่งที่ต้องการสนับสนุนให้บรรลุเป้าหมาย"
               sortable
               style={{ width: "150px" }}
             />
             <Column
               header="แก้ไข"
               body={renderActionCell}
-              style={{ width: "130px" }}
+              style={{ width: "7%" }}
               align="center"
             />
 
             <Column
               header="ลบ"
               body={renderDeleteButton}
-              style={{ width: "80px", textAlign: "center" }}
+              style={{ width: "7%" }}
               align="center"
             />
           </DataTable>
@@ -837,9 +976,233 @@ function KpiFormPage() {
         setSelectedRows={setSelectedRows}
         dialogFooterDuplicate={dialogFooterDuplicate}
       />
+
+      {/* <Dialog
+        header="ประเด็นปัญหา/ข้อเสนอแนะ"
+        visible={dialogQualityVisible}
+        style={{ width: "50vw" }}
+        onHide={() => {
+          if (!dialogQualityVisible) return;
+          setDialogQualityVisible(false);
+        }}
+      >
+        <div className="mb-4">
+          <Dropdown
+            value={selectedKpiQuality}
+            options={kpiNamesActive}
+            onChange={(e) => setSelectedKpiQuality(e.value)}
+            optionLabel="label"
+            placeholder="เลือกตัวชี้วัด"
+            className="mr-5 w-full"
+          />
+        </div>
+
+        <div className="flex">
+          <Calendar
+            value={reportDate}
+            onChange={(e) => setReportDate(e.value)}
+            view="month"
+            dateFormat="mm/yy"
+            placeholder="เดือน/ปี"
+            className="mr-5 w-full"
+            showIcon
+          />
+          <Dropdown
+            value={selectedType}
+            onChange={(e) => setSelectedType(e.value)}
+            options={[
+              { label: "ไทย", value: "ไทย" },
+              { label: "ต่างชาติ", value: "ต่างชาติ" },
+            ]}
+            optionLabel="label"
+            placeholder="เลือกประเภท"
+            className="w-full"
+          />
+        </div>
+
+        <div className="flex mt-5">
+          <Panel
+            header="ปัญหาและอุปสรรค"
+            pt={{
+              header: {
+                style: {
+                  // backgroundColor: "oklch(70.4% 0.191 22.216)",
+                  backgroundColor: "oklch(93.6% 0.032 17.717)",
+                },
+              },
+            }}
+            className="w-full"
+          >
+            <InputTextarea
+              className="w-full"
+              value={issueDetails}
+              onChange={(e) => setIssueDetails(e.target.value)}
+              rows={5}
+            />
+          </Panel>
+          <Divider layout="vertical" />
+          <Panel
+            header="สิ่งที่ต้องการสนับสนุนให้บรรลุเป้าหมาย"
+            className="w-full"
+            pt={{
+              header: {
+                style: {
+                  backgroundColor: "oklch(69.6% 0.17 162.48)",
+                  backgroundColor: "oklch(96.2% 0.044 156.743)",
+                },
+              },
+            }}
+          >
+            <InputTextarea
+              className="w-full"
+              value={supportDetails}
+              onChange={(e) => setSupportDetails(e.target.value)}
+              rows={5}
+            />
+          </Panel>
+        </div>
+        <div className="flex justify-end w-full mt-5">
+          <Button
+            label="บันทึกข้อมูล"
+            severity="success"
+            onClick={handleQualitySubmit}
+          />
+        </div>
+      </Dialog> */}
+      <Dialog
+        header={isEditMode ? "แก้ไขข้อมูลตัวชี้วัด" : "เพิ่มข้อมูลตัวชี้วัด"}
+        visible={dialogQualityVisible}
+        style={{ width: "40vw" }}
+        onHide={() => {
+          if (!dialogQualityVisible) return;
+          setDialogQualityVisible(false);
+        }}
+      >
+        <div className="mb-4">
+          {isEditMode ? (
+            <span className="font-bold">
+              {selectedKPIObj.label || "เลือกตัวชี้วัด"}
+            </span>
+          ) : (
+            <Dropdown
+              value={form.selectedKpiQuality}
+              options={kpiNamesActive}
+              onChange={(e) => updateField("selectedKpiQuality", e.value)}
+              optionLabel="label"
+              placeholder="เลือกตัวชี้วัด"
+              className="mr-5 w-full"
+              filter
+              filterDelay={400}
+            />
+          )}
+        </div>
+        <div
+          className={`flex justify-between items-center mb-4 ${
+            isEditMode ? "" : "border-1 border-gray-300 px-3 py-2 rounded-md"
+          }`}
+        >
+          <p className="mr-5">{form.aName || "ชื่อตัวตั้ง"}</p>
+          <InputText
+            value={form.aValue}
+            onChange={(e) => updateField("aValue", e.target.value)}
+            placeholder="ค่าตัวตั้ง"
+            className="w-45"
+          />
+        </div>
+        <div
+          className={`flex justify-between items-center mb-4 ${
+            isEditMode ? "" : "border-1 border-gray-300 px-3 py-2 rounded-md"
+          }`}
+        >
+          <p className="mr-5">{form.bName || "ชื่อตัวหาร"}</p>
+          <InputText
+            value={form.bValue}
+            onChange={(e) => updateField("bValue", e.target.value)}
+            placeholder="ค่าตัวหาร"
+            className="w-45"
+          />
+        </div>
+
+        <div className="flex justify-between gap-5">
+          <div className="w-full">
+            <Calendar
+              value={form.reportDate}
+              onChange={(e) => updateField("reportDate", e.value)}
+              view="month"
+              dateFormat="mm/yy"
+              placeholder="เดือน/ปี"
+              className="w-full mr-5"
+              showIcon
+            />
+          </div>
+
+          <div className="w-full">
+            <Dropdown
+              value={form.selectedType}
+              onChange={(e) => updateField("selectedType", e.value)}
+              options={[
+                { label: "ไทย", value: "ไทย" },
+                { label: "ต่างชาติ", value: "ต่างชาติ" },
+              ]}
+              optionLabel="label"
+              placeholder="เลือกประเภท"
+              className="w-full"
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-5 mt-5">
+          <Panel
+            header="ปัญหาและอุปสรรค"
+            pt={{
+              header: {
+                style: {
+                  // backgroundColor: "oklch(70.4% 0.191 22.216)",
+                  backgroundColor: "oklch(93.6% 0.032 17.717)",
+                },
+              },
+            }}
+            className="w-full"
+          >
+            <InputTextarea
+              className="w-full"
+              value={form.issueDetails || ""}
+              onChange={(e) => updateField("issueDetails", e.target.value)}
+              rows={5}
+            />
+          </Panel>
+
+          <Panel
+            header="สิ่งที่ต้องการสนับสนุนให้บรรลุเป้าหมาย"
+            className="w-full"
+            pt={{
+              header: {
+                style: {
+                  // backgroundColor: "oklch(69.6% 0.17 162.48)",
+                  backgroundColor: "oklch(96.2% 0.044 156.743)",
+                },
+              },
+            }}
+          >
+            <InputTextarea
+              className="w-full"
+              value={form.supportDetails || ""}
+              onChange={(e) => updateField("supportDetails", e.target.value)}
+              rows={5}
+            />
+          </Panel>
+        </div>
+        <div className="flex justify-end w-full mt-5">
+          <Button
+            label="บันทึกข้อมูล"
+            severity="success"
+            onClick={isEditMode ? updateQualityData : handleQualitySubmit}
+          />
+        </div>
+      </Dialog>
       <Footer />
     </div>
   );
 }
 
-export default KpiFormPage;
+export default KpiFormQualityPage;

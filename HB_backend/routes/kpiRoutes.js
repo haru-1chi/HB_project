@@ -3,6 +3,7 @@ const router = express.Router();
 const kpiController = require('../controllers/kpiController');
 const kpiMedController = require('../controllers/kpiMedController');
 const opdController = require('../controllers/opdController');
+const qualityController = require('../controllers/qualityController');
 const { authAndRole } = require("../middleware/auth")
 
 router.post('/kpi-data/create', authAndRole(1, 2), kpiController.createdata); //ไม่ใช้แล้ว
@@ -29,11 +30,20 @@ router.post('/kpi-data-med', authAndRole(1, 2), kpiMedController.createKPIMedErr
 router.put('/kpi-data-med', authAndRole(1, 2), kpiMedController.updateKPIMedError);
 router.get('/kpi-data-med', kpiMedController.getKPIMedData);
 router.delete('/kpi-data-med/:id', authAndRole(1, 2), kpiMedController.deleteKPIMedError);
+router.get('/kpi-data-med/chart', kpiMedController.getKPIMedPie);
 
 router.post('/opd-name', authAndRole(1, 2), opdController.createOPDName);
 router.put('/opd-name', authAndRole(1, 2), opdController.updateOPDName);
 router.delete('/opd-name/:id', authAndRole(1, 2), opdController.deleteOPDName);
 router.get('/opd-name', opdController.getOPDName);
+
+router.post('/kpi-quality', authAndRole(1, 2), qualityController.createKPIDataQuality);
+router.get('/kpi-quality', qualityController.getKPIDataQuality);
+router.put("/kpi-quality/:id", authAndRole(1, 2), qualityController.updateKPIDataQuality);
+
+// router.put('/opd-name', authAndRole(1, 2), opdController.updateOPDName);
+// router.delete('/opd-name/:id', authAndRole(1, 2), opdController.deleteOPDName);
+
 module.exports = router;
 
 // router.post('/create', auth, kpiController.createdata);

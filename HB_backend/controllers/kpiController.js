@@ -588,10 +588,6 @@ exports.getData = async (req, res) => {
             params.push(kpi_name);
         }
 
-        // if (type != "รวม" && chart !== "percent") {
-        //     whereClause.push("d.type = ?");
-        //     params.push(type);
-        // }
         if (since && until) {
             whereClause.push("d.report_date BETWEEN ? AND ?");
             params.push(since, until);
@@ -615,7 +611,7 @@ exports.getData = async (req, res) => {
             n.a_name,
             n.b_name,
             'รวม' AS type,
-            ROUND(SUM(d.a_value) / SUM(d.b_value) * 100, 2) AS result,
+   COALESCE(ROUND(SUM(d.a_value) / SUM(d.b_value) * n.unit_value, 2), 0) AS result,
             n.max_value,
             DATE_FORMAT(d.report_date, '%b-%y') AS month,
             DATE_FORMAT(d.report_date, '%Y-%m') AS month_key
@@ -632,7 +628,7 @@ exports.getData = async (req, res) => {
             n.a_name,
             n.b_name,
             d.type,
-            ROUND((d.a_value / d.b_value) * 100, 2) AS result,
+            COALESCE(ROUND((d.a_value / d.b_value) * n.unit_value, 2), 0) AS result,
             n.max_value,
             DATE_FORMAT(d.report_date, '%b-%y') AS month,
             DATE_FORMAT(d.report_date, '%Y-%m') AS month_key
@@ -652,8 +648,14 @@ exports.getData = async (req, res) => {
                 n.a_name,
             n.b_name,
              n.max_value,
-    ROUND(MAX(CASE WHEN d.type = 'ไทย' THEN (d.a_value / d.b_value) * 100 END), 2) AS percent_th,
-    ROUND(MAX(CASE WHEN d.type = 'ต่างชาติ' THEN (d.a_value / d.b_value) * 100 END), 2) AS percent_en
+    COALESCE(
+  ROUND(MAX(CASE WHEN d.type = 'ไทย' THEN (d.a_value / d.b_value) * n.unit_value END), 2),
+  0
+) AS percent_th,
+    COALESCE(
+  ROUND(MAX(CASE WHEN d.type = 'ต่างชาติ' THEN (d.a_value / d.b_value) * n.unit_value END), 2),
+  0
+) AS percent_en
 FROM kpi_data d LEFT JOIN kpi_name n ON d.kpi_name = n.id
                 ${whereClause.length ? "WHERE " + whereClause.filter(w => !w.includes("d.type")).join(" AND ") : ""}
 GROUP BY
@@ -694,53 +696,66 @@ exports.getDetail = async (req, res) => {
         const since = req.query.since || "2025-01-01";
         const until = req.query.until || "2025-12-31";
 
-        // ✅ Use parameterized query to prevent SQL injection & improve parsing efficiency
-        const params = [kpi_name, since, until, kpi_name, since, until, kpi_name, since, until];
+        // Parameters (used 1 time in WHERE of CTE)
+        const params = [kpi_name, since, until];
 
         const query = `
       WITH summary AS (
         SELECT 
-          DATE_FORMAT(report_date, '%b-%y') AS month,
-          SUM(CASE WHEN type = 'ไทย' THEN a_value ELSE 0 END) AS sum_a_thai,
-          SUM(CASE WHEN type = 'ไทย' THEN b_value ELSE 0 END) AS sum_b_thai,
-          SUM(CASE WHEN type = 'ต่างชาติ' THEN a_value ELSE 0 END) AS sum_a_foreign,
-          SUM(CASE WHEN type = 'ต่างชาติ' THEN b_value ELSE 0 END) AS sum_b_foreign,
-          SUM(a_value) AS sum_a_total,
-          SUM(b_value) AS sum_b_total,
-          MIN(report_date) AS report_date
-        FROM kpi_data
-        WHERE kpi_name = ? AND report_date BETWEEN ? AND ?
-        GROUP BY DATE_FORMAT(report_date, '%b-%y')
+          DATE_FORMAT(d.report_date, '%b-%y') AS month,
+          SUM(CASE WHEN d.type = 'ไทย' THEN d.a_value ELSE 0 END) AS sum_a_thai,
+          SUM(CASE WHEN d.type = 'ไทย' THEN d.b_value ELSE 0 END) AS sum_b_thai,
+          SUM(CASE WHEN d.type = 'ต่างชาติ' THEN d.a_value ELSE 0 END) AS sum_a_foreign,
+          SUM(CASE WHEN d.type = 'ต่างชาติ' THEN d.b_value ELSE 0 END) AS sum_b_foreign,
+          SUM(d.a_value) AS sum_a_total,
+          SUM(d.b_value) AS sum_b_total,
+          MIN(d.report_date) AS report_date,
+          d.kpi_name
+        FROM kpi_data d
+        WHERE d.kpi_name = ? 
+          AND d.report_date BETWEEN ? AND ?
+        GROUP BY DATE_FORMAT(d.report_date, '%b-%y'), d.kpi_name
       )
+
       SELECT 
-        month,
-        ROUND((sum_a_thai / NULLIF(sum_b_thai, 0)) * 100, 2) AS result_thai,
-        ROUND((sum_a_foreign / NULLIF(sum_b_foreign, 0)) * 100, 2) AS result_foreign,
-        ROUND((sum_a_total / NULLIF(sum_b_total, 0)) * 100, 2) AS result_total,
-        CONCAT(
-          CASE 
-            WHEN ROUND((sum_a_total / NULLIF(sum_b_total, 0)) * 100, 2) -
-                 LAG(ROUND((sum_a_total / NULLIF(sum_b_total, 0)) * 100, 2)) 
-                 OVER (ORDER BY report_date) > 0 THEN '+'
-            ELSE ''
-          END,
-          ROUND(
-            ROUND((sum_a_total / NULLIF(sum_b_total, 0)) * 100, 2) -
-            LAG(ROUND((sum_a_total / NULLIF(sum_b_total, 0)) * 100, 2)) 
-            OVER (ORDER BY report_date),
-            2
-          ),
-          '%'
-        ) AS note
-      FROM summary
-      ORDER BY STR_TO_DATE(CONCAT('01-', month), '%d-%b-%y');
+  s.month,
+  COALESCE(ROUND((s.sum_a_thai / NULLIF(s.sum_b_thai, 0)) * n.unit_value, 2), 0) AS result_thai,
+  COALESCE(ROUND((s.sum_a_foreign / NULLIF(s.sum_b_foreign, 0)) * n.unit_value, 2), 0) AS result_foreign,
+  COALESCE(ROUND((s.sum_a_total / NULLIF(s.sum_b_total, 0)) * n.unit_value, 2), 0) AS result_total,
+
+  COALESCE(
+    CONCAT(
+      CASE 
+        WHEN 
+          ROUND((s.sum_a_total / NULLIF(s.sum_b_total, 0)) * n.unit_value, 2) -
+          LAG(ROUND((s.sum_a_total / NULLIF(s.sum_b_total, 0)) * n.unit_value, 2))
+          OVER (ORDER BY s.report_date) > 0 
+        THEN '+'
+        ELSE ''
+      END,
+      ROUND(
+        ROUND((s.sum_a_total / NULLIF(s.sum_b_total, 0)) * n.unit_value, 2) -
+        LAG(ROUND((s.sum_a_total / NULLIF(s.sum_b_total, 0)) * n.unit_value, 2))
+        OVER (ORDER BY s.report_date),
+        2
+      )
+    ),
+    '0'
+  ) AS note
+
+
+      FROM summary s
+      LEFT JOIN kpi_name n ON n.id = s.kpi_name
+      ORDER BY STR_TO_DATE(CONCAT('01-', s.month), '%d-%b-%y');
     `;
 
         const result = await new Promise((resolve, reject) => {
-            db.query(query, params, (err, rows) => (err ? reject(err) : resolve(rows)));
+            db.query(query, params, (err, rows) =>
+                err ? reject(err) : resolve(rows)
+            );
         });
 
-        // ✅ Format month names in Thai
+        // Convert month from EN → TH
         const formatted = result.map(item => {
             if (!item.month) return item;
             const [mon, yr] = item.month.split("-");
@@ -754,9 +769,13 @@ exports.getDetail = async (req, res) => {
         res.json(formatted);
     } catch (err) {
         console.error("Database error:", err);
-        res.status(500).json({ error: "Internal server error", details: err.message });
+        res.status(500).json({
+            error: "Internal server error",
+            details: err.message
+        });
     }
 };
+
 
 
 exports.dataCurrentMonth = async (req, res) => {
@@ -771,9 +790,9 @@ exports.dataCurrentMonth = async (req, res) => {
 
         const query = `
  SELECT
-        ROUND(SUM(d.a_value)/NULLIF(SUM(d.b_value),0)*100, 2) AS sum_rate,
-        ROUND(SUM(CASE WHEN d.type='ไทย' THEN d.a_value ELSE 0 END)/NULLIF(SUM(CASE WHEN d.type='ไทย' THEN d.b_value ELSE 0 END),0)*100, 2) AS thai_rate,
-        ROUND(SUM(CASE WHEN d.type='ต่างชาติ' THEN d.a_value ELSE 0 END)/NULLIF(SUM(CASE WHEN d.type='ต่างชาติ' THEN d.b_value ELSE 0 END),0)*100, 2) AS foreigner_rate,
+        ROUND(SUM(d.a_value)/NULLIF(SUM(d.b_value),0)*n.unit_value, 2) AS sum_rate,
+        ROUND(SUM(CASE WHEN d.type='ไทย' THEN d.a_value ELSE 0 END)/NULLIF(SUM(CASE WHEN d.type='ไทย' THEN d.b_value ELSE 0 END),0)*n.unit_value, 2) AS thai_rate,
+        ROUND(SUM(CASE WHEN d.type='ต่างชาติ' THEN d.a_value ELSE 0 END)/NULLIF(SUM(CASE WHEN d.type='ต่างชาติ' THEN d.b_value ELSE 0 END),0)*n.unit_value, 2) AS foreigner_rate,
 				n.max_value
       FROM kpi_data d
 			left JOIN kpi_name n on d.kpi_name = n.id

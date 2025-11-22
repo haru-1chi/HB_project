@@ -6,10 +6,12 @@ import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import "./App.css";
 import Home from "./pages/Home";
 import KpiDashboard from "./pages/KpiDashboard";
+import KpiDashboardMedError from "./pages/KpiDashboardMedError";
 import Lookup from "./pages/Lookup";
 import LookupMedError from "./pages/LookupMedError";
 import LookupOPD from "./pages/LookupOPD";
 import KpiFormPage from "./pages/KpiFormPage";
+import KpiFormQualityPage from "./pages/KpiFormQualityPage";
 import KpiMedFormPage from "./pages/KpiMedFormPage";
 import Login from "./pages/Login";
 import Profile from "./pages/Profile";
@@ -21,7 +23,7 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-          <div className="bg-[#191b24]">
+        <div className="bg-[#191b24]">
         {/* <div className="bg-[#F2F8FD]"> */}
           <Routes>
             <Route path="/login" element={<Login />} />
@@ -36,6 +38,14 @@ function App() {
                 }
               />
               <Route
+                path="/kpiMedError"
+                element={
+                  <ProtectedRoute>
+                    <KpiDashboardMedError />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/lookup"
                 element={
                   <ProtectedRoute roles={[1, 2]}>
@@ -43,7 +53,7 @@ function App() {
                   </ProtectedRoute>
                 }
               />
-                 <Route
+              <Route
                 path="/lookupOPD"
                 element={
                   <ProtectedRoute roles={[1, 2]}>
@@ -64,6 +74,14 @@ function App() {
                 element={
                   <ProtectedRoute roles={[1, 2]}>
                     <KpiFormPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/KpiFormQualityPage"
+                element={
+                  <ProtectedRoute roles={[1, 2]}>
+                    <KpiFormQualityPage />
                   </ProtectedRoute>
                 }
               />

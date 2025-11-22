@@ -24,7 +24,7 @@ function SideBarMenu({ collapsed, setCollapsed }) {
 
   return (
     <div
-      // className={`sm:fixed sm:top-0 sm:left-0 sm:h-dvh bg-white flex flex-col transition-all duration-300 pt-5`}
+      // className={`sm:fixed sm:top-0 sm:left-0 sm:h-dvh bg-white flex flex-col transition-all duration-300 pt-5 shadow-md`}
       className={`sm:fixed sm:top-0 sm:left-0 sm:h-dvh bg-grey-900 flex flex-col transition-all duration-300 pt-5`}
       style={{ width: collapsed ? "4rem" : "18.75rem" }}
     >
@@ -95,6 +95,22 @@ function SideBarMenu({ collapsed, setCollapsed }) {
                 </div>
               )}
             </Link>
+            <Link
+              to="/kpiMedError"
+              className={`p-3 rounded-lg block mb-3 ${
+                isActive("/kpiMedError")
+                  ? "text-white font-bold bg-teal-500"
+                  : "text-gray-700 hover:text-teal-500"
+              }`}
+            >
+              {!collapsed ? (
+                "ตัวชี้วัดความเสี่ยง"
+              ) : (
+                <div className="text-center">
+                  <FontAwesomeIcon icon={faChartLine} />
+                </div>
+              )}
+            </Link>
             {user?.role !== 3 && (
               <>
                 <Link
@@ -156,6 +172,22 @@ function SideBarMenu({ collapsed, setCollapsed }) {
                 >
                   {!collapsed ? (
                     "จัดการข้อมูลตัวชี้วัด"
+                  ) : (
+                    <div className="text-center">
+                      <FontAwesomeIcon icon={faFilePen} />
+                    </div>
+                  )}
+                </Link>
+                <Link
+                  to="/KpiFormQualityPage"
+                  className={`p-3 rounded-lg block mb-3 ${
+                    isActive("/KpiFormQualityPage")
+                      ? "text-white font-bold bg-teal-500"
+                      : "text-gray-700 hover:text-teal-500"
+                  }`}
+                >
+                  {!collapsed ? (
+                    "จัดการข้อมูลตัวชี้วัดคุณภาพ"
                   ) : (
                     <div className="text-center">
                       <FontAwesomeIcon icon={faFilePen} />

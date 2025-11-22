@@ -1,32 +1,55 @@
 import React from "react";
 
-const GaugeChart = ({ value, target }) => {
+const GaugeChart = ({ value, target, selectedKPI }) => {
+  const { unit_type, target_direction, max_value } = selectedKPI;
+  let target_value;
+
+  if (unit_type === "percent") {
+    target_value = 100;
+  } else {
+    target_value = max_value + max_value * 0.5;
+  }
+  console.log("max_value", target_value);
   const radius = 30; // smaller radius
   const strokeWidth = 12; // smaller bar
   const center = radius + strokeWidth; // center coordinate
   const circumference = Math.PI * radius; // semicircle length
 
   // Clamp value 0-100
-  const clampedValue = Math.min(Math.max(value, 0), 100);
-  const clampedTarget = Math.min(Math.max(target, 0), 100);
+  const clampedValue = Math.min(Math.max(value, 0), target_value);
+  const clampedTarget = Math.min(Math.max(max_value, 0), target_value);
 
   // Convert value to stroke-dashoffset for semicircle
-  const dashOffset = circumference - (circumference * clampedValue) / 100;
+  const dashOffset =
+    circumference - (circumference * clampedValue) / target_value;
 
   // Needle rotation
-  const needleAngle = (clampedValue / 100) * 180 - 180; // -90 to start from left
+  const needleAngle = (clampedValue / target_value) * 180 - 180; // -90 to start from left
 
   // Target angle
-  const targetAngle = (clampedTarget / 100) * 180 - 180;
+  const targetAngle = (clampedTarget / target_value) * 180 - 180;
 
   const targetDistance = radius + 10; // same distance as needle value text
   const targetWidth = 8; // width of triangle marker
 
+  // ============================
+  // 1️⃣ Determine Good or Bad
+  // ============================
+  let isGood = false;
+
+  if (target_direction === "less_than") {
+    isGood = clampedValue <= clampedTarget;
+  } else if (target_direction === "more_than") {
+    isGood = clampedValue >= clampedTarget;
+  }
+
+  const valueColorClass = isGood ? "fill-green-500" : "fill-red-500";
+  const needleColor = isGood ? "#009f27" : "#fb2c36"; // line color
   return (
     <div className="flex flex-col items-center">
       <svg
-        width={((radius + strokeWidth) * 2) + 15}
-        height={(radius + strokeWidth + 20)-25}
+        width={(radius + strokeWidth) * 2 + 15}
+        height={radius + strokeWidth + 20 - 25}
         className="overflow-visible"
       >
         {/* Background semicircle */}
@@ -44,8 +67,19 @@ const GaugeChart = ({ value, target }) => {
         {/* Gradient Bar */}
         <defs>
           <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#34d399" />
-            <stop offset="100%" stopColor="#3b82f6" />
+            {target_direction === "less_than" ? (
+              <>
+                <stop offset="0%" stopColor="#00c951" />
+                <stop offset="50%" stopColor="#ffba00" />
+                <stop offset="100%" stopColor="#fb2c36" />
+              </>
+            ) : (
+              <>
+                <stop offset="0%" stopColor="#fb2c36" />
+                <stop offset="50%" stopColor="#ffba00" />
+                <stop offset="100%" stopColor="#00c951" />
+              </>
+            )}
           </linearGradient>
         </defs>
         <path
@@ -67,7 +101,7 @@ const GaugeChart = ({ value, target }) => {
           y1={center}
           x2={center + radius * Math.cos((needleAngle * Math.PI) / 180)}
           y2={center + radius * Math.sin((needleAngle * Math.PI) / 180)}
-          stroke="#ef4444"
+          stroke={needleColor}
           strokeWidth="3"
         />
         {/* Needle value */}
@@ -76,7 +110,7 @@ const GaugeChart = ({ value, target }) => {
           y={center + (radius + 20) * Math.sin((needleAngle * Math.PI) / 180)}
           textAnchor="middle"
           dominantBaseline="middle"
-          className="text-sm font-bold fill-red-500"
+          className={`text-sm font-bold ${valueColorClass}`}
         >
           {clampedValue}%
         </text>
@@ -108,7 +142,7 @@ const GaugeChart = ({ value, target }) => {
               Math.sin(((targetAngle + 4) * Math.PI) / 180)
           }
           `}
-          fill="#facc15"
+          fill="#e17100"
         />
 
         {/* Min & Max labels */}
@@ -126,7 +160,7 @@ const GaugeChart = ({ value, target }) => {
           textAnchor="ens"
           className="text-sm fill-gray-600"
         >
-          100
+          {target_value}
         </text>
       </svg>
     </div>

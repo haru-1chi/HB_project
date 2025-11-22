@@ -133,6 +133,87 @@ exports.deleteOPDName = async (req, res) => {
     }
 };
 
+exports.updateKPIDataQuality = async (req, res) => {
+    const { id } = req.params; // /kpi-data-quality/:id
+    const { kpi_id, issue_details, support_details, report_date, type } = req.body;
+
+    try {
+        if (!id) {
+            return res.status(400).json({
+                success: false,
+                message: "Missing id parameter",
+            });
+        }
+
+        // Build dynamic SQL
+        const fields = [];
+        const values = [];
+
+        if (kpi_id !== undefined) {
+            fields.push("kpi_id = ?");
+            values.push(kpi_id);
+        }
+
+        if (issue_details !== undefined) {
+            fields.push("issue_details = ?");
+            values.push(issue_details || null);
+        }
+
+        if (support_details !== undefined) {
+            fields.push("support_details = ?");
+            values.push(support_details || null);
+        }
+
+        if (report_date !== undefined) {
+            fields.push("report_date = ?");
+            values.push(report_date);
+        }
+
+        if (type !== undefined) {
+            fields.push("type = ?");
+            values.push(type);
+        }
+
+        if (fields.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "No data provided to update",
+            });
+        }
+
+        const sql = `
+            UPDATE kpi_data_quality
+            SET ${fields.join(", ")}
+            WHERE id = ?
+        `;
+
+        values.push(id);
+
+        const result = await queryAsync(sql, values);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "No KPI data found with this ID",
+            });
+        }
+
+        res.json({
+            success: true,
+            message: "✅ KPI Quality Data updated successfully",
+            updatedId: id,
+        });
+
+    } catch (error) {
+        console.error("❌ Error updating KPI Quality data:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to update KPI Quality data",
+            error: error.message,
+        });
+    }
+};
+
 exports.getOPDName = async (req, res) => {
     try {
         const includeDeleted = req.query.includeDeleted === "true";

@@ -22,7 +22,7 @@ ChartJS.register(
   ChartDataLabels
 );
 
-const KPILineChart = ({ data }) => {
+const KPILineChart = ({ data, unitLabel }) => {
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -80,7 +80,6 @@ const KPILineChart = ({ data }) => {
   const chartData = {
     labels,
     datasets: [...datasets, maxDataset],
-
   };
 
   const options = {
@@ -91,22 +90,22 @@ const KPILineChart = ({ data }) => {
       tooltip: {
         callbacks: {
           label: function (tooltipItem) {
-            return `${tooltipItem.dataset.label}: ${tooltipItem.raw}%`;
+            return `${tooltipItem.dataset.label}: ${tooltipItem.raw} ${unitLabel}`;
           },
         },
       },
       datalabels: {
         color: "#555555", // text color
         align: "top",
-        formatter: (value) => `${value}%`, // show value with %
+        formatter: (value) => `${value}`, // show value with %
         font: {
           weight: "bold",
         },
       },
     },
     scales: {
-      y: { beginAtZero: true, title: { display: true, text: "Result (%)" } },
-      x: { title: { display: true, text: "Month" } },
+      y: { beginAtZero: true, title: { display: true, text: `ผลลัพธ์ (${unitLabel})` } },
+      x: { title: { display: true, text: "เดือน" } },
     },
   };
 

@@ -21,7 +21,11 @@ import {
   faLessThanEqual,
 } from "@fortawesome/free-solid-svg-icons";
 import Footer from "../components/Footer";
-import { formatDateForSQL, formatMonthYear } from "../utils/dateTime";
+import {
+  formatDateForSQL,
+  formatMonthYear,
+  multiplierToThaiUnit,
+} from "../utils/dateTime";
 import { sumField, exportToExcel } from "../utils/exportUtils";
 import { ScrollTop } from "primereact/scrolltop";
 
@@ -36,6 +40,8 @@ function KpiDashboard() {
 
   const [data, setData] = useState([]);
   const [detail, setDetail] = useState([]);
+  const [qualityData, setQualityData] = useState([]);
+
   const [dataCurrentMonth, setDataCurrentMonth] = useState([]);
 
   const [allKPIChoices, setAllKPIChoices] = useState([]); //rename kpiOptions
@@ -50,8 +56,8 @@ function KpiDashboard() {
   const selectedOptions = [
     //rename typeOptions
     { label: "รวมทั้งหมด", value: "รวม" },
-    { label: "ชาวไทย", value: "ไทย" },
-    { label: "ชาวต่างชาติ", value: "ต่างชาติ" },
+    { label: "ไทย", value: "ไทย" },
+    { label: "ต่างชาติ", value: "ต่างชาติ" },
   ];
 
   const selectedChart = [
@@ -65,12 +71,17 @@ function KpiDashboard() {
     (a, b) => order.indexOf(a.type) - order.indexOf(b.type)
   );
 
-  const selectedKPINameLabel =
-    allKPIChoices.find((item) => item.value === selectedKPIName)?.label || "";
+  const selectedKPI = allKPIChoices.find(
+    (item) => item.value === selectedKPIName
+  );
+
+  const selectedKPINameLabel = selectedKPI?.label || 100;
+
   const selectedTypeLabel =
     selectedOptions.find((item) => item.value === selectedTypeOptions)?.label ||
     "";
-
+  const selectedUnitValue = selectedKPI?.unit_value || 100; // default 100
+  const unitLabel = multiplierToThaiUnit(selectedUnitValue);
   const exportExcel = () => {
     exportToExcel(detail, selectedKPINameLabel, selectedTypeLabel, sortedData);
   };
@@ -82,7 +93,13 @@ function KpiDashboard() {
       const mapped = res.data.map((item) => ({
         label: item.kpi_name,
         value: item.id.toString(),
+        unit_type: item.unit_type,
+        unit_value: item.unit_value,
+        unit_label: item.unit_label,
+        target_direction: item.target_direction,
+        max_value: item.max_value,
       }));
+      console.log(res);
       setAllKPIChoices(mapped);
     } catch (err) {
       console.error("Error fetching KPI options:", err);
@@ -134,31 +151,106 @@ function KpiDashboard() {
     fetchDashboardData();
   }, [fetchKPInames, fetchDashboardData]);
 
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const query = new URLSearchParams({
+          kpi_name: selectedKPIName,
+          type: selectedTypeOptions,
+          since: formatDateForSQL(sinceDate),
+          until: formatDateForSQL(endDate, true),
+        }).toString();
+
+        const res = await axios.get(`${API_BASE}/kpi-quality?${query}`);
+        setQualityData(res.data);
+        // console.log(res.data);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    fetchData();
+  }, [selectedKPIName, selectedTypeOptions, sinceDate, endDate]);
+
+  const renderPanelContent = (data, keyName) => {
+    const grouped = {};
+
+    data.forEach((item) => {
+      const value = item[keyName];
+      if (!value) return;
+
+      const typeKey = item.type;
+      const monthKey = item.report_date.slice(0, 7); // keep grouping by YYYY-MM
+
+      if (!grouped[typeKey]) grouped[typeKey] = {};
+      if (!grouped[typeKey][monthKey]) grouped[typeKey][monthKey] = [];
+
+      grouped[typeKey][monthKey].push(item);
+    });
+
+    if (Object.keys(grouped).length === 0) {
+      return <p className="m-0">ยังไม่มีข้อมูล</p>;
+    }
+
+    return Object.entries(grouped).map(([type, months]) => (
+      <div key={type}>
+        <h3>ประเภท: {type}</h3>
+
+        {Object.entries(months).map(([month, items]) => (
+          <div key={month} style={{ paddingLeft: 20 }}>
+            {/* Show Thai month-year, e.g., เม.ย. 25 */}
+            <p>{items[0].report_date_formatted}:</p>
+
+            {items.map((item, idx) =>
+              (item[keyName] || "").split("\n").map((line, i) => (
+                <p key={`${idx}-${i}`} style={{ paddingLeft: 20, margin: 0 }}>
+                  {line}
+                </p>
+              ))
+            )}
+          </div>
+        ))}
+      </div>
+    ));
+  };
+
   const noteBodyTemplate = (rowData) => {
     const value = rowData.note;
+    if (
+      value === null ||
+      value === undefined ||
+      value === "" ||
+      parseFloat(value) === 0 ||
+      !selectedKPI
+    ) {
+      return null;
+    }
 
-    if (!value) return null;
-
+    const { target_direction } = selectedKPI;
     const isPositive = value.startsWith("+");
 
+    // Determine good/bad based on KPI rule
+    let isGood = false;
+
+    if (target_direction === "less_than") {
+      isGood = !isPositive;
+    } else if (target_direction === "more_than") {
+      isGood = isPositive;
+    }
+
+    const color = isGood ? "text-green-500" : "text-red-500";
+    const bg = isGood ? "bg-green-100" : "bg-red-100";
+    const icon = isPositive ? faArrowTrendUp : faArrowTrendDown;
+
     return (
-      <div
-        className={`w-fit flex items-center px-2 rounded-md ${
-          isPositive ? "bg-red-100" : "bg-green-100"
-        }`}
-      >
-        <FontAwesomeIcon
-          icon={isPositive ? faArrowTrendUp : faArrowTrendDown}
-          className={isPositive ? "text-red-500" : "text-green-500"}
-        />
-        <p className={`ml-2 ${isPositive ? "text-red-500" : "text-green-500"}`}>
-          {value}
-        </p>
+      <div className={`w-fit flex items-center px-2 rounded-md ${bg}`}>
+        <FontAwesomeIcon icon={icon} className={color} />
+        <p className={`ml-2 ${color}`}>{value}</p>
       </div>
     );
   };
 
-  const getGaugeChart = (type, value, target) => {
+  const getGaugeChart = (type, value) => {
     if (!type || type === "null") return null;
     // Make sure the value is a number (assuming value is numeric already)
     const percentage = Number(value); // Ensure value is treated as a number
@@ -167,9 +259,9 @@ function KpiDashboard() {
       case "sum_rate":
       case "thai_rate":
         // Pass the numeric value to the chart
-        return <GaugeChart value={percentage} target={target} />;
+        return <GaugeChart value={percentage} selectedKPI={selectedKPI} />;
       default:
-        return <GaugeChart value={percentage} target={target} />;
+        return <GaugeChart value={percentage} selectedKPI={selectedKPI} />;
     }
   };
   const getTitle = (type) => {
@@ -181,14 +273,31 @@ function KpiDashboard() {
 
     switch (type) {
       case "sum_rate":
-        return `ร้อยละการเสียชีวิตรวมทั้งหมด${rangeText}`;
+        return `รวมทั้งหมด${rangeText}`;
       case "thai_rate":
-        return `ร้อยละการเสียชีวิตชาวไทยรวม${rangeText}`;
+        return `ไทยรวม${rangeText}`;
       case "foreigner_rate":
-        return `ร้อยละการเสียชีวิตชาวต่างชาติรวม${rangeText}`;
+        return `ต่างชาติรวม${rangeText}`;
       default:
-        return `ร้อยละการเสียชีวิต (${type})${rangeText}`;
+        return `(${type})${rangeText}`;
     }
+  };
+
+  const getValueColorClass = (item, selectedKPI) => {
+    if (!selectedKPI) return "";
+
+    const { target_direction, max_value } = selectedKPI;
+    const value = item.value;
+
+    if (target_direction === "less_than") {
+      return value > max_value ? "text-red-500" : "text-green-600";
+    }
+
+    if (target_direction === "more_than") {
+      return value < max_value ? "text-red-500" : "text-green-600";
+    }
+
+    return "";
   };
 
   const header = (
@@ -248,6 +357,8 @@ function KpiDashboard() {
                 optionLabel="label"
                 checkmark
                 className="mr-5"
+                filter
+                filterDelay={400}
               />
             </div>
 
@@ -297,53 +408,60 @@ function KpiDashboard() {
         </div>
 
         <div className="card-board grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 md:gap-8">
-          {dataCurrentMonth.map((item, index) => (
-            <div
-              key={`${item.type}-${index}`}
-              className="bg-white shadow-md border-1 border-gray-200 h-[100px] md:h-[136px] p-3 md:p-5 rounded-xl flex flex-col justify-between"
-              // className="bg-grey-900 shadow-md border-1 border-gray-200 h-[100px] md:h-[136px] p-3 md:p-5 rounded-xl flex flex-col justify-between"
-            >
-              <div className="flex items-center justify-between">
-                <h1 className="text-5xl font-semibold">
-                  {item.value}
-                  <span className="text-3xl">%</span>
-                </h1>
-                {getGaugeChart(item.type, item.value, item.max_value)}
+          {dataCurrentMonth.map((item, index) => {
+            const valueColor = getValueColorClass(item, selectedKPI);
+
+            return (
+              <div
+                key={`${item.type}-${index}`}
+                className="bg-white shadow-md border-1 border-gray-200 h-[100px] md:h-[136px] p-3 md:p-5 rounded-xl flex flex-col justify-between"
+              >
+                <div className="flex items-center justify-between">
+                  <h1 className={`text-5xl font-semibold ${valueColor}`}>
+                    {item.value}
+                    <span
+                      className={unitLabel === 100 ? "text-2xl" : "text-3xl"}
+                    >
+                      {unitLabel}
+                    </span>
+                  </h1>
+                  {getGaugeChart(item.type, item.value)}
+                </div>
+                <p>{getTitle(item.type)}</p>
               </div>
-              <p>{getTitle(item.type)}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
         <div className="bg-white p-4 my-7 w-full rounded-xl shadow-md h-auto border-1 border-gray-200">
           {/* <div className="bg-grey-900 p-4 my-7 w-full rounded-xl shadow-md h-auto border-1 border-gray-200"> */}
           {data?.length > 0 ? (
             selectedChartType === "percent" ? (
-              <KPILineChart data={data} />
+              <KPILineChart data={data} unitLabel={unitLabel} />
             ) : (
-              <BarChart data={data} type="kpi" />
+              <BarChart data={data} type="kpi" unitLabel={unitLabel}/>
             )
           ) : (
             <p>ไม่พบข้อมูล...</p>
           )}
         </div>
 
-        <div className="flex gap-5">
+        {/* <div className="flex gap-5">
           <Card
             title="ปัญหาและอุปสรรค"
             className="w-full"
             style={{
               backgroundColor: "oklch(97.1% 0.013 17.38)",
             }}
+            pt={{
+              title: {
+                style: {
+                  paddingBottom: "15px",
+                  borderBottom: "5px solid #ffffff",
+                },
+              },
+            }}
           >
-            <p className="m-0">
-              - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
-            </p>
-            <p className="m-0">
-              - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
-            </p>
-            <p className="m-0">
-              - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
-            </p>
+            {renderPanelContent(qualityData, "issue_details")}
           </Card>
           <Card
             title="สิ่งที่ต้องการสนับสนุนให้บรรลุเป้าหมาย"
@@ -351,63 +469,69 @@ function KpiDashboard() {
             style={{
               backgroundColor: "oklch(98.2% 0.018 155.826)",
             }}
+             pt={{
+              title: {
+                style: {
+                  paddingBottom: "15px",
+                  borderBottom: "5px solid #ffffff",
+                },
+              },
+            }}
           >
-            <p className="m-0">
-              - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
-            </p>
-            <p className="m-0">
-              - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
-            </p>
-            <p className="m-0">
-              - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
-            </p>
+            {renderPanelContent(qualityData, "support_details")}
           </Card>
-        </div>
+        </div> */}
 
-        {/* <div className="flex gap-5">
+        <div className="flex items-stretch gap-5">
           <Panel
             header="ปัญหาและอุปสรรค"
-            className="w-full"
+            className="flex-1 flex flex-col"
             pt={{
               header: {
                 style: {
-                  backgroundColor: "oklch(93.6% 0.032 17.717)",
+                  backgroundColor: "oklch(70.4% 0.191 22.216)",
+                  //  backgroundColor: "oklch(93.6% 0.032 17.717)",
+                },
+              },
+              toggleableContent: {
+                style: {
+                  flex: 1,
+                },
+              },
+              content: {
+                style: {
+                  height: "100%",
                 },
               },
             }}
           >
-            <p className="m-0">
-              - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
-            </p>
-            <p className="m-0">
-              - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
-            </p>
-            <p className="m-0">
-              - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
-            </p>
+            {renderPanelContent(qualityData, "issue_details")}
           </Panel>
+
           <Panel
             header="สิ่งที่ต้องการสนับสนุนให้บรรลุเป้าหมาย"
-            className="w-full"
+            className="flex-1 flex flex-col"
             pt={{
               header: {
                 style: {
-                  backgroundColor: "oklch(96.2% 0.044 156.743)",
+                  backgroundColor: "oklch(69.6% 0.17 162.48)",
+                },
+              },
+              toggleableContent: {
+                style: {
+                  flex: 1,
+                },
+              },
+              content: {
+                style: {
+                  height: "100%",
                 },
               },
             }}
           >
-            <p className="m-0">
-              - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
-            </p>
-            <p className="m-0">
-              - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
-            </p>
-            <p className="m-0">
-              - Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
-            </p>
+            {renderPanelContent(qualityData, "support_details")}
           </Panel>
-        </div> */}
+        </div>
 
         {/* <div className="flex gap-5">
           <Fieldset
@@ -470,17 +594,20 @@ function KpiDashboard() {
             <Column field="month" header="เดือน-ปี"></Column>
             <Column
               field="result_thai"
-              header="อัตราการเสียชีวิตชาวไทย (%)"
+              header={`ไทย (${unitLabel})`}
             ></Column>
             <Column
               field="result_foreign"
-              header="อัตราการเสียชีวิตชาวต่างชาติ (%)"
+              header={`ต่างชาติ (${unitLabel})`}
             ></Column>
             <Column
               field="result_total"
-              header="อัตราการเสียชีวิตรวม (%)"
+              header={`รวม (${unitLabel})`}
             ></Column>
-            <Column header="แนวโน้ม" body={noteBodyTemplate}></Column>
+            <Column
+              header={`แนวโน้ม (${unitLabel})`}
+              body={noteBodyTemplate}
+            ></Column>
           </DataTable>
         </div>
       </div>

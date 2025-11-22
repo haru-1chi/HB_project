@@ -106,8 +106,6 @@ function Lookup() {
       if (values.unit_type === "percent") {
         if (values.unit_value !== 100)
           errors.unit_value = "ค่าตัวคูณต้องเป็น 100 สำหรับร้อยละ";
-        if (values.unit_label !== "ราย")
-          errors.unit_label = "ชื่อหน่วยต้องเป็น 'ราย' สำหรับร้อยละ";
       }
     }
     if (!values.target_direction?.trim())
@@ -359,7 +357,6 @@ function Lookup() {
               }
               className={`w-full ${formErrors.unit_label ? "p-invalid" : ""}`}
               placeholder="ชื่อหน่วย (เช่น ราย, ทารกเกิดมีชีพ)"
-              disabled={editValues.unit_type === "percent"}
             />
             {formErrors.unit_label && (
               <small className="p-error">{formErrors.unit_label}</small>
@@ -630,8 +627,7 @@ function Lookup() {
                   setFormValues({ ...formValues, unit_label: e.target.value })
                 }
                 className={`w-full ${formErrors.unit_label ? "p-invalid" : ""}`}
-                placeholder="ราย"
-                disabled={formValues.unit_type === "percent"}
+                placeholder="ชื่อหน่วย"
               />
               {formErrors.unit_label && (
                 <small className="p-error">{formErrors.unit_label}</small>

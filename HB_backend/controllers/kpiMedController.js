@@ -448,6 +448,118 @@ exports.getKPIMedData = async (req, res) => {
     }
 };
 
+exports.getKPIMedPie = async (req, res) => {
+    try {
+        const { sinceDate, endDate, kpi_id, opd_id, type } = req.query;
+
+        const kpiId = Number(kpi_id);
+        const mode = type?.trim() || "detail";
+
+        //
+        // 1️⃣ Get all leaf KPI IDs in a single recursive SQL (faster than multiple queries)
+        //
+        const kpiRows = await query(
+            `
+            WITH RECURSIVE kpi_tree AS (
+                SELECT id, parent_id
+                FROM kpi_name_med
+                WHERE id = ?
+
+                UNION ALL
+
+                SELECT k.id, k.parent_id
+                FROM kpi_name_med k
+                INNER JOIN kpi_tree t ON k.parent_id = t.id
+                WHERE k.deleted_at IS NULL
+            )
+            SELECT id FROM kpi_tree;
+            `,
+            [kpiId]
+        );
+
+        const targetKpiIds = kpiRows.map(r => r.id);
+
+        //
+        // 2️⃣ Build WHERE clause using a static template (avoids string concatenation)
+        //
+        const params = [...targetKpiIds];
+        const whereParts = [`kpi_id IN (${targetKpiIds.map(() => '?').join(',')})`];
+
+        // Date filters
+        if (sinceDate) {
+            whereParts.push(`report_date >= DATE_FORMAT(?, '%Y-%m-01')`);
+            params.push(sinceDate);
+        }
+        if (endDate) {
+            // Use LAST_DAY() to avoid DATE_FORMAT overhead
+            whereParts.push(`report_date <= LAST_DAY(DATE_FORMAT(?, '%Y-%m-01'))`);
+            params.push(endDate);
+        }
+
+        // OPD filter
+        if (opd_id) {
+            whereParts.push(`opd_id = ?`);
+            params.push(opd_id);
+        }
+
+        const whereSQL = "WHERE " + whereParts.join(" AND ");
+
+        //
+        // 3️⃣ Pre-build strong SQL once — no string concat in logic
+        //
+        const SELECT_FIELDS =
+            mode === "group"
+                ? `
+                    SUM(A + B) AS AB,
+                    SUM(C + D) AS CD,
+                    SUM(E + F) AS EF,
+                    SUM(G + H + I) AS GHI
+                  `
+                : `
+                    SUM(A) AS A, SUM(B) AS B, SUM(C) AS C,
+                    SUM(D) AS D, SUM(E) AS E, SUM(F) AS F,
+                    SUM(G) AS G, SUM(H) AS H, SUM(I) AS I
+                  `;
+
+        const queryStr = `
+            SELECT ${SELECT_FIELDS}
+            FROM kpi_med_error
+            ${whereSQL}
+        `;
+
+        //
+        // 4️⃣ Execute
+        //
+        const [data] = await query(queryStr, params);
+
+        //
+        // 5️⃣ Format response
+        //
+        if (mode === "group") {
+            return res.status(200).json({
+                AB: data?.AB ?? 0,
+                CD: data?.CD ?? 0,
+                EF: data?.EF ?? 0,
+                GHI: data?.GHI ?? 0,
+            });
+        }
+
+        const fields = ["A", "B", "C", "D", "E", "F", "G", "H", "I"];
+        return res.status(200).json(
+            Object.fromEntries(fields.map(k => [k, data?.[k] ?? 0]))
+        );
+
+    } catch (err) {
+        console.error("❌ Error fetching KPI pie:", err);
+        return res.status(500).json({
+            error: "Error fetching KPI pie",
+            message: err.message,
+        });
+    }
+};
+
+
+
 // exports.getKPIMedData = async (req, res) => {
 //     const { kpi_id,
 //         opd_id,
