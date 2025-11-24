@@ -453,11 +453,16 @@ exports.getKPIMedPie = async (req, res) => {
         const { sinceDate, endDate, kpi_id, opd_id, type } = req.query;
 
         const kpiId = Number(kpi_id);
-        const mode = type?.trim() || "detail";
+        if (!kpiId) {
+            return res.status(400).json({ error: "Missing or invalid KPI ID" });
+        }
 
-        //
-        // 1️⃣ Get all leaf KPI IDs in a single recursive SQL (faster than multiple queries)
-        //
+        const mode = (type || "detail").trim();
+
+        /**
+         * 1️⃣ Fetch all related KPIs (recursive CTE)
+         *    Return early if none found – avoids useless queries.
+         */
         const kpiRows = await query(
             `
             WITH RECURSIVE kpi_tree AS (
@@ -469,7 +474,7 @@ exports.getKPIMedPie = async (req, res) => {
 
                 SELECT k.id, k.parent_id
                 FROM kpi_name_med k
-                INNER JOIN kpi_tree t ON k.parent_id = t.id
+                JOIN kpi_tree t ON k.parent_id = t.id
                 WHERE k.deleted_at IS NULL
             )
             SELECT id FROM kpi_tree;
@@ -477,36 +482,39 @@ exports.getKPIMedPie = async (req, res) => {
             [kpiId]
         );
 
+        if (!kpiRows.length) {
+            return res.status(200).json({});
+        }
+
         const targetKpiIds = kpiRows.map(r => r.id);
 
-        //
-        // 2️⃣ Build WHERE clause using a static template (avoids string concatenation)
-        //
+        /**
+         * 2️⃣ Build WHERE clause efficiently (no repeated .map(), no string churn)
+         */
+        const whereParts = [`kpi_id IN (${Array(targetKpiIds.length).fill('?').join(',')})`];
         const params = [...targetKpiIds];
-        const whereParts = [`kpi_id IN (${targetKpiIds.map(() => '?').join(',')})`];
 
-        // Date filters
         if (sinceDate) {
             whereParts.push(`report_date >= DATE_FORMAT(?, '%Y-%m-01')`);
             params.push(sinceDate);
         }
+
         if (endDate) {
-            // Use LAST_DAY() to avoid DATE_FORMAT overhead
             whereParts.push(`report_date <= LAST_DAY(DATE_FORMAT(?, '%Y-%m-01'))`);
             params.push(endDate);
         }
 
-        // OPD filter
         if (opd_id) {
             whereParts.push(`opd_id = ?`);
             params.push(opd_id);
         }
 
-        const whereSQL = "WHERE " + whereParts.join(" AND ");
+        const whereSQL = `WHERE ${whereParts.join(' AND ')}`;
 
-        //
-        // 3️⃣ Pre-build strong SQL once — no string concat in logic
-        //
+        /**
+         * 3️⃣ Precompute SELECT field template
+         *    Keeps SQL engine work minimal.
+         */
         const SELECT_FIELDS =
             mode === "group"
                 ? `
@@ -521,39 +529,186 @@ exports.getKPIMedPie = async (req, res) => {
                     SUM(G) AS G, SUM(H) AS H, SUM(I) AS I
                   `;
 
-        const queryStr = `
+        const sql = `
             SELECT ${SELECT_FIELDS}
             FROM kpi_med_error
-            ${whereSQL}
+            ${whereSQL};
         `;
 
-        //
-        // 4️⃣ Execute
-        //
-        const [data] = await query(queryStr, params);
+        /**
+         * 4️⃣ Execute query (single row aggregated)
+         */
+        const [row] = await query(sql, params);
 
-        //
-        // 5️⃣ Format response
-        //
+        /**
+         * 5️⃣ Prepare lightweight response
+         */
         if (mode === "group") {
             return res.status(200).json({
-                AB: data?.AB ?? 0,
-                CD: data?.CD ?? 0,
-                EF: data?.EF ?? 0,
-                GHI: data?.GHI ?? 0,
+                AB: row?.AB ?? 0,
+                CD: row?.CD ?? 0,
+                EF: row?.EF ?? 0,
+                GHI: row?.GHI ?? 0,
             });
         }
 
         const fields = ["A", "B", "C", "D", "E", "F", "G", "H", "I"];
-        return res.status(200).json(
-            Object.fromEntries(fields.map(k => [k, data?.[k] ?? 0]))
-        );
+        const mapped = {};
+
+        for (const key of fields) {
+            mapped[key] = row?.[key] ?? 0;
+        }
+
+        return res.status(200).json(mapped);
 
     } catch (err) {
         console.error("❌ Error fetching KPI pie:", err);
         return res.status(500).json({
             error: "Error fetching KPI pie",
             message: err.message,
+        });
+    }
+};
+
+
+exports.getKPIMedStack = async (req, res) => {
+    try {
+        const { sinceDate, endDate, kpi_id, opd_id, type } = req.query;
+
+        const kpiId = Number(kpi_id);
+        const mode = (type || "detail").trim();   // "detail" or "group"
+
+        if (!kpiId) {
+            return res.status(400).json({ error: "Missing or invalid KPI ID" });
+        }
+
+        /**
+         * 1️⃣ Fetch leaf/sub KPIs using a recursive CTE
+         *    (Use SELECT id only once; avoid building large IN (...) strings)
+         */
+        const kpiRows = await query(
+            `
+            WITH RECURSIVE kpi_tree AS (
+                SELECT id, parent_id
+                FROM kpi_name_med
+                WHERE id = ?
+
+                UNION ALL
+
+                SELECT k.id, k.parent_id
+                FROM kpi_name_med k
+                JOIN kpi_tree t 
+                  ON k.parent_id = t.id
+                WHERE k.deleted_at IS NULL
+            )
+            SELECT id FROM kpi_tree;
+            `,
+            [kpiId]
+        );
+
+        const targetKpiIds = kpiRows.map(r => r.id);
+        if (targetKpiIds.length === 0) {
+            return res.status(200).json([]); // nothing to query
+        }
+
+        /**
+         * 2️⃣ Build WHERE with fewer string operations and clean param push
+         */
+        const params = [];
+        const whereParts = [];
+
+        // Always present
+        whereParts.push(`kpi_id IN (${targetKpiIds.map(() => '?').join(',')})`);
+        params.push(...targetKpiIds);
+
+        if (sinceDate) {
+            whereParts.push(`report_date >= DATE_FORMAT(?, '%Y-%m-01')`);
+            params.push(sinceDate);
+        }
+
+        if (endDate) {
+            whereParts.push(`report_date <= LAST_DAY(DATE_FORMAT(?, '%Y-%m-01'))`);
+            params.push(endDate);
+        }
+
+        if (opd_id) {
+            whereParts.push(`opd_id = ?`);
+            params.push(opd_id);
+        }
+
+        const whereSQL = `WHERE ${whereParts.join(" AND ")}`;
+
+        /**
+         * 3️⃣ Dynamic SELECT using prebuilt strings
+         *    (avoids repeating sums in main query)
+         */
+        const SELECT_FIELDS =
+            mode === "group"
+                ? `
+                    SUM(A + B) AS AB,
+                    SUM(C + D) AS CD,
+                    SUM(E + F) AS EF,
+                    SUM(G + H + I) AS GHI
+                  `
+                : `
+                    SUM(A) AS A, SUM(B) AS B, SUM(C) AS C,
+                    SUM(D) AS D, SUM(E) AS E, SUM(F) AS F,
+                    SUM(G) AS G, SUM(H) AS H, SUM(I) AS I
+                  `;
+
+        /**
+         * 4️⃣ Query
+         *    → Use DATE(report_date) grouping only once
+         *    → Avoid computing DATE_FORMAT 3x
+         */
+        const queryStr = `
+            SELECT
+                ${SELECT_FIELDS},
+                DATE_FORMAT(report_date, '%Y-%m') AS month_key,
+                DATE_FORMAT(report_date, '%b-%y') AS month_display
+            FROM kpi_med_error
+            ${whereSQL}
+            GROUP BY month_key
+            ORDER BY month_key;
+        `;
+
+        const rows = await query(queryStr, params);
+
+        /**
+         * 5️⃣ Output formatting
+         */
+        const response = rows.map(r =>
+            mode === "group"
+                ? {
+                    month: r.month_display,
+                    month_key: r.month_key,
+                    AB: r.AB || 0,
+                    CD: r.CD || 0,
+                    EF: r.EF || 0,
+                    GHI: r.GHI || 0
+                }
+                : {
+                    month: r.month_display,
+                    month_key: r.month_key,
+                    A: r.A || 0,
+                    B: r.B || 0,
+                    C: r.C || 0,
+                    D: r.D || 0,
+                    E: r.E || 0,
+                    F: r.F || 0,
+                    G: r.G || 0,
+                    H: r.H || 0,
+                    I: r.I || 0,
+                }
+        );
+
+        return res.status(200).json(response);
+
+    } catch (err) {
+        console.error("❌ Error fetching KPI stacked chart:", err);
+        return res.status(500).json({
+            error: "Error fetching KPI stacked chart",
+            message: err.message
         });
     }
 };

@@ -39,17 +39,32 @@ const PieChart = ({ data, type }) => {
         backgroundColor:
           type === "detail"
             ? [
+                // "#00B8D4",
+                // "#00BFA5",
+                // "#00C853",
+                // "#64DD17",
+                // "#AEEA00",
+                // "#FFAB00",
+                // "#ff6900",
+                // "#ff4514",
+                // "#fb2c36",
                 "#00B8D4",
                 "#00BFA5",
                 "#00C853",
                 "#64DD17",
                 "#AEEA00",
-                "#FFAB00",
-                "#ff6900",
-                "#ff4514",
-                "#fb2c36",
+                "#ffba00",
+                "#ff8904",
+                "#ff6540",
+                "#ff6467",
               ]
-            : ["#00B8D4", "#64DD17", "#FFAB00", "#fb2c36"],
+            : [
+                // "#00B8D4", "#64DD17", "#FFAB00", "#fb2c36"
+                "#00B8D4",
+                "#64DD17",
+                "#ffba00",
+                "#ff6467",
+              ],
 
         borderColor: "#fff",
         borderWidth: 1,

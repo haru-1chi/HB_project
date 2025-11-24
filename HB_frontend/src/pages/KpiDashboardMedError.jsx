@@ -1,5 +1,5 @@
 import axios from "axios";
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Dropdown } from "primereact/dropdown";
 import { Calendar } from "primereact/calendar";
 import { BreadCrumb } from "primereact/breadcrumb";
@@ -13,6 +13,7 @@ import { Card } from "primereact/card";
 import { Panel } from "primereact/panel";
 import GaugeChart from "../components/GaugeChart";
 import PieChart from "../components/PieChart";
+import KpiChartCard from "../components/KpiChartCard";
 import BarChart from "../components/BarChart";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -29,160 +30,163 @@ import {
 } from "../utils/dateTime";
 import { sumField, exportToExcel } from "../utils/exportUtils";
 import { ScrollTop } from "primereact/scrolltop";
+import { classNames } from "primereact/utils";
 
 function KpiDashboardMedError() {
   const API_BASE =
     import.meta.env.VITE_REACT_APP_API || "http://localhost:3000/api";
-  const [charts, setCharts] = useState([]);
-  const [subCharts, setSubCharts] = useState([]);
 
-  const now = new Date();
-  const [OPDNames, setOPDNames] = useState([]);
+  const [opdList, setOpdList] = useState([]);
   const [allKpis, setAllKpis] = useState([]);
-  const [kpiList, setKpiList] = useState([]); // only parent KPIs
+  const [charts, setCharts] = useState({});
+  const [stackData, setStackData] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [activeParent, setActiveParent] = useState(null);
+  const [error, setError] = useState(null);
+  // Filters
+  const now = new Date();
   const [pickerMode, setPickerMode] = useState("month");
+  const [selectedKPI, setSelectedKPI] = useState(null);
   const [selectedOPD, setSelectedOPD] = useState(null);
   const [selectedType, setSelectedType] = useState("detail");
-
   const [sinceDate, setSinceDate] = useState(new Date(now.getFullYear(), 0, 1));
   const [endDate, setEndDate] = useState(now);
 
-  const [activeParentKpi, setActiveParentKpi] = useState(null);
-  const [activeParentLabel, setActiveParentLabel] = useState("");
+   const formatDate = (date) =>
+    date
+      ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+          2,
+          "0"
+        )}-01`
+      : null;
+      
+  const parentKpis = useMemo(
+    () => allKpis.filter((k) => k.parent_id === null),
+    [allKpis]
+  );
 
-  const breadcrumbItems = [
-    {
-      label: "อุบัติการณ์ความเสี่ยง",
-      command: () => {
-        setActiveParentKpi(null);
-        setActiveParentLabel("");
-      },
-    },
-  ];
+  const kpiOptions = useMemo(
+    () =>
+      allKpis.map((k) => ({
+        label: k.kpi_name,
+        value: k.id,
+      })),
+    [allKpis]
+  );
 
-  if (activeParentKpi) {
-    breadcrumbItems.push({ label: activeParentLabel });
-  }
+ 
 
-  const breadcrumbHome = {
-    label: "อุบัติการณ์ความเสี่ยง",
-    command: () => setActiveParentKpi(null), // resets to main section
-  };
+  const fetchChart = useCallback(
+    (kpiId) =>
+      axios.get(`${API_BASE}/kpi-data-med/chart`, {
+        params: {
+          kpi_id: kpiId,
+          opd_id: selectedOPD,
+          sinceDate: formatDate(sinceDate),
+          endDate: formatDate(endDate),
+          type: selectedType,
+        },
+      }),
+    [API_BASE, selectedOPD, selectedType, sinceDate, endDate]
+  );
 
-  const formatDate = (date) => {
-    if (!date) return null;
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    return `${year}-${month}-01`;
-  };
+  const fetchParentCharts = useCallback(async () => {
+    if (!parentKpis.length) return;
 
-  const fetchSubKpiCharts = async (parentId, label) => {
-    setActiveParentKpi(parentId);
-    setActiveParentLabel(label);
+    const responses = await Promise.all(
+      parentKpis.map((k) =>
+        fetchChart(k.id).then((res) => ({
+          kpi_id: k.id,
+          kpi_label: k.kpi_name,
+          data: res.data,
+        }))
+      )
+    );
 
-    const subKpis = allKpis.filter((kpi) => kpi.parent_id === parentId);
-    if (!subKpis.length) return;
+    setCharts((prev) => ({ ...prev, root: responses }));
+  }, [parentKpis, fetchChart]);
 
-    try {
-      const requests = subKpis.map((subKpi) =>
-        axios
-          .get(`${API_BASE}/kpi-data-med/chart`, {
-            params: {
-              kpi_id: subKpi.id,
-              opd_id: selectedOPD,
-              sinceDate: formatDate(sinceDate),
-              endDate: formatDate(endDate),
-              type: selectedType,
-            },
-          })
-          .then((res) => ({
-            kpi_id: subKpi.id,
-            kpi_label: subKpi.kpi_name,
+  const fetchSubCharts = useCallback(
+    async (parentId) => {
+      const children = allKpis.filter((k) => k.parent_id === parentId);
+      if (!children.length) return;
+
+      setActiveParent(parentId);
+
+      const responses = await Promise.all(
+        children.map((k) =>
+          fetchChart(k.id).then((res) => ({
+            kpi_id: k.id,
+            kpi_label: k.kpi_name,
             data: res.data,
           }))
+        )
       );
 
-      const collected = await Promise.all(requests);
+      setCharts((prev) => ({ ...prev, [parentId]: responses }));
+    },
+    [allKpis, fetchChart]
+  );
 
-      setSubCharts((prev) => ({ ...prev, [parentId]: collected }));
+  const fetchStackChart = async () => {
+    try {
+      const res = await axios.get(`${API_BASE}/kpi-data-med/stack`, {
+        params: {
+          kpi_id: selectedKPI,
+          opd_id: selectedOPD,
+          sinceDate: formatDate(sinceDate),
+          endDate: formatDate(endDate),
+          type: selectedType, // detail or group
+        },
+      });
+      setStackData(res.data);
     } catch (err) {
-      console.error("❌ Error fetching sub-KPI charts", err);
+      console.error("❌ Error fetching stacked bar chart:", err);
     }
   };
 
   useEffect(() => {
     const fetchNames = async () => {
-      try {
-        const [resOPD, resKPI] = await Promise.all([
-          axios.get(`${API_BASE}/opd-name`, {
-            params: { includeDeleted: true },
-          }),
-          axios.get(`${API_BASE}/kpi-name-med`),
-        ]);
+      const [resOPD, resKPI] = await Promise.all([
+        axios.get(`${API_BASE}/opd-name`, {
+          params: { includeDeleted: true },
+        }),
+        axios.get(`${API_BASE}/kpi-name-med`),
+      ]);
 
-        const activeOPD = resOPD.data
-          .filter((item) => !item.deleted_at)
-          .map((item) => ({
-            label: item.opd_name,
-            value: item.id,
-            parent_id: item.parent_id,
-          }));
+      setOpdList(
+        resOPD.data
+          .filter((i) => !i.deleted_at)
+          .map((i) => ({
+            label: i.opd_name,
+            value: i.id,
+          }))
+      );
+      setAllKpis(resKPI.data);
 
-        setOPDNames(activeOPD);
-        setAllKpis(resKPI.data);
-        setKpiList(resKPI.data.filter((k) => k.parent_id === null));
-      } catch (err) {
-        console.error(err);
+      if (resKPI.data?.length > 0 && !selectedKPI) {
+        setSelectedKPI(resKPI.data[0].id);
       }
     };
 
     fetchNames();
   }, [API_BASE]);
 
-  // ---- Fetch charts whenever filters change
   useEffect(() => {
-    if (!kpiList.length) return;
+    fetchParentCharts();
 
-    const fetchCharts = async () => {
-      try {
-        // Fetch all parent KPI charts concurrently instead of sequentially
-        const requests = kpiList.map((kpi) =>
-          axios
-            .get(`${API_BASE}/kpi-data-med/chart`, {
-              params: {
-                kpi_id: kpi.id,
-                opd_id: selectedOPD,
-                sinceDate: formatDate(sinceDate),
-                endDate: formatDate(endDate),
-                type: selectedType,
-              },
-            })
-            .then((res) => ({
-              kpi_id: kpi.id,
-              kpi_label: kpi.kpi_name,
-              data: res.data,
-            }))
-        );
-
-        const collected = await Promise.all(requests);
-        setCharts(collected);
-      } catch (err) {
-        console.error("❌ Error fetching parent KPI charts", err);
-      }
-    };
-
-    fetchCharts();
-  }, [kpiList, selectedOPD, selectedType, sinceDate, endDate]);
+    if (activeParent) fetchSubCharts(activeParent);
+  }, [fetchParentCharts, fetchSubCharts]);
 
   useEffect(() => {
-    // Re-fetch subcharts only for parents that have been loaded before
-    const parents = Object.keys(subCharts);
-    if (!parents.length) return;
+    if (pickerMode !== "year") return;
+    if (!selectedKPI) return;
+    console.log("selectedKPI?.value", selectedKPI?.value);
 
-    parents.forEach((parentId) => {
-      fetchSubKpiCharts(Number(parentId));
-    });
-  }, [selectedOPD, selectedType, sinceDate, endDate]);
+    fetchStackChart();
+  }, [pickerMode, selectedKPI, selectedOPD, sinceDate, endDate, selectedType]);
+
+  const currentCharts = activeParent ? charts[activeParent] : charts.root;
 
   const isAllZero = (obj) =>
     !obj || Object.values(obj).every((v) => Number(v) === 0);
@@ -195,13 +199,29 @@ function KpiDashboardMedError() {
       >
         <div className="flex items-center mb-4">
           <BreadCrumb
-            model={breadcrumbItems}
+            model={[
+              {
+                label: "อุบัติการณ์ความเสี่ยง",
+                command: () => setActiveParent(null),
+              },
+              ...(activeParent
+                ? [
+                    {
+                      label: allKpis.find((k) => k.id === activeParent)
+                        ?.kpi_name,
+                    },
+                  ]
+                : []),
+            ]}
             pt={{
               root: {
                 style: {
                   backgroundColor: "transparent",
                   border: "none",
                   boxShadow: "none",
+                  padding: "0.4rem 0",
+                  fontSize: "1.5rem",
+                  fontWeight: "600",
                 },
               },
             }}
@@ -270,10 +290,22 @@ function KpiDashboardMedError() {
             </div>
             <div className="flex">
               <div className="hidden sm:block  mr-5">
+                {pickerMode === "year" && (
+                  <Dropdown
+                    value={selectedKPI}
+                    options={kpiOptions}
+                    optionLabel="label"
+                    placeholder="เลือก KPI"
+                    className="min-w-xs mr-3"
+                    onChange={(e) => setSelectedKPI(e.value)}
+                    filter
+                    filterDelay={400}
+                  />
+                )}
                 <Dropdown
                   value={selectedOPD}
                   onChange={(e) => setSelectedOPD(e.value)}
-                  options={OPDNames}
+                  options={opdList}
                   optionLabel="label"
                   placeholder="เลือก OPD"
                   className="w-full"
@@ -281,30 +313,6 @@ function KpiDashboardMedError() {
                   filterDelay={400}
                 />
               </div>
-              {/* <div className="hidden sm:block  mr-5">
-                <Dropdown
-                  value={selectedOPD}
-                  onChange={(e) => setSelectedOPD(e.value)}
-                  options={OPDNames}
-                  optionLabel="label"
-                  placeholder="เลือก OPD"
-                  className="w-full"
-                  filter
-                  filterDelay={400}
-                />
-              </div>
-              <div className="hidden sm:block  mr-5">
-                <Dropdown
-                  value={selectedOPD}
-                  onChange={(e) => setSelectedOPD(e.value)}
-                  options={OPDNames}
-                  optionLabel="label"
-                  placeholder="เลือก OPD"
-                  className="w-full"
-                  filter
-                  filterDelay={400}
-                />
-              </div> */}
             </div>
           </div>
           <div className="hidden sm:block">
@@ -322,101 +330,55 @@ function KpiDashboardMedError() {
             />
           </div>
         </div>
-
-        <div className="flex flex-wrap gap-5 mt-5">
-          {charts.length === 0 && (
-            <p className="text-center w-full">Loading...</p>
-          )}
-
-          {!activeParentKpi && (
-            <div className="flex flex-wrap gap-5 mt-5">
-              {charts
-                .filter((item) => !isAllZero(item.data))
-                .map((item) => (
-                  <div
-                    key={item.kpi_id}
-                    className="p-4 w-[500px] rounded-xl shadow-md border border-gray-200"
-                  >
-                    <p className="text-center font-semibold text-xl mb-3">
-                      {item.kpi_label}
-                    </p>
-
-                    <PieChart data={item.data} type={selectedType} />
-
-                    {allKpis.some((k) => k.parent_id === item.kpi_id) && (
-                      <Button
-                        label="ดูตามหัวข้อย่อย"
-                        onClick={() =>
-                          fetchSubKpiCharts(item.kpi_id, item.kpi_label)
-                        }
-                      />
-                    )}
-                  </div>
-                ))}
+        {pickerMode === "year" &&
+          (stackData?.length > 0 ? (
+            <div className="bg-white p-4 my-7 w-full rounded-xl shadow-md h-auto border-1 border-gray-200">
+              <BarChart data={stackData} type="stack" dataType={selectedType} />
             </div>
-          )}
-          {activeParentKpi && (
-            <div className="flex flex-wrap gap-5 mt-5">
-              {subCharts[activeParentKpi]
-                ?.filter((sub) => !isAllZero(sub.data))
-                .map((sub) => (
-                  <div
-                    key={sub.kpi_id}
-                    className="p-4 w-[450px] rounded-xl shadow-md border border-gray-200"
-                  >
-                    <p className="text-center font-medium text-lg mb-3">
-                      {sub.kpi_label}
-                    </p>
-                    <PieChart data={sub.data} type={selectedType} />
-                  </div>
-                ))}
-            </div>
-          )}
-        </div>
+          ) : (
+            <p>ไม่พบข้อมูล...</p>
+          ))}
 
-        {/* <div className="flex h-full">
-          <div>
-            <div className="flex justify-between gap-5">
-              <div className="bg-white p-4 my-7 w-full rounded-xl shadow-md h-auto border-1 border-gray-200">
-                <p className="text-center font-semibold text-md mb-3">
-                  Prescribing error
-                  (เกิดข้อผิดพลาด/อุบัติการณ์ในขั้นตอนการสั่งใช้ยา)
-                </p>
-                {chartData ? <PieChart data={chartData} /> : "Loading..."}
-              </div>
-              <div className="bg-white p-4 my-7 w-full rounded-xl shadow-md h-auto border-1 border-gray-200">
-                <p className="text-center font-semibold text-md mb-3">
-                  Transcribing error
-                  (เกิดข้อผิดพลาด/อุบัติการณ์ในขั้นตอนการคัดลอกยา)
-                </p>
-                {chartData ? <PieChart data={chartData} /> : "Loading..."}
-              </div>
-              <div className="bg-white p-4 my-7 w-full rounded-xl shadow-md h-auto border-1 border-gray-200">
-                <p className="text-center font-semibold text-md mb-3">
-                  Pre-dispensing(เกิดข้อผิดพลาด/อุบัติการณ์ในขั้นตอนการจัดเตรียมจ่ายยา)
-                </p>
-                {chartData ? <PieChart data={chartData} /> : "Loading..."}
-              </div>
-            </div>
+        {pickerMode === "month" && (
+          <div className="flex flex-wrap gap-5">
+            {loading && <p className="text-center">Loading...</p>}
 
-            <div className="flex justify-between gap-5">
-              <div className="bg-white p-4 w-full rounded-xl shadow-md h-auto border-1 border-gray-200">
-                <p className="text-center font-semibold text-md mb-3">
-                  Dispensing error
-                  (เกิดข้อผิดพลาด/อุบัติการณ์ในขั้นตอนการจ่ายยา)
-                </p>
-                {chartData ? <PieChart data={chartData} /> : "Loading..."}
+            {!activeParent && currentCharts?.length > 0 && (
+              <div className="flex flex-wrap gap-5">
+                {currentCharts
+                  .filter((item) => !isAllZero(item.data))
+                  .map((item) => (
+                    <KpiChartCard
+                      key={item.kpi_id}
+                      kpiId={item.kpi_id}
+                      label={item.kpi_label}
+                      data={item.data}
+                      selectedType={selectedType}
+                      hasChildren={allKpis.some(
+                        (k) => k.parent_id === item.kpi_id
+                      )}
+                      onOpenSub={(id) => fetchSubCharts(id)}
+                    />
+                  ))}
               </div>
-              <div className="bg-white p-4 w-full rounded-xl shadow-md h-auto border-1 border-gray-200">
-                <p className="text-center font-semibold text-md mb-3">
-                  Administration error
-                  (เกิดข้อผิดพลาด/อุบัติการณ์ในขั้นตอนการให้ยา)
-                </p>
-                {chartData ? <PieChart data={chartData} /> : "Loading..."}
+            )}
+            {activeParent && currentCharts?.length > 0 && (
+              <div className="flex flex-wrap gap-5">
+                {currentCharts
+                  .filter((sub) => !isAllZero(sub.data))
+                  .map((sub) => (
+                    <KpiChartCard
+                      key={sub.kpi_id}
+                      kpiId={sub.kpi_id}
+                      label={sub.kpi_label}
+                      data={sub.data}
+                      selectedType={selectedType}
+                    />
+                  ))}
               </div>
-            </div>
+            )}
           </div>
-        </div> */}
+        )}
       </div>
       <Footer />
     </div>

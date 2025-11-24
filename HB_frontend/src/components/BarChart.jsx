@@ -24,7 +24,7 @@ ChartJS.register(
   ChartDataLabels
 );
 
-const BarChart = ({ data, type, unitLabel }) => {
+const BarChart = ({ data, type, unitLabel, dataType }) => {
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -36,6 +36,20 @@ const BarChart = ({ data, type, unitLabel }) => {
 
   let labels = [];
   let datasets = [];
+
+  const colorsDetail = [
+    "#00B8D4",
+    "#00BFA5",
+    "#00C853",
+    "#64DD17",
+    "#AEEA00",
+    "#ffba00",
+    "#ff8904",
+    "#ff6540",
+    "#ff6467",
+  ];
+
+  const colorsGroup = ["#00B8D4", "#64DD17", "#ffba00", "#ff6467"];
 
   if (type === "kpi") {
     labels = data.map((item) => item.month);
@@ -105,9 +119,37 @@ const BarChart = ({ data, type, unitLabel }) => {
         borderWidth: 1,
       },
     ];
+  } else if (type === "stack") {
+    if (dataType === "detail") {
+      const fields = ["A", "B", "C", "D", "E", "F", "G", "H", "I"];
+      datasets = fields.map((f, idx) => ({
+        label: f,
+        data: data.map((item) => item[f]),
+        backgroundColor: colorsDetail[idx],
+        borderColor: "#fff",
+        borderWidth: 1,
+      }));
+    } else {
+      const fields = ["AB", "CD", "EF", "GHI"];
+      datasets = fields.map((f, idx) => ({
+        label: f,
+        data: data.map((item) => item[f]),
+        backgroundColor: colorsGroup[idx],
+        borderColor: "#fff",
+        borderWidth: 1,
+      }));
+    }
   }
+  let chartData;
 
-  const chartData = { labels, datasets };
+  if (type === "stack") {
+    chartData = {
+      labels: data.map((d) => d.month),
+      datasets,
+    };
+  } else {
+    chartData = { labels, datasets };
+  }
 
   const options = {
     indexAxis: isMobile ? "y" : "x",
@@ -133,13 +175,29 @@ const BarChart = ({ data, type, unitLabel }) => {
         font: { weight: "bold" },
       },
     },
-    scales: {
-      y: {
-        beginAtZero: true,
-        title: { display: type === "kpi", text: `ผลลัพธ์ (${unitLabel})` },
-      },
-      x: { title: { display: type === "kpi", text: "เดือน" } },
-    },
+    scales:
+      type === "stack"
+        ? {
+            y: {
+              stacked: true,
+              beginAtZero: true,
+            },
+            x: {
+              stacked: true,
+            },
+          }
+        : {
+            y: {
+              beginAtZero: true,
+              title: {
+                display: type === "kpi",
+                text: `ผลลัพธ์ (${unitLabel})`,
+              },
+            },
+            x: {
+              title: { display: type === "kpi", text: "เดือน" },
+            },
+          },
   };
 
   const chartHeight = isMobile ? data.length * 60 : 400;

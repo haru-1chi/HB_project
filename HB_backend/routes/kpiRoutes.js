@@ -31,11 +31,22 @@ router.put('/kpi-data-med', authAndRole(1, 2), kpiMedController.updateKPIMedErro
 router.get('/kpi-data-med', kpiMedController.getKPIMedData);
 router.delete('/kpi-data-med/:id', authAndRole(1, 2), kpiMedController.deleteKPIMedError);
 router.get('/kpi-data-med/chart', kpiMedController.getKPIMedPie);
+router.get('/kpi-data-med/stack', kpiMedController.getKPIMedStack);
 
-router.post('/opd-name', authAndRole(1, 2), opdController.createOPDName);
-router.put('/opd-name', authAndRole(1, 2), opdController.updateOPDName);
-router.delete('/opd-name/:id', authAndRole(1, 2), opdController.deleteOPDName);
-router.get('/opd-name', opdController.getOPDName);
+router.post('/mission-name', authAndRole(1, 2), opdController.missionGroupController.create);
+router.put('/mission-name', authAndRole(1, 2), opdController.missionGroupController.update);
+router.delete('/mission-name/:id', authAndRole(1, 2), opdController.missionGroupController.delete);
+router.get('/mission-name', opdController.missionGroupController.list);
+
+router.post('/work-name', authAndRole(1, 2), opdController.workGroupController.create);
+router.put('/work-name', authAndRole(1, 2), opdController.workGroupController.update);
+router.delete('/work-name/:id', authAndRole(1, 2), opdController.workGroupController.delete);
+router.get('/work-name', opdController.workGroupController.list);
+
+router.post('/opd-name', authAndRole(1, 2), opdController.opdController.create);
+router.put('/opd-name', authAndRole(1, 2), opdController.opdController.update);
+router.delete('/opd-name/:id', authAndRole(1, 2), opdController.opdController.delete);
+router.get('/opd-name', opdController.opdController.list);
 
 router.post('/kpi-quality', authAndRole(1, 2), qualityController.createKPIDataQuality);
 router.get('/kpi-quality', qualityController.getKPIDataQuality);
