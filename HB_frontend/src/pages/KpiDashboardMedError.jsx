@@ -36,13 +36,18 @@ function KpiDashboardMedError() {
   const API_BASE =
     import.meta.env.VITE_REACT_APP_API || "http://localhost:3000/api";
 
+  const [selectedMission, setSelectedMission] = useState(null);
+  const [selectedWork, setSelectedWork] = useState(null);
+  const [missionList, setMissionList] = useState([]);
+  const [workList, setWorkList] = useState([]);
   const [opdList, setOpdList] = useState([]);
+
   const [allKpis, setAllKpis] = useState([]);
   const [charts, setCharts] = useState({});
   const [stackData, setStackData] = useState({});
   const [loading, setLoading] = useState(false);
   const [activeParent, setActiveParent] = useState(null);
-  const [error, setError] = useState(null);
+
   // Filters
   const now = new Date();
   const [pickerMode, setPickerMode] = useState("month");
@@ -52,14 +57,6 @@ function KpiDashboardMedError() {
   const [sinceDate, setSinceDate] = useState(new Date(now.getFullYear(), 0, 1));
   const [endDate, setEndDate] = useState(now);
 
-   const formatDate = (date) =>
-    date
-      ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
-          2,
-          "0"
-        )}-01`
-      : null;
-      
   const parentKpis = useMemo(
     () => allKpis.filter((k) => k.parent_id === null),
     [allKpis]
@@ -74,7 +71,13 @@ function KpiDashboardMedError() {
     [allKpis]
   );
 
- 
+  const formatDate = (date) =>
+    date
+      ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+          2,
+          "0"
+        )}-01`
+      : null;
 
   const fetchChart = useCallback(
     (kpiId) =>
@@ -135,10 +138,11 @@ function KpiDashboardMedError() {
           kpi_id: selectedKPI,
           opd_id: selectedOPD,
           sinceDate: formatDate(sinceDate),
-          endDate: formatDate(endDate),
+          endDate: endDate,
           type: selectedType, // detail or group
         },
       });
+      console.log(endDate);
       setStackData(res.data);
     } catch (err) {
       console.error("❌ Error fetching stacked bar chart:", err);
@@ -147,12 +151,34 @@ function KpiDashboardMedError() {
 
   useEffect(() => {
     const fetchNames = async () => {
-      const [resOPD, resKPI] = await Promise.all([
+      const [resMission, resWork, resOPD, resKPI] = await Promise.all([
+        axios.get(`${API_BASE}/mission-name`, {
+          params: { includeDeleted: true },
+        }),
+        axios.get(`${API_BASE}/work-name`, {
+          params: { includeDeleted: true },
+        }),
         axios.get(`${API_BASE}/opd-name`, {
           params: { includeDeleted: true },
         }),
         axios.get(`${API_BASE}/kpi-name-med`),
       ]);
+
+      setMissionList(
+        resMission.data
+          .filter((i) => !i.deleted_at)
+          .map((i) => ({ label: i.mission_name, value: i.id }))
+      );
+
+      setWorkList(
+        resWork.data
+          .filter((i) => !i.deleted_at)
+          .map((i) => ({
+            label: i.work_name,
+            value: i.id,
+            mission_id: i.mission_id,
+          }))
+      );
 
       setOpdList(
         resOPD.data
@@ -160,8 +186,10 @@ function KpiDashboardMedError() {
           .map((i) => ({
             label: i.opd_name,
             value: i.id,
+            work_id: i.work_id,
           }))
       );
+
       setAllKpis(resKPI.data);
 
       if (resKPI.data?.length > 0 && !selectedKPI) {
@@ -179,10 +207,15 @@ function KpiDashboardMedError() {
   }, [fetchParentCharts, fetchSubCharts]);
 
   useEffect(() => {
+    if (pickerMode === "year") {
+      const currentYear = now.getFullYear();
+      setEndDate(new Date(currentYear, 11, 31, 23, 59, 59));
+    }
+  }, [pickerMode]);
+
+  useEffect(() => {
     if (pickerMode !== "year") return;
     if (!selectedKPI) return;
-    console.log("selectedKPI?.value", selectedKPI?.value);
-
     fetchStackChart();
   }, [pickerMode, selectedKPI, selectedOPD, sinceDate, endDate, selectedType]);
 
@@ -237,7 +270,6 @@ function KpiDashboardMedError() {
                 onChange={(e) => setPickerMode(e.value)}
                 options={[
                   { label: "เดือน", value: "month" },
-                  { label: "ไตรมาส", value: "quarter" },
                   { label: "ปี", value: "year" },
                 ]}
                 optionLabel="label"
@@ -270,7 +302,10 @@ function KpiDashboardMedError() {
                 <>
                   <Calendar
                     value={sinceDate}
-                    onChange={(e) => setSinceDate(e.value)}
+                    onChange={(e) => {
+                      const selectedYear = e.value.getFullYear();
+                      setSinceDate(new Date(selectedYear, 0, 1, 0, 0, 0));
+                    }}
                     view="year"
                     dateFormat="yy"
                     className="mr-3 w-50"
@@ -279,7 +314,10 @@ function KpiDashboardMedError() {
                   <p> - </p>
                   <Calendar
                     value={endDate}
-                    onChange={(e) => setEndDate(e.value)}
+                    onChange={(e) => {
+                      const selectedYear = e.value.getFullYear();
+                      setEndDate(new Date(selectedYear, 11, 31, 23, 59, 59));
+                    }}
                     view="year"
                     dateFormat="yy"
                     className="ml-3 w-50"
@@ -296,19 +334,48 @@ function KpiDashboardMedError() {
                     options={kpiOptions}
                     optionLabel="label"
                     placeholder="เลือก KPI"
-                    className="min-w-xs mr-3"
+                    className="min-w-xs mr-5"
                     onChange={(e) => setSelectedKPI(e.value)}
                     filter
                     filterDelay={400}
                   />
                 )}
+                {/* Mission dropdown */}
+                <Dropdown
+                  value={selectedMission}
+                  onChange={(e) => {
+                    setSelectedMission(e.value);
+                    setSelectedWork(null); // reset work selection
+                  }}
+                  options={missionList}
+                  optionLabel="label"
+                  placeholder="เลือก กลุ่มภารกิจ"
+                  className="mr-3"
+                  filter
+                  filterDelay={400}
+                />
+
+                {/* Work dropdown filtered by selectedMission */}
+                <Dropdown
+                  value={selectedWork}
+                  onChange={(e) => setSelectedWork(e.value)}
+                  options={workList.filter(
+                    (w) => w.mission_id === selectedMission
+                  )}
+                  optionLabel="label"
+                  className="mr-3"
+                  placeholder="เลือก กลุ่มงาน"
+                  filter
+                  filterDelay={400}
+                />
+
+                {/* OPD dropdown filtered by selectedWork */}
                 <Dropdown
                   value={selectedOPD}
                   onChange={(e) => setSelectedOPD(e.value)}
-                  options={opdList}
+                  options={opdList.filter((o) => o.work_id === selectedWork)}
                   optionLabel="label"
-                  placeholder="เลือก OPD"
-                  className="w-full"
+                  placeholder="เลือก หน่วยงาน"
                   filter
                   filterDelay={400}
                 />
@@ -332,7 +399,7 @@ function KpiDashboardMedError() {
         </div>
         {pickerMode === "year" &&
           (stackData?.length > 0 ? (
-            <div className="bg-white p-4 my-7 w-full rounded-xl shadow-md h-auto border-1 border-gray-200">
+            <div className="p-4 my-7 w-full rounded-xl shadow-md h-auto border-1 border-gray-200">
               <BarChart data={stackData} type="stack" dataType={selectedType} />
             </div>
           ) : (

@@ -185,6 +185,56 @@ exports.getKPIMedName = async (req, res) => {
         });
     }
 };
+// exports.getKPIMedName = async (req, res) => {
+//     try {
+//         const includeDeleted = req.query.includeDeleted === "true";
+
+//         const sql = `
+//       SELECT id, kpi_name, parent_id
+//       FROM kpi_name_med
+//       ${includeDeleted ? "" : "WHERE deleted_at IS NULL"}
+//     `;
+
+//         const rows = await query(sql);
+
+//         // No data → return empty list
+//         if (!rows || rows.length === 0) {
+//             return res.status(200).json([]);
+//         }
+
+//         // Single pass mapping
+//         const lookup = new Map();
+//         const roots = [];
+
+//         // Initialize lookup with node objects
+//         for (const row of rows) {
+//             lookup.set(row.id, { ...row, children: [] });
+//         }
+
+//         // Build the tree in one loop
+//         for (const row of rows) {
+//             const node = lookup.get(row.id);
+
+//             if (row.parent_id) {
+//                 const parent = lookup.get(row.parent_id);
+//                 if (parent) parent.children.push(node);
+//             } else {
+//                 roots.push(node);
+//             }
+//         }
+
+//         return res.status(200).json(roots);
+
+//     } catch (err) {
+//         console.error("❌ Error fetching KPI names:", err);
+//         return res.status(500).json({
+//             success: false,
+//             message: "Failed to fetch KPI names",
+//             error: err.message,
+//         });
+//     }
+// };
+
 
 //--------------------------------------
 exports.createKPIMedError = async (req, res) => {
@@ -448,6 +498,7 @@ exports.getKPIMedData = async (req, res) => {
     }
 };
 
+
 exports.getKPIMedPie = async (req, res) => {
     try {
         const { sinceDate, endDate, kpi_id, opd_id, type } = req.query;
@@ -570,11 +621,131 @@ exports.getKPIMedPie = async (req, res) => {
     }
 };
 
+// exports.getKPIMedPie = async (req, res) => {
+//     try {
+//         const { sinceDate, endDate, opd_id, type } = req.query;
+//         const mode = (type || "detail").trim();
+
+//         const detailFields = ["A", "B", "C", "D", "E", "F", "G", "H", "I"];
+
+//         // Format WHERE conditions only once
+//         const conditions = [];
+//         const params = [];
+
+//         if (sinceDate) {
+//             conditions.push("report_date >= ?");
+//             params.push(sinceDate);
+//         }
+//         if (endDate) {
+//             conditions.push("report_date <= ?");
+//             params.push(endDate);
+//         }
+//         if (opd_id) {
+//             conditions.push("opd_id = ?");
+//             params.push(opd_id);
+//         }
+
+//         const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
+//         // 1️⃣ Load all KPI names (parent + child)
+//         const allKpis = await query(`
+//       SELECT id, kpi_name, parent_id
+//       FROM kpi_name_med
+//       WHERE deleted_at IS NULL
+//     `);
+
+//         if (!allKpis.length) return res.json([]);
+
+//         // 2️⃣ Load all KPI SUM values (single query)
+//         const sumSql = `
+//       SELECT 
+//         kpi_id,
+//         ${detailFields.map(f => `SUM(${f}) AS ${f}`).join(", ")}
+//       FROM kpi_med_error
+//       ${whereClause}
+//       GROUP BY kpi_id
+//     `;
+
+//         const sumData = await query(sumSql, params);
+
+//         // Convert into a lookup table
+//         const sumLookup = new Map();
+//         for (const row of sumData) {
+//             sumLookup.set(row.kpi_id, row);
+//         }
+
+//         // 3️⃣ Turn raw SUM rows into mapped values (group or detail)
+//         const mapFields = (row) => {
+//             if (!row) return {};
+
+//             if (mode === "detail") {
+//                 const result = {};
+//                 for (const f of detailFields) result[f] = row[f] ?? 0;
+//                 return result;
+//             }
+
+//             return {
+//                 AB: (row.A ?? 0) + (row.B ?? 0),
+//                 CD: (row.C ?? 0) + (row.D ?? 0),
+//                 EF: (row.E ?? 0) + (row.F ?? 0),
+//                 GHI: (row.G ?? 0) + (row.H ?? 0) + (row.I ?? 0),
+//             };
+//         };
+
+//         // 4️⃣ Build lookup for all KPI nodes
+//         const lookup = new Map();
+//         for (const kpi of allKpis) {
+//             lookup.set(kpi.id, {
+//                 ...kpi,
+//                 data: mapFields(sumLookup.get(kpi.id)),
+//                 children: [],
+//             });
+//         }
+
+//         // 5️⃣ Build tree in memory
+//         const parents = [];
+//         for (const kpi of lookup.values()) {
+//             if (kpi.parent_id) {
+//                 const parent = lookup.get(kpi.parent_id);
+//                 if (parent) parent.children.push(kpi);
+//             } else {
+//                 parents.push(kpi);
+//             }
+//         }
+
+//         // 6️⃣ Aggregate children values upward
+//         const addChildSum = (parent) => {
+//             for (const child of parent.children) {
+//                 addChildSum(child);
+
+//                 for (const key in child.data) {
+//                     parent.data[key] = (parent.data[key] ?? 0) + (child.data[key] ?? 0);
+//                 }
+//             }
+//         };
+
+//         for (const p of parents) addChildSum(p);
+
+//         // 7️⃣ Filter out parents that have all 0 values (including children)
+//         const filtered = parents.filter((p) => {
+//             return Object.values(p.data).some(v => v !== 0);
+//         });
+
+//         return res.json(filtered);
+
+//     } catch (err) {
+//         console.error("❌ Error fetching KPI pie:", err);
+//         return res.status(500).json({
+//             error: "Error fetching KPI pie",
+//             message: err.message,
+//         });
+//     }
+// };
+
 
 exports.getKPIMedStack = async (req, res) => {
     try {
         const { sinceDate, endDate, kpi_id, opd_id, type } = req.query;
-
         const kpiId = Number(kpi_id);
         const mode = (type || "detail").trim();   // "detail" or "group"
 
