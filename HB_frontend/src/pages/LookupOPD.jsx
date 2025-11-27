@@ -10,7 +10,7 @@ import { Dialog } from "primereact/dialog";
 import { IconField } from "primereact/iconfield";
 import { Dropdown } from "primereact/dropdown";
 import { InputIcon } from "primereact/inputicon";
-import { InputNumber } from "primereact/inputnumber";
+import { AutoComplete } from "primereact/autocomplete";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faTrash,
@@ -35,12 +35,9 @@ function LookupOPD() {
   const [dialogVisible, setDialogVisible] = useState(false);
   const [allKPIChoices, setAllKPIChoices] = useState([]); //rename
   const [activeIndex, setActiveIndex] = useState(0);
-  const [activeTab, setActiveTab] = useState("mission");
+  const [activeTab, setActiveTab] = useState("opd");
   const [formValues, setFormValues] = useState({});
-  const [editRowId, setEditRowId] = useState(null);
-  const [editValues, setEditValues] = useState({
-    opd_name: "",
-  });
+
   const [editMissionId, setEditMissionId] = useState(null);
   const [editMissionValues, setEditMissionValues] = useState({
     mission_name: "",
@@ -54,6 +51,38 @@ function LookupOPD() {
 
   const [formErrors, setFormErrors] = useState({});
 
+  const formConfig = {
+    mission: [
+      { field: "mission_name", label: "ชื่อกลุ่มภารกิจ", type: "text" },
+    ],
+
+    work: [
+      {
+        field: "mission_id",
+        label: "ชื่อกลุ่มภารกิจ",
+        type: "autocomplete",
+        source: "mission",
+      },
+      { field: "work_name", label: "ชื่อกลุ่มงาน", type: "text" },
+    ],
+
+    opd: [
+      {
+        field: "mission_id",
+        label: "ชื่อกลุ่มภารกิจ",
+        type: "autocomplete",
+        source: "mission",
+      },
+      {
+        field: "work_id",
+        label: "ชื่อกลุ่มงาน",
+        type: "autocomplete",
+        source: "work",
+      },
+      { field: "opd_name", label: "ชื่อหน่วยงาน", type: "text" },
+    ],
+  };
+
   const toast = useRef(null);
   const token = localStorage.getItem("token");
 
@@ -66,20 +95,31 @@ function LookupOPD() {
     });
   };
 
+  const [suggestions, setSuggestions] = useState({});
+
+  const searchSuggestion = (field, query) => {
+    let list = [];
+
+    if (field === "mission_id") {
+      list = missionList.map((m) => ({ label: m.mission_name, id: m.id }));
+    }
+
+    if (field === "work_id") {
+      list = workList.map((w) => ({ label: w.work_name, id: w.id }));
+    }
+
+    setSuggestions((prev) => ({
+      ...prev,
+      [field]: list.filter((item) =>
+        item.label.toLowerCase().includes(query.toLowerCase())
+      ),
+    }));
+  };
+
   const missionOptions = missionList.map((m) => ({
     label: m.mission_name,
     value: m.id,
   }));
-
-  const fetchKPInames = useCallback(async () => {
-    try {
-      const res = await axios.get(`${API_BASE}/opd-name`);
-      setAllKPIChoices(res.data);
-    } catch (err) {
-      showToast("error", "ผิดพลาด", "ไม่สามารถดึงข้อมูลได้");
-      console.error(err);
-    }
-  }, []);
 
   const fetchMissions = useCallback(async () => {
     const res = await axios.get(`${API_BASE}/mission-name`);
@@ -660,53 +700,56 @@ function LookupOPD() {
           onHide={() => setDialogVisible(false)}
           style={{ width: "50vw" }}
         >
-          {Object.keys(formValues).map((field, idx) => (
-            <div key={idx} className="mt-3">
-              <label htmlFor={field}>
-                {field === "mission_name"
-                  ? "ชื่อกลุ่มภารกิจ"
-                  : field === "work_name"
-                  ? "ชื่อกลุ่มงาน"
-                  : field === "opd_name"
-                  ? "ชื่อหน่วยงาน"
-                  : field === "mission_id"
-                  ? "กลุ่มภารกิจ"
-                  : field === "work_id"
-                  ? "กลุ่มงาน"
-                  : field}
-              </label>
-              {field === "mission_id" || field === "work_id" ? (
-                <Dropdown
-                  value={formValues[field]}
-                  options={
-                    field === "mission_id"
-                      ? missionList.map((m) => ({
-                          label: m.mission_name,
-                          value: m.id,
-                        }))
-                      : workList.map((w) => ({
-                          label: w.work_name,
-                          value: w.id,
-                        }))
-                  }
-                  onChange={(e) =>
-                    setFormValues({ ...formValues, [field]: e.value })
-                  }
-                  placeholder="เลือก"
-                  className={`w-full ${formErrors[field] ? "p-invalid" : ""}`}
-                />
-              ) : (
+          {formConfig[activeTab].map((cfg) => (
+            <div key={cfg.field} className="mt-3">
+              <label>{cfg.label}</label>
+
+              {cfg.type === "text" && (
                 <InputText
-                  id={field}
-                  value={formValues[field]}
+                  value={formValues[cfg.field] || ""}
                   onChange={(e) =>
-                    setFormValues({ ...formValues, [field]: e.target.value })
+                    setFormValues({
+                      ...formValues,
+                      [cfg.field]: e.target.value,
+                    })
                   }
-                  className={`w-full ${formErrors[field] ? "p-invalid" : ""}`}
+                  className={`w-full ${
+                    formErrors[cfg.field] ? "p-invalid" : ""
+                  }`}
                 />
               )}
-              {formErrors[field] && (
-                <small className="p-error">{formErrors[field]}</small>
+
+              {cfg.type === "autocomplete" && (
+                <AutoComplete
+                  dropdown
+                  value={
+                    // If stored as ID, convert to label for display
+                    suggestions[cfg.field]?.find(
+                      (x) => x.id === formValues[cfg.field]
+                    ) ||
+                    formValues[cfg.field] ||
+                    null
+                  }
+                  suggestions={suggestions[cfg.field] || []}
+                  completeMethod={(e) => searchSuggestion(cfg.field, e.query)}
+                  field="label"
+                  forceSelection={false}
+                  onChange={(e) => {
+                    setFormValues({
+                      ...formValues,
+                      [cfg.field]:
+                        typeof e.value === "object" ? e.value.id : e.value,
+                    });
+                  }}
+                  placeholder="ค้นหา หรือพิมพ์เพิ่ม"
+                  className={`w-full ${
+                    formErrors[cfg.field] ? "p-invalid" : ""
+                  }`}
+                />
+              )}
+
+              {formErrors[cfg.field] && (
+                <small className="p-error">{formErrors[cfg.field]}</small>
               )}
             </div>
           ))}

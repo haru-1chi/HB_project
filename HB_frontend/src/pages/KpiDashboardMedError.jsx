@@ -3,15 +3,8 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Dropdown } from "primereact/dropdown";
 import { Calendar } from "primereact/calendar";
 import { BreadCrumb } from "primereact/breadcrumb";
-import { DataTable } from "primereact/datatable";
-import { Column } from "primereact/column";
-import { ColumnGroup } from "primereact/columngroup";
-import { Row } from "primereact/row";
+import { TreeSelect } from "primereact/treeselect";
 import { Button } from "primereact/button";
-import { Fieldset } from "primereact/fieldset";
-import { Card } from "primereact/card";
-import { Panel } from "primereact/panel";
-import GaugeChart from "../components/GaugeChart";
 import PieChart from "../components/PieChart";
 import KpiChartCard from "../components/KpiChartCard";
 import BarChart from "../components/BarChart";
@@ -30,7 +23,6 @@ import {
 } from "../utils/dateTime";
 import { sumField, exportToExcel } from "../utils/exportUtils";
 import { ScrollTop } from "primereact/scrolltop";
-import { classNames } from "primereact/utils";
 
 function KpiDashboardMedError() {
   const API_BASE =
@@ -57,11 +49,6 @@ function KpiDashboardMedError() {
   const [sinceDate, setSinceDate] = useState(new Date(now.getFullYear(), 0, 1));
   const [endDate, setEndDate] = useState(now);
 
-  const parentKpis = useMemo(
-    () => allKpis.filter((k) => k.parent_id === null),
-    [allKpis]
-  );
-
   const kpiOptions = useMemo(
     () =>
       allKpis.map((k) => ({
@@ -79,57 +66,39 @@ function KpiDashboardMedError() {
         )}-01`
       : null;
 
-  const fetchChart = useCallback(
-    (kpiId) =>
-      axios.get(`${API_BASE}/kpi-data-med/chart`, {
+  const fetchChart = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API_BASE}/kpi-data-med/chart`, {
         params: {
-          kpi_id: kpiId,
-          opd_id: selectedOPD,
+          mission_id: selectedMission === "all" ? null : selectedMission,
+          work_id: selectedWork === "all" ? null : selectedWork,
+          opd_id: selectedOPD === "all" ? null : selectedOPD,
           sinceDate: formatDate(sinceDate),
           endDate: formatDate(endDate),
           type: selectedType,
         },
-      }),
-    [API_BASE, selectedOPD, selectedType, sinceDate, endDate]
-  );
+      });
 
-  const fetchParentCharts = useCallback(async () => {
-    if (!parentKpis.length) return;
+      setCharts(res.data || []);
+    } catch (err) {
+      console.error("❌ Error fetching stacked bar chart:", err);
+    }
+  }, [
+    API_BASE,
+    selectedOPD,
+    selectedType,
+    sinceDate,
+    endDate,
+    selectedMission,
+    selectedWork,
+  ]);
 
-    const responses = await Promise.all(
-      parentKpis.map((k) =>
-        fetchChart(k.id).then((res) => ({
-          kpi_id: k.id,
-          kpi_label: k.kpi_name,
-          data: res.data,
-        }))
-      )
-    );
-
-    setCharts((prev) => ({ ...prev, root: responses }));
-  }, [parentKpis, fetchChart]);
-
-  const fetchSubCharts = useCallback(
-    async (parentId) => {
-      const children = allKpis.filter((k) => k.parent_id === parentId);
-      if (!children.length) return;
-
-      setActiveParent(parentId);
-
-      const responses = await Promise.all(
-        children.map((k) =>
-          fetchChart(k.id).then((res) => ({
-            kpi_id: k.id,
-            kpi_label: k.kpi_name,
-            data: res.data,
-          }))
-        )
-      );
-
-      setCharts((prev) => ({ ...prev, [parentId]: responses }));
-    },
-    [allKpis, fetchChart]
-  );
+  useEffect(() => {
+    fetchChart();
+    console.log("selectedMission", selectedMission);
+    console.log("selectedWork", selectedWork);
+    console.log("selectedOPD", selectedOPD);
+  }, [fetchChart]);
 
   const fetchStackChart = async () => {
     try {
@@ -149,6 +118,17 @@ function KpiDashboardMedError() {
     }
   };
 
+  const convertToTreeNodes = (list) => {
+    return list.map((node) => ({
+      key: String(node.id),
+      label: node.kpi_name,
+      data: node.id,
+      ...(node.children?.length
+        ? { children: convertToTreeNodes(node.children) }
+        : {}),
+    }));
+  };
+
   useEffect(() => {
     const fetchNames = async () => {
       const [resMission, resWork, resOPD, resKPI] = await Promise.all([
@@ -164,33 +144,37 @@ function KpiDashboardMedError() {
         axios.get(`${API_BASE}/kpi-name-med`),
       ]);
 
-      setMissionList(
-        resMission.data
+      setMissionList([
+        { label: "ทั้งหมด", value: "all" },
+        ...resMission.data
           .filter((i) => !i.deleted_at)
-          .map((i) => ({ label: i.mission_name, value: i.id }))
-      );
+          .map((i) => ({ label: i.mission_name, value: i.id })),
+      ]);
 
-      setWorkList(
-        resWork.data
+      setWorkList([
+        { label: "ทั้งหมด", value: "all" },
+        ...resWork.data
           .filter((i) => !i.deleted_at)
           .map((i) => ({
             label: i.work_name,
             value: i.id,
             mission_id: i.mission_id,
-          }))
-      );
+          })),
+      ]);
 
-      setOpdList(
-        resOPD.data
+      setOpdList([
+        { label: "ทั้งหมด", value: "all" },
+        ...resOPD.data
           .filter((i) => !i.deleted_at)
           .map((i) => ({
             label: i.opd_name,
             value: i.id,
             work_id: i.work_id,
-          }))
-      );
+          })),
+      ]);
 
-      setAllKpis(resKPI.data);
+      const tree = convertToTreeNodes(resKPI.data);
+      setAllKpis(tree);
 
       if (resKPI.data?.length > 0 && !selectedKPI) {
         setSelectedKPI(resKPI.data[0].id);
@@ -199,12 +183,6 @@ function KpiDashboardMedError() {
 
     fetchNames();
   }, [API_BASE]);
-
-  useEffect(() => {
-    fetchParentCharts();
-
-    if (activeParent) fetchSubCharts(activeParent);
-  }, [fetchParentCharts, fetchSubCharts]);
 
   useEffect(() => {
     if (pickerMode === "year") {
@@ -219,11 +197,14 @@ function KpiDashboardMedError() {
     fetchStackChart();
   }, [pickerMode, selectedKPI, selectedOPD, sinceDate, endDate, selectedType]);
 
-  const currentCharts = activeParent ? charts[activeParent] : charts.root;
-
   const isAllZero = (obj) =>
     !obj || Object.values(obj).every((v) => Number(v) === 0);
 
+  const parentCharts = charts;
+
+  const currentCharts = activeParent
+    ? parentCharts.find((p) => p.id === activeParent)?.children || []
+    : parentCharts;
   return (
     <div className="Home-page overflow-hidden min-h-dvh flex flex-col justify-between">
       <ScrollTop />
@@ -329,23 +310,33 @@ function KpiDashboardMedError() {
             <div className="flex">
               <div className="hidden sm:block  mr-5">
                 {pickerMode === "year" && (
-                  <Dropdown
+                  <TreeSelect
                     value={selectedKPI}
-                    options={kpiOptions}
-                    optionLabel="label"
-                    placeholder="เลือก KPI"
-                    className="min-w-xs mr-5"
                     onChange={(e) => setSelectedKPI(e.value)}
+                    options={allKpis} // from API
+                    placeholder="Select KPI"
+                    className="mr-5"
                     filter
-                    filterDelay={400}
                   />
+
+                  // <Dropdown
+                  //   value={selectedKPI}
+                  //   options={kpiOptions}
+                  //   optionLabel="label"
+                  //   placeholder="เลือก KPI"
+                  //   className="min-w-xs mr-5"
+                  //   onChange={(e) => setSelectedKPI(e.value)}
+                  //   filter
+                  //   filterDelay={400}
+                  // />
                 )}
-                {/* Mission dropdown */}
+
                 <Dropdown
                   value={selectedMission}
                   onChange={(e) => {
                     setSelectedMission(e.value);
-                    setSelectedWork(null); // reset work selection
+                    setSelectedWork(null);
+                    setSelectedOPD(null);
                   }}
                   options={missionList}
                   optionLabel="label"
@@ -355,13 +346,21 @@ function KpiDashboardMedError() {
                   filterDelay={400}
                 />
 
-                {/* Work dropdown filtered by selectedMission */}
                 <Dropdown
                   value={selectedWork}
-                  onChange={(e) => setSelectedWork(e.value)}
-                  options={workList.filter(
-                    (w) => w.mission_id === selectedMission
-                  )}
+                  onChange={(e) => {
+                    setSelectedWork(e.value);
+                    setSelectedOPD(null);
+                  }}
+                  options={
+                    selectedMission === "all"
+                      ? workList
+                      : workList.filter(
+                          (w) =>
+                            w.mission_id === selectedMission ||
+                            w.value === "all"
+                        )
+                  }
                   optionLabel="label"
                   className="mr-3"
                   placeholder="เลือก กลุ่มงาน"
@@ -369,11 +368,16 @@ function KpiDashboardMedError() {
                   filterDelay={400}
                 />
 
-                {/* OPD dropdown filtered by selectedWork */}
                 <Dropdown
                   value={selectedOPD}
                   onChange={(e) => setSelectedOPD(e.value)}
-                  options={opdList.filter((o) => o.work_id === selectedWork)}
+                  options={
+                    selectedWork === "all"
+                      ? opdList
+                      : opdList.filter(
+                          (o) => o.work_id === selectedWork || o.value === "all"
+                        )
+                  }
                   optionLabel="label"
                   placeholder="เลือก หน่วยงาน"
                   filter
@@ -407,37 +411,35 @@ function KpiDashboardMedError() {
           ))}
 
         {pickerMode === "month" && (
-          <div className="flex flex-wrap gap-5">
+          <div>
             {loading && <p className="text-center">Loading...</p>}
 
             {!activeParent && currentCharts?.length > 0 && (
-              <div className="flex flex-wrap gap-5">
+              <div className="grid grid-cols-3 gap-5">
                 {currentCharts
                   .filter((item) => !isAllZero(item.data))
                   .map((item) => (
                     <KpiChartCard
-                      key={item.kpi_id}
-                      kpiId={item.kpi_id}
-                      label={item.kpi_label}
+                      key={item.id}
+                      kpiId={item.id}
+                      label={item.kpi_name}
                       data={item.data}
                       selectedType={selectedType}
-                      hasChildren={allKpis.some(
-                        (k) => k.parent_id === item.kpi_id
-                      )}
-                      onOpenSub={(id) => fetchSubCharts(id)}
+                      hasChildren={item.children?.length > 0}
+                      onOpenSub={() => setActiveParent(item.id)}
                     />
                   ))}
               </div>
             )}
             {activeParent && currentCharts?.length > 0 && (
-              <div className="flex flex-wrap gap-5">
+              <div className="grid grid-cols-3 gap-5">
                 {currentCharts
                   .filter((sub) => !isAllZero(sub.data))
                   .map((sub) => (
                     <KpiChartCard
-                      key={sub.kpi_id}
-                      kpiId={sub.kpi_id}
-                      label={sub.kpi_label}
+                      key={sub.id}
+                      kpiId={sub.id}
+                      label={sub.kpi_name}
                       data={sub.data}
                       selectedType={selectedType}
                     />

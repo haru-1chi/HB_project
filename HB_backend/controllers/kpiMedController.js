@@ -163,77 +163,77 @@ exports.deleteKPINameMed = async (req, res) => {
 };
 
 
-exports.getKPIMedName = async (req, res) => {
-    try {
-        const includeDeleted = req.query.includeDeleted === "true";
-
-        const sql = `
-      SELECT *
-      FROM kpi_name_med
-      ${includeDeleted ? "" : "WHERE deleted_at IS NULL"}
-    `;
-
-        const result = await query(sql);
-
-        res.status(200).json(result || []);
-    } catch (err) {
-        console.error("❌ Error fetching KPI names:", err);
-        res.status(500).json({
-            success: false,
-            message: "Failed to fetch KPI names",
-            error: err.message,
-        });
-    }
-};
 // exports.getKPIMedName = async (req, res) => {
 //     try {
 //         const includeDeleted = req.query.includeDeleted === "true";
 
 //         const sql = `
-//       SELECT id, kpi_name, parent_id
+//       SELECT *
 //       FROM kpi_name_med
 //       ${includeDeleted ? "" : "WHERE deleted_at IS NULL"}
 //     `;
 
-//         const rows = await query(sql);
+//         const result = await query(sql);
 
-//         // No data → return empty list
-//         if (!rows || rows.length === 0) {
-//             return res.status(200).json([]);
-//         }
-
-//         // Single pass mapping
-//         const lookup = new Map();
-//         const roots = [];
-
-//         // Initialize lookup with node objects
-//         for (const row of rows) {
-//             lookup.set(row.id, { ...row, children: [] });
-//         }
-
-//         // Build the tree in one loop
-//         for (const row of rows) {
-//             const node = lookup.get(row.id);
-
-//             if (row.parent_id) {
-//                 const parent = lookup.get(row.parent_id);
-//                 if (parent) parent.children.push(node);
-//             } else {
-//                 roots.push(node);
-//             }
-//         }
-
-//         return res.status(200).json(roots);
-
+//         res.status(200).json(result || []);
 //     } catch (err) {
 //         console.error("❌ Error fetching KPI names:", err);
-//         return res.status(500).json({
+//         res.status(500).json({
 //             success: false,
 //             message: "Failed to fetch KPI names",
 //             error: err.message,
 //         });
 //     }
 // };
+exports.getKPIMedName = async (req, res) => {
+    try {
+        const includeDeleted = req.query.includeDeleted === "true";
+
+        const sql = `
+      SELECT id, kpi_name, parent_id
+      FROM kpi_name_med
+      ${includeDeleted ? "" : "WHERE deleted_at IS NULL"}
+    `;
+
+        const rows = await query(sql);
+
+        // No data → return empty list
+        if (!rows || rows.length === 0) {
+            return res.status(200).json([]);
+        }
+
+        // Single pass mapping
+        const lookup = new Map();
+        const roots = [];
+
+        // Initialize lookup with node objects
+        for (const row of rows) {
+            lookup.set(row.id, { ...row, children: [] });
+        }
+
+        // Build the tree in one loop
+        for (const row of rows) {
+            const node = lookup.get(row.id);
+
+            if (row.parent_id) {
+                const parent = lookup.get(row.parent_id);
+                if (parent) parent.children.push(node);
+            } else {
+                roots.push(node);
+            }
+        }
+
+        return res.status(200).json(roots);
+
+    } catch (err) {
+        console.error("❌ Error fetching KPI names:", err);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch KPI names",
+            error: err.message,
+        });
+    }
+};
 
 
 //--------------------------------------
@@ -499,239 +499,118 @@ exports.getKPIMedData = async (req, res) => {
 };
 
 
-exports.getKPIMedPie = async (req, res) => {
-    try {
-        const { sinceDate, endDate, kpi_id, opd_id, type } = req.query;
-
-        const kpiId = Number(kpi_id);
-        if (!kpiId) {
-            return res.status(400).json({ error: "Missing or invalid KPI ID" });
-        }
-
-        const mode = (type || "detail").trim();
-
-        /**
-         * 1️⃣ Fetch all related KPIs (recursive CTE)
-         *    Return early if none found – avoids useless queries.
-         */
-        const kpiRows = await query(
-            `
-            WITH RECURSIVE kpi_tree AS (
-                SELECT id, parent_id
-                FROM kpi_name_med
-                WHERE id = ?
-
-                UNION ALL
-
-                SELECT k.id, k.parent_id
-                FROM kpi_name_med k
-                JOIN kpi_tree t ON k.parent_id = t.id
-                WHERE k.deleted_at IS NULL
-            )
-            SELECT id FROM kpi_tree;
-            `,
-            [kpiId]
-        );
-
-        if (!kpiRows.length) {
-            return res.status(200).json({});
-        }
-
-        const targetKpiIds = kpiRows.map(r => r.id);
-
-        /**
-         * 2️⃣ Build WHERE clause efficiently (no repeated .map(), no string churn)
-         */
-        const whereParts = [`kpi_id IN (${Array(targetKpiIds.length).fill('?').join(',')})`];
-        const params = [...targetKpiIds];
-
-        if (sinceDate) {
-            whereParts.push(`report_date >= DATE_FORMAT(?, '%Y-%m-01')`);
-            params.push(sinceDate);
-        }
-
-        if (endDate) {
-            whereParts.push(`report_date <= LAST_DAY(DATE_FORMAT(?, '%Y-%m-01'))`);
-            params.push(endDate);
-        }
-
-        if (opd_id) {
-            whereParts.push(`opd_id = ?`);
-            params.push(opd_id);
-        }
-
-        const whereSQL = `WHERE ${whereParts.join(' AND ')}`;
-
-        /**
-         * 3️⃣ Precompute SELECT field template
-         *    Keeps SQL engine work minimal.
-         */
-        const SELECT_FIELDS =
-            mode === "group"
-                ? `
-                    SUM(A + B) AS AB,
-                    SUM(C + D) AS CD,
-                    SUM(E + F) AS EF,
-                    SUM(G + H + I) AS GHI
-                  `
-                : `
-                    SUM(A) AS A, SUM(B) AS B, SUM(C) AS C,
-                    SUM(D) AS D, SUM(E) AS E, SUM(F) AS F,
-                    SUM(G) AS G, SUM(H) AS H, SUM(I) AS I
-                  `;
-
-        const sql = `
-            SELECT ${SELECT_FIELDS}
-            FROM kpi_med_error
-            ${whereSQL};
-        `;
-
-        /**
-         * 4️⃣ Execute query (single row aggregated)
-         */
-        const [row] = await query(sql, params);
-
-        /**
-         * 5️⃣ Prepare lightweight response
-         */
-        if (mode === "group") {
-            return res.status(200).json({
-                AB: row?.AB ?? 0,
-                CD: row?.CD ?? 0,
-                EF: row?.EF ?? 0,
-                GHI: row?.GHI ?? 0,
-            });
-        }
-
-        const fields = ["A", "B", "C", "D", "E", "F", "G", "H", "I"];
-        const mapped = {};
-
-        for (const key of fields) {
-            mapped[key] = row?.[key] ?? 0;
-        }
-
-        return res.status(200).json(mapped);
-
-    } catch (err) {
-        console.error("❌ Error fetching KPI pie:", err);
-        return res.status(500).json({
-            error: "Error fetching KPI pie",
-            message: err.message,
-        });
-    }
-};
-
 // exports.getKPIMedPie = async (req, res) => {
 //     try {
-//         const { sinceDate, endDate, opd_id, type } = req.query;
+//         const { sinceDate, endDate, kpi_id, opd_id, type } = req.query;
+
+//         const kpiId = Number(kpi_id);
+//         if (!kpiId) {
+//             return res.status(400).json({ error: "Missing or invalid KPI ID" });
+//         }
+
 //         const mode = (type || "detail").trim();
 
-//         const detailFields = ["A", "B", "C", "D", "E", "F", "G", "H", "I"];
+//         /**
+//          * 1️⃣ Fetch all related KPIs (recursive CTE)
+//          *    Return early if none found – avoids useless queries.
+//          */
+//         const kpiRows = await query(
+//             `
+//             WITH RECURSIVE kpi_tree AS (
+//                 SELECT id, parent_id
+//                 FROM kpi_name_med
+//                 WHERE id = ?
 
-//         // Format WHERE conditions only once
-//         const conditions = [];
-//         const params = [];
+//                 UNION ALL
+
+//                 SELECT k.id, k.parent_id
+//                 FROM kpi_name_med k
+//                 JOIN kpi_tree t ON k.parent_id = t.id
+//                 WHERE k.deleted_at IS NULL
+//             )
+//             SELECT id FROM kpi_tree;
+//             `,
+//             [kpiId]
+//         );
+
+//         if (!kpiRows.length) {
+//             return res.status(200).json({});
+//         }
+
+//         const targetKpiIds = kpiRows.map(r => r.id);
+
+//         /**
+//          * 2️⃣ Build WHERE clause efficiently (no repeated .map(), no string churn)
+//          */
+//         const whereParts = [`kpi_id IN (${Array(targetKpiIds.length).fill('?').join(',')})`];
+//         const params = [...targetKpiIds];
 
 //         if (sinceDate) {
-//             conditions.push("report_date >= ?");
+//             whereParts.push(`report_date >= DATE_FORMAT(?, '%Y-%m-01')`);
 //             params.push(sinceDate);
 //         }
+
 //         if (endDate) {
-//             conditions.push("report_date <= ?");
+//             whereParts.push(`report_date <= LAST_DAY(DATE_FORMAT(?, '%Y-%m-01'))`);
 //             params.push(endDate);
 //         }
+
 //         if (opd_id) {
-//             conditions.push("opd_id = ?");
+//             whereParts.push(`opd_id = ?`);
 //             params.push(opd_id);
 //         }
 
-//         const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+//         const whereSQL = `WHERE ${whereParts.join(' AND ')}`;
 
-//         // 1️⃣ Load all KPI names (parent + child)
-//         const allKpis = await query(`
-//       SELECT id, kpi_name, parent_id
-//       FROM kpi_name_med
-//       WHERE deleted_at IS NULL
-//     `);
+//         /**
+//          * 3️⃣ Precompute SELECT field template
+//          *    Keeps SQL engine work minimal.
+//          */
+//         const SELECT_FIELDS =
+//             mode === "group"
+//                 ? `
+//                     SUM(A + B) AS AB,
+//                     SUM(C + D) AS CD,
+//                     SUM(E + F) AS EF,
+//                     SUM(G + H + I) AS GHI
+//                   `
+//                 : `
+//                     SUM(A) AS A, SUM(B) AS B, SUM(C) AS C,
+//                     SUM(D) AS D, SUM(E) AS E, SUM(F) AS F,
+//                     SUM(G) AS G, SUM(H) AS H, SUM(I) AS I
+//                   `;
 
-//         if (!allKpis.length) return res.json([]);
+//         const sql = `
+//             SELECT ${SELECT_FIELDS}
+//             FROM kpi_med_error
+//             ${whereSQL};
+//         `;
 
-//         // 2️⃣ Load all KPI SUM values (single query)
-//         const sumSql = `
-//       SELECT 
-//         kpi_id,
-//         ${detailFields.map(f => `SUM(${f}) AS ${f}`).join(", ")}
-//       FROM kpi_med_error
-//       ${whereClause}
-//       GROUP BY kpi_id
-//     `;
+//         /**
+//          * 4️⃣ Execute query (single row aggregated)
+//          */
+//         const [row] = await query(sql, params);
 
-//         const sumData = await query(sumSql, params);
-
-//         // Convert into a lookup table
-//         const sumLookup = new Map();
-//         for (const row of sumData) {
-//             sumLookup.set(row.kpi_id, row);
-//         }
-
-//         // 3️⃣ Turn raw SUM rows into mapped values (group or detail)
-//         const mapFields = (row) => {
-//             if (!row) return {};
-
-//             if (mode === "detail") {
-//                 const result = {};
-//                 for (const f of detailFields) result[f] = row[f] ?? 0;
-//                 return result;
-//             }
-
-//             return {
-//                 AB: (row.A ?? 0) + (row.B ?? 0),
-//                 CD: (row.C ?? 0) + (row.D ?? 0),
-//                 EF: (row.E ?? 0) + (row.F ?? 0),
-//                 GHI: (row.G ?? 0) + (row.H ?? 0) + (row.I ?? 0),
-//             };
-//         };
-
-//         // 4️⃣ Build lookup for all KPI nodes
-//         const lookup = new Map();
-//         for (const kpi of allKpis) {
-//             lookup.set(kpi.id, {
-//                 ...kpi,
-//                 data: mapFields(sumLookup.get(kpi.id)),
-//                 children: [],
+//         /**
+//          * 5️⃣ Prepare lightweight response
+//          */
+//         if (mode === "group") {
+//             return res.status(200).json({
+//                 AB: row?.AB ?? 0,
+//                 CD: row?.CD ?? 0,
+//                 EF: row?.EF ?? 0,
+//                 GHI: row?.GHI ?? 0,
 //             });
 //         }
 
-//         // 5️⃣ Build tree in memory
-//         const parents = [];
-//         for (const kpi of lookup.values()) {
-//             if (kpi.parent_id) {
-//                 const parent = lookup.get(kpi.parent_id);
-//                 if (parent) parent.children.push(kpi);
-//             } else {
-//                 parents.push(kpi);
-//             }
+//         const fields = ["A", "B", "C", "D", "E", "F", "G", "H", "I"];
+//         const mapped = {};
+
+//         for (const key of fields) {
+//             mapped[key] = row?.[key] ?? 0;
 //         }
 
-//         // 6️⃣ Aggregate children values upward
-//         const addChildSum = (parent) => {
-//             for (const child of parent.children) {
-//                 addChildSum(child);
-
-//                 for (const key in child.data) {
-//                     parent.data[key] = (parent.data[key] ?? 0) + (child.data[key] ?? 0);
-//                 }
-//             }
-//         };
-
-//         for (const p of parents) addChildSum(p);
-
-//         // 7️⃣ Filter out parents that have all 0 values (including children)
-//         const filtered = parents.filter((p) => {
-//             return Object.values(p.data).some(v => v !== 0);
-//         });
-
-//         return res.json(filtered);
+//         return res.status(200).json(mapped);
 
 //     } catch (err) {
 //         console.error("❌ Error fetching KPI pie:", err);
@@ -741,6 +620,168 @@ exports.getKPIMedPie = async (req, res) => {
 //         });
 //     }
 // };
+
+exports.getKPIMedPie = async (req, res) => {
+    try {
+        const { sinceDate, endDate, opd_id, work_id, mission_id, type } = req.query;
+        const mode = (type || "detail").trim();
+
+        const detailFields = ["A", "B", "C", "D", "E", "F", "G", "H", "I"];
+
+        // ===============================
+        // 1️⃣ Determine OPDs to filter
+        // ===============================
+        let opdList = [];
+
+        // 1) opd_id → ใช้เลย
+        if (opd_id) {
+            opdList = [opd_id];
+        }
+
+        // 2) work_id → โหลด opd ทั้งหมดของ work นั้น
+        else if (work_id) {
+            const rows = await query(
+                `SELECT id FROM opd_name WHERE work_id = ? AND deleted_at IS NULL`,
+                [work_id]
+            );
+            opdList = rows.map(r => r.id);
+        }
+
+        // 3) mission_id → โหลด opd ทั้งหมดของ mission นั้น
+        else if (mission_id) {
+            const rows = await query(`
+        SELECT o.id
+        FROM opd_name o
+        JOIN work_name w ON o.work_id = w.id
+        WHERE w.mission_id = ? AND o.deleted_at IS NULL
+    `, [mission_id]);
+            opdList = rows.map(r => r.id);
+        }
+
+        // 4) ถ้าไม่เลือกอะไรเลย (all) → โหลด ALL opd
+        else {
+            const rows = await query(
+                `SELECT id FROM opd_name WHERE deleted_at IS NULL`
+            );
+            opdList = rows.map(r => r.id);
+        }
+        if ((work_id || mission_id) && opdList.length === 0) {
+            return res.json([]);
+        }
+
+        // Format WHERE conditions only once
+        const conditions = [];
+        const params = [];
+
+        if (sinceDate) {
+            conditions.push("report_date >= ?");
+            params.push(sinceDate);
+        }
+        if (endDate) {
+            conditions.push("report_date <= ?");
+            params.push(endDate);
+        }
+        if (opdList.length > 0) {
+            conditions.push(`opd_id IN (${opdList.map(() => '?').join(',')})`);
+            params.push(...opdList);
+        }
+
+        const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
+        // 1️⃣ Load all KPI names (parent + child)
+        const allKpis = await query(`
+      SELECT id, kpi_name, parent_id
+      FROM kpi_name_med
+      WHERE deleted_at IS NULL
+    `);
+
+        if (!allKpis.length) return res.json([]);
+
+        // 2️⃣ Load all KPI SUM values (single query)
+        const sumSql = `
+      SELECT 
+        kpi_id,
+        ${detailFields.map(f => `SUM(${f}) AS ${f}`).join(", ")}
+      FROM kpi_med_error
+      ${whereClause}
+      GROUP BY kpi_id
+    `;
+
+        const sumData = await query(sumSql, params);
+
+        // Convert into a lookup table
+        const sumLookup = new Map();
+        for (const row of sumData) {
+            sumLookup.set(row.kpi_id, row);
+        }
+
+        // 3️⃣ Turn raw SUM rows into mapped values (group or detail)
+        const mapFields = (row) => {
+            if (!row) return {};
+
+            if (mode === "detail") {
+                const result = {};
+                for (const f of detailFields) result[f] = row[f] ?? 0;
+                return result;
+            }
+
+            return {
+                AB: (row.A ?? 0) + (row.B ?? 0),
+                CD: (row.C ?? 0) + (row.D ?? 0),
+                EF: (row.E ?? 0) + (row.F ?? 0),
+                GHI: (row.G ?? 0) + (row.H ?? 0) + (row.I ?? 0),
+            };
+        };
+
+        // 4️⃣ Build lookup for all KPI nodes
+        const lookup = new Map();
+        for (const kpi of allKpis) {
+            lookup.set(kpi.id, {
+                ...kpi,
+                data: mapFields(sumLookup.get(kpi.id)),
+                children: [],
+            });
+        }
+
+        // 5️⃣ Build tree in memory
+        const parents = [];
+        for (const kpi of lookup.values()) {
+            if (kpi.parent_id) {
+                const parent = lookup.get(kpi.parent_id);
+                if (parent) parent.children.push(kpi);
+            } else {
+                parents.push(kpi);
+            }
+        }
+
+        // 6️⃣ Aggregate children values upward
+        const addChildSum = (parent) => {
+            for (const child of parent.children) {
+                addChildSum(child);
+
+                for (const key in child.data) {
+                    parent.data[key] = (parent.data[key] ?? 0) + (child.data[key] ?? 0);
+                }
+            }
+        };
+
+        for (const p of parents) addChildSum(p);
+
+        // 7️⃣ Filter out parents that have all 0 values (including children)
+        const filtered = parents.filter((p) => {
+            return Object.values(p.data).some(v => v !== 0);
+        });
+
+        return res.json(filtered);
+
+    } catch (err) {
+        console.error("❌ Error fetching KPI pie:", err);
+        return res.status(500).json({
+            error: "Error fetching KPI pie",
+            message: err.message,
+        });
+    }
+};
 
 
 exports.getKPIMedStack = async (req, res) => {

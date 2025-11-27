@@ -47,6 +47,7 @@ router.post('/opd-name', authAndRole(1, 2), opdController.opdController.create);
 router.put('/opd-name', authAndRole(1, 2), opdController.opdController.update);
 router.delete('/opd-name/:id', authAndRole(1, 2), opdController.opdController.delete);
 router.get('/opd-name', opdController.opdController.list);
+router.get('/opd-name-group', opdController.getWorkOPDGroup);
 
 router.post('/kpi-quality', authAndRole(1, 2), qualityController.createKPIDataQuality);
 router.get('/kpi-quality', qualityController.getKPIDataQuality);

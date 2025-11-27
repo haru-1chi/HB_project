@@ -104,33 +104,48 @@ function KpiMedFormPage() {
     [API_BASE, showToast]
   );
 
+  const processKpiForDropdown = (tree) => {
+    return tree.map((node) => {
+      if (node.children && node.children.length > 0) {
+        // Parent has children → parent not selectable
+        return {
+          label: node.kpi_name,
+          items: node.children.map((child) => ({
+            label: child.kpi_name,
+            value: child.id,
+          })),
+        };
+      } else {
+        // Parent has no children → selectable
+        return { items: [{ label: node.kpi_name, value: node.id }] };
+      }
+    });
+  };
+
   useEffect(() => {
     const fetchNames = async () => {
       try {
         const [resKpi, resOPD] = await Promise.all([
-          axios.get(`${API_BASE}/kpi-name-med`, {
-            params: { includeDeleted: true },
-          }),
-          axios.get(`${API_BASE}/opd-name`, {
+          axios.get(`${API_BASE}/kpi-name-med`),
+          axios.get(`${API_BASE}/opd-name-group`, {
             params: { includeDeleted: true },
           }),
         ]);
 
-        const processData = (data, labelKey) =>
-          data
-            .filter((item) => !item.deleted_at) // filter active items
-            .map((item) => ({
-              label: item[labelKey],
-              value: item.id,
-              created_by: item.created_by,
-            }));
+        // const processData = (data, labelKey) =>
+        //   data
+        //     .filter((item) => !item.deleted_at) // filter active items
+        //     .map((item) => ({
+        //       label: item[labelKey],
+        //       value: item.id,
+        //       created_by: item.created_by,
+        //     }));
 
-        const activeKpi = processData(resKpi.data, "kpi_name");
-        const activeOPD = processData(resOPD.data, "opd_name");
+        const activeKpi = processKpiForDropdown(resKpi.data);
 
         setKpiNames(activeKpi);
-        setOPDNames(activeOPD);
-
+        setOPDNames(resOPD.data);
+        console.log(activeKpi);
         if (activeKpi.length > 0) {
           setSelectedKpi(activeKpi[0].value);
 
@@ -627,6 +642,8 @@ function KpiMedFormPage() {
           value={selectedKpiForm}
           options={kpiNames}
           optionLabel="label"
+          optionGroupLabel="label"
+          optionGroupChildren="items"
           placeholder="เลือก KPI"
           className="min-w-xs mr-3"
           onChange={(e) => setSelectedKpiForm(e.value)}
@@ -825,6 +842,8 @@ function KpiMedFormPage() {
                 }}
                 optionLabel="label"
                 placeholder="เลือก OPD"
+                optionGroupLabel="label" // Mission
+                optionGroupChildren="items"
                 className="w-full"
                 filter
                 filterDelay={400}
