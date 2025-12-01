@@ -6,66 +6,49 @@ on:
       - main
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set working directory
+        run: cd HB_frontend
+        shell: bash
+
+      - name: Set up NodeJS
+        uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '20'
+
       - run: npm ci
         working-directory: ./HB_frontend
-      - run: npm run build
+
+      - name: Install dependencies
+        run: npm install
         working-directory: ./HB_frontend
+
+      - name: Build React App
+        run: npm run build
+        working-directory: ./HB_frontend
+
       - uses: actions/upload-artifact@v3
         with:
           name: frontend-dist
           path: ./HB_frontend/dist
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
       - uses: actions/download-artifact@v3
         with:
           name: frontend-dist
           path: ./HB_frontend/dist
-      - uses: peaceiris/actions-gh-pages@v4
+
+      - name: Deploy to Github Pages
+        uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./HB_frontend/dist
-
-# jobs:
-#   build-and-deploy:
-#     runs-on: ubuntu-latest
-#     permissions:
-#       contents: write
-#       pages: write
-#       id-token: write
-
-#     steps:
-#       - name: Checkout repository
-#         uses: actions/checkout@v4
-      
-#       - name: Set working directory
-#         run: cd HB_frontend
-#         shell: bash
-
-#       - name: Set up NodeJS
-#         uses: actions/setup-node@v4
-#         with:
-#           node-version: '20'
-
-#       - name: Install dependencies
-#         run: npm install
-#         working-directory: ./HB_frontend
-
-#       - name: Build React App
-#         run: npm run build
-#         working-directory: ./HB_frontend
-
-#       - name: Deploy to Github Pages
-#         uses: peaceiris/actions-gh-pages@v4
-#         with:
-#           github_token: ${{ secrets.GITHUB_TOKEN }}
-#           publish_dir: ./HB_frontend/dist
