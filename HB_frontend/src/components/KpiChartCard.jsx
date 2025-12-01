@@ -13,7 +13,7 @@ export default function KpiChartCard({
   return (
     <div
       key={kpiId}
-      className="bg-white p-4 w-[500px] rounded-xl shadow-md border border-gray-200"
+      className="p-4 w-full rounded-xl shadow-md border border-gray-200"
     >
       <p className="text-center font-semibold text-xl mb-3">{label}</p>
 

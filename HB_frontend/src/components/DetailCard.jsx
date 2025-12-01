@@ -90,7 +90,7 @@ function DetailCard({
   ]);
 
   return (
-    <div className="bg-white shadow-md border-1 border-gray-200 h-[350px] p-5 rounded-xl flex flex-col justify-between">
+    <div className="bg-grey-900 shadow-md border-1 border-gray-200 h-[350px] p-5 rounded-xl flex flex-col justify-between">
       <h1 className="text-3xl font-semibold">{OPD_name}</h1>
       <div className="flex items-center justify-between">
         <div className="flex items-center">

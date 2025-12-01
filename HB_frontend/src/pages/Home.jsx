@@ -230,7 +230,7 @@ function Home() {
           </>
         )}
 
-        <div className="bg-white p-4 my-7 w-full rounded-xl shadow-md h-auto border-1 border-gray-200">
+        <div className="bg-grey-900 p-4 my-7 w-full rounded-xl shadow-md h-auto border-1 border-gray-200">
           {data?.length > 0 ? (
             <BarChart data={data} type="opd" />
           ) : (

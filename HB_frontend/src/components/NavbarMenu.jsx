@@ -23,7 +23,7 @@ function NavbarMenu() {
 
   return (
     <>
-      <div className="w-full fixed top-0 left-0 flex justify-between items-center z-1 bg-white p-3 shadow-md">
+      <div className="w-full fixed top-0 left-0 flex justify-between items-center z-1 bg-grey-900 p-3 shadow-md">
         <div className="flex items-center">
           <img className="w-15 mr-3" src={Logo} alt="" />
           <h5 className="text-lg font-bold text-teal-500">MaeSot Hospital</h5>
@@ -42,7 +42,7 @@ function NavbarMenu() {
         className="p-sidebar-sm"
       >
         <div
-          className={`h-full bg-white flex flex-col justify-between transition-all duration-300 pt-5`}
+          className={`h-full bg-grey-900 flex flex-col justify-between transition-all duration-300 pt-5`}
         >
           <div className="flex flex-col flex-grow px-2">
             <Link
@@ -77,6 +77,7 @@ function NavbarMenu() {
             >
               จัดการชื่อตัวชี้วัด
             </Link>
+            
           </div>
 
           <div className="mt-auto px-2 py-4">
