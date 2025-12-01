@@ -50,8 +50,8 @@ function KpiMedFormPage() {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
-
-  const [sinceDate, setSinceDate] = useState(null); //for filter
+  const now = new Date();
+  const [sinceDate, setSinceDate] = useState(now); //for filter
   const [endDate, setEndDate] = useState(null); //for filter
 
   const toast = useRef(null);
@@ -316,7 +316,7 @@ function KpiMedFormPage() {
         res.data.message || "เพิ่มข้อมูลเรียบร้อยแล้ว"
       );
       resetRows();
-      fetchKpiData(selectedKpi); //ดึงข้อมูล response เดือนที่เพิ่ม
+      fetchKpiData(normalizeDate(reportDateForm)); //ดึงข้อมูล response เดือนที่เพิ่ม
       setDialogVisible(false);
     } catch (err) {
       console.error("❌ Error saving KPI MED Error:", err);
@@ -333,7 +333,6 @@ function KpiMedFormPage() {
     fetchKpiData,
     normalizeDate,
     resetRows,
-    selectedKpi,
     showToast,
     setDialogVisible,
   ]);
@@ -348,10 +347,17 @@ function KpiMedFormPage() {
 
   const cancelEdit = useCallback(() => {
     if (editRowId && previousValues) {
+      // 🔥 แปลง key → id จริง
+      const realId =
+        typeof editRowId === "string" && editRowId.startsWith("opd-")
+          ? parseInt(editRowId.replace("opd-", ""), 10)
+          : editRowId;
+
       setKpiData((prev) =>
-        prev.map((r) => (r.id === editRowId ? previousValues : r))
+        prev.map((r) => (r.id === realId ? { ...r, ...previousValues } : r))
       );
     }
+
     setEditRowId(null);
     setEditRowData({});
     setPreviousValues(null);
@@ -366,7 +372,12 @@ function KpiMedFormPage() {
       acceptClassName: "p-button-success",
       accept: async () => {
         try {
-          const payload = { id: editRowId };
+          const realId =
+            typeof editRowId === "string" && editRowId.startsWith("opd-")
+              ? parseInt(editRowId.replace("opd-", ""), 10)
+              : editRowId;
+
+          const payload = { id: realId };
           fields.forEach((f) => (payload[f] = parseInt(editRowData[f]) || 0));
           payload.kpi_id = editRowData.kpi_id;
           payload.opd_id = editRowData.opd_id;
@@ -376,7 +387,7 @@ function KpiMedFormPage() {
           });
 
           setKpiData((prev) =>
-            prev.map((r) => (r.id === editRowId ? { ...r, ...payload } : r))
+            prev.map((r) => (r.id === realId ? { ...r, ...payload } : r))
           );
 
           showToast("success", "สำเร็จ", "อัพเดตข้อมูลเรียบร้อยแล้ว");
@@ -414,8 +425,8 @@ function KpiMedFormPage() {
 
   const renderInputCell = useCallback(
     (field, width) => (rowNode) => {
-      const isParent = rowNode.children?.length > 0;
-      if (isParent) return rowNode.data[field]; // parent always read-only
+      const isChild = !!rowNode.data.opd_name; // row จาก DB เท่านั้นที่แก้ได้
+      if (!isChild) return rowNode.data[field];
 
       if (editRowId !== rowNode.key) return rowNode.data[field]; // only active row
 
@@ -438,8 +449,9 @@ function KpiMedFormPage() {
             setKpiData((prevData) => {
               let parentTotals = {}; // store sums per kpi_id
 
+              const realId = parseInt(rowNode.key.replace("opd-", ""), 10);
               // 1️⃣ Compute new row total
-              const updatedRow = prevData.find((r) => r.id === rowNode.key);
+              const updatedRow = prevData.find((r) => r.id === realId);
               const updated = { ...updatedRow, [field]: numericValue };
               updated.total = fields.reduce(
                 (sum, f) =>
@@ -692,13 +704,57 @@ function KpiMedFormPage() {
 
   const [expandedKeys, setExpandedKeys] = useState({});
 
+  // const nodes = useMemo(() => {
+  //   const map = new Map();
+
+  //   kpiData.forEach((row) => {
+  //     if (!map.has(row.kpi_id)) {
+  //       map.set(row.kpi_id, {
+  //         key: row.kpi_id,
+  //         data: {
+  //           kpi_label: row.kpi_label,
+  //           A: 0,
+  //           B: 0,
+  //           C: 0,
+  //           D: 0,
+  //           E: 0,
+  //           F: 0,
+  //           G: 0,
+  //           H: 0,
+  //           I: 0,
+  //           total: 0,
+  //         },
+  //         children: [],
+  //       });
+  //     }
+
+  //     const parent = map.get(row.kpi_id);
+
+  //     parent.children.push({
+  //       key: row.id,
+  //       data: { ...row, opd_name: row.opd_name },
+  //     });
+
+  //     fields.concat("total").forEach((f) => {
+  //       parent.data[f] += parseInt(row[f]) || 0;
+  //     });
+  //   });
+
+  //   return Array.from(map.values());
+  // }, [kpiData, fields]);
   const nodes = useMemo(() => {
     const map = new Map();
 
     kpiData.forEach((row) => {
+      const isMain = row.parent_id == null; // main KPI เดิม
+      const isSub = !isMain; // KPI ย่อย
+
+      // --- ① สร้าง node ถ้ายังไม่มี ---
       if (!map.has(row.kpi_id)) {
         map.set(row.kpi_id, {
           key: row.kpi_id,
+          parent_id: row.parent_id,
+          rowType: row.parent_id == null ? "main" : "sub",
           data: {
             kpi_label: row.kpi_label,
             A: 0,
@@ -712,25 +768,81 @@ function KpiMedFormPage() {
             I: 0,
             total: 0,
           },
-          children: [],
+          children: [], // opd หรือ sub จะมาอยู่ตรงนี้
         });
       }
 
-      const parent = map.get(row.kpi_id);
+      const current = map.get(row.kpi_id);
 
-      parent.children.push({
-        key: row.id,
-        data: { ...row, opd_name: row.opd_name },
-      });
+      // --- ② ถ้าเป็น KPI หลัก (ไม่มี parent_id) → แสดง opd children ---
+      if (isMain) {
+        current.children.push({
+          key: `opd-${row.id}`,
+          rowType: "opd",
+          data: row,
+        });
 
-      fields.concat("total").forEach((f) => {
-        parent.data[f] += parseInt(row[f]) || 0;
-      });
+        fields.concat("total").forEach((f) => {
+          current.data[f] += parseInt(row[f]) || 0;
+        });
+      }
+
+      // --- ③ ถ้าเป็น KPI ย่อย (มี parent_id) ---
+      if (isSub) {
+        // 3.1 -> push opd เข้า sub-kpi
+        current.children.push({
+          key: `opd-${row.id}`,
+          data: row,
+        });
+
+        // รวม opd → sub KPI
+        fields.concat("total").forEach((f) => {
+          current.data[f] += parseInt(row[f]) || 0;
+        });
+
+        // 3.2 -> สร้าง main KPI ถ้ายังไม่มี
+        if (!map.has(row.parent_id)) {
+          map.set(row.parent_id, {
+            key: row.parent_id,
+            rowType: "main",
+            parent_id: null,
+            data: {
+              kpi_label: row.kpi_parent_label ?? "Unknown",
+              A: 0,
+              B: 0,
+              C: 0,
+              D: 0,
+              E: 0,
+              F: 0,
+              G: 0,
+              H: 0,
+              I: 0,
+              total: 0,
+            },
+            children: [],
+          });
+        }
+
+        const parent = map.get(row.parent_id);
+
+        // 3.3 -> แปะ sub KPI เข้า main KPI
+        parent.children.push({
+          key: `sub-${row.kpi_id}`,
+          ...current,
+        });
+
+        // 3.4 -> รวมยอด sub KPI → main KPI
+        fields.concat("total").forEach((f) => {
+          parent.data[f] += current.data[f];
+        });
+      }
     });
 
-    return Array.from(map.values());
+    return Array.from(map.values()).filter((n) => n.parent_id == null);
   }, [kpiData, fields]);
 
+  console.log("kpiData", kpiData);
+  console.log("nodes", nodes);
   return (
     <div className="Home-page overflow-hidden min-h-dvh flex flex-col justify-between">
       <ScrollTop />
@@ -760,6 +872,11 @@ function KpiMedFormPage() {
             paginator
             rows={10}
             rowsPerPageOptions={[10, 25, 50]}
+            rowClassName={(rowNode) => {
+              if (rowNode.rowType === "main") return "main-kpi-row";
+              if (rowNode.rowType === "sub") return "sub-kpi-row";
+              return ""; // opd
+            }}
           >
             <Column
               header="อุบัติการณ์ความเสี่ยง"
@@ -771,22 +888,73 @@ function KpiMedFormPage() {
                     : rowNode.data.opd_name // child
               }
               expander
+              headerClassName="header-kpi-row"
             />
-            <Column field="A" header="A" body={renderInputCell("A", "80px")} />
-            <Column field="B" header="B" body={renderInputCell("B", "80px")} />
-            <Column field="C" header="C" body={renderInputCell("C", "80px")} />
-            <Column field="D" header="D" body={renderInputCell("D", "80px")} />
-            <Column field="E" header="E" body={renderInputCell("E", "80px")} />
-            <Column field="F" header="F" body={renderInputCell("F", "80px")} />
-            <Column field="G" header="G" body={renderInputCell("G", "80px")} />
-            <Column field="H" header="H" body={renderInputCell("H", "80px")} />
-            <Column field="I" header="I" body={renderInputCell("I", "80px")} />
-            <Column field="total" header="รวม" />
+            <Column
+              field="A"
+              header="A"
+              body={renderInputCell("A", "80px")}
+              headerClassName="header-kpi-row"
+            />
+            <Column
+              field="B"
+              header="B"
+              body={renderInputCell("B", "80px")}
+              headerClassName="header-kpi-row"
+            />
+            <Column
+              field="C"
+              header="C"
+              body={renderInputCell("C", "80px")}
+              headerClassName="header-kpi-row"
+            />
+            <Column
+              field="D"
+              header="D"
+              body={renderInputCell("D", "80px")}
+              headerClassName="header-kpi-row"
+            />
+            <Column
+              field="E"
+              header="E"
+              body={renderInputCell("E", "80px")}
+              headerClassName="header-kpi-row"
+            />
+            <Column
+              field="F"
+              header="F"
+              body={renderInputCell("F", "80px")}
+              headerClassName="header-kpi-row"
+            />
+            <Column
+              field="G"
+              header="G"
+              body={renderInputCell("G", "80px")}
+              headerClassName="header-kpi-row"
+            />
+            <Column
+              field="H"
+              header="H"
+              body={renderInputCell("H", "80px")}
+              headerClassName="header-kpi-row"
+            />
+            <Column
+              field="I"
+              header="I"
+              body={renderInputCell("I", "80px")}
+              headerClassName="header-kpi-row"
+            />
+            <Column
+              field="total"
+              header="รวม"
+              headerClassName="header-kpi-row"
+            />
             <Column
               header="แก้ไข"
               body={renderActionCell}
-              style={{ width: "130px" }}
+              style={{ width: "130px", textAlign: "center" }}
               align="center"
+              headerClassName="header-kpi-row"
             />
 
             <Column
@@ -794,6 +962,7 @@ function KpiMedFormPage() {
               body={renderDeleteButton}
               style={{ width: "80px", textAlign: "center" }}
               align="center"
+              headerClassName="header-kpi-row"
             />
           </TreeTable>
         </div>

@@ -23,6 +23,7 @@ import {
 import Footer from "../components/Footer";
 import { ScrollTop } from "primereact/scrolltop";
 import { TabView, TabPanel } from "primereact/tabview";
+import { Message } from "primereact/message";
 function LookupOPD() {
   const API_BASE =
     import.meta.env.VITE_REACT_APP_API || "http://localhost:3000/api";
@@ -49,6 +50,7 @@ function LookupOPD() {
   const [editOpdId, setEditOpdId] = useState(null);
   const [editOpdValues, setEditOpdValues] = useState({ opd_name: "" });
 
+  const [missionMismatch, setMissionMismatch] = useState(false);
   const [formErrors, setFormErrors] = useState({});
 
   const formConfig = {
@@ -97,15 +99,26 @@ function LookupOPD() {
 
   const [suggestions, setSuggestions] = useState({});
 
-  const searchSuggestion = (field, query) => {
+  const searchSuggestion = (field, query, editValues, rowData) => {
     let list = [];
 
     if (field === "mission_id") {
-      list = missionList.map((m) => ({ label: m.mission_name, id: m.id }));
+      list = missionList.map((m) => ({
+        label: m.mission_name,
+        id: m.id,
+      }));
     }
 
     if (field === "work_id") {
-      list = workList.map((w) => ({ label: w.work_name, id: w.id }));
+      const selectedMissionId =
+        editValues?.mission_id ?? rowData?.mission_id ?? formValues.mission_id;
+
+      list = workList
+        .filter((w) => w.mission_id === selectedMissionId)
+        .map((w) => ({
+          label: w.work_name,
+          id: w.id,
+        }));
     }
 
     setSuggestions((prev) => ({
@@ -115,11 +128,6 @@ function LookupOPD() {
       ),
     }));
   };
-
-  const missionOptions = missionList.map((m) => ({
-    label: m.mission_name,
-    value: m.id,
-  }));
 
   const fetchMissions = useCallback(async () => {
     const res = await axios.get(`${API_BASE}/mission-name`);
@@ -162,6 +170,39 @@ function LookupOPD() {
     setFormErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
+    if (activeTab === "opd" || activeTab === "work") {
+      const selectedWork = workList.find((w) => w.id === formValues.work_id);
+
+      if (selectedWork) {
+        const correctMissionId = selectedWork.mission_id;
+
+        if (
+          formValues.mission_id &&
+          formValues.mission_id !== correctMissionId
+        ) {
+          setMissionMismatch(true);
+
+          setFormValues((prev) => ({
+            ...prev,
+            mission_id: correctMissionId,
+          }));
+
+          const correctMission = missionList.find(
+            (m) => m.id === correctMissionId
+          );
+
+          setSuggestions((prev) => ({
+            ...prev,
+            mission_id: [
+              { id: correctMission.id, label: correctMission.mission_name },
+            ],
+          }));
+
+          return;
+        }
+      }
+    }
+
     let apiUrl = "";
     if (activeTab === "mission") apiUrl = `${API_BASE}/mission-name`;
     if (activeTab === "work") apiUrl = `${API_BASE}/work-name`;
@@ -177,6 +218,7 @@ function LookupOPD() {
 
       setFormValues({});
       setDialogVisible(false);
+      setMissionMismatch(false);
     } catch (error) {
       showToast("error", "ผิดพลาด", "ไม่สามารถเพิ่มข้อมูลได้");
       console.error("Failed to add:", error);
@@ -342,6 +384,28 @@ function LookupOPD() {
     </div>
   );
 
+  const getAutocompleteOptions = (field, editValues, rowData) => {
+    if (field === "mission_name") {
+      return missionList.map((m) => ({
+        label: m.mission_name,
+        id: m.id,
+      }));
+    }
+
+    if (field === "work_name") {
+      const selectedMission = editValues.mission_id ?? rowData.mission_id;
+
+      return workList
+        .filter((w) => w.mission_id === selectedMission)
+        .map((w) => ({
+          label: w.work_name,
+          id: w.id,
+        }));
+    }
+
+    return [];
+  };
+
   const renderTextBody = (
     rowData,
     field,
@@ -365,38 +429,37 @@ function LookupOPD() {
 
     // Render dropdown
     if (isDropdown) {
-      let options = [];
+      const options = getAutocompleteOptions(field, editValues, rowData);
+      const idField = field === "mission_name" ? "mission_id" : "work_id";
 
-      if (field === "mission_name") options = missionOptions;
-      if (field === "work_name") {
-        const selectedMission = editValues.mission_id ?? rowData.mission_id;
-
-        options = workList
-          .filter((w) => w.mission_id === selectedMission)
-          .map((w) => ({
-            label: w.work_name,
-            value: w.id,
-          }));
-      }
-      const fieldIdMap = {
-        mission_name: "mission_id",
-        work_name: "work_id",
-      };
-
-      const idField = fieldIdMap[field];
       return (
-        <Dropdown
-          value={editValues[idField] ?? rowData[idField] ?? null}
-          onChange={(e) =>
+        <AutoComplete
+          dropdown
+          field="label"
+          value={
+            options.find(
+              (item) => item.id === (editValues[idField] ?? rowData[idField])
+            ) ||
+            (typeof editValues[idField] === "string"
+              ? editValues[idField]
+              : null)
+          }
+          suggestions={suggestions[idField] || []}
+          completeMethod={(e) =>
+            searchSuggestion(idField, e.query, editValues, rowData)
+          }
+          onChange={(e) => {
+            const valueId = typeof e.value === "object" ? e.value.id : e.value;
+
             setEditValues({
               ...editValues,
-              [idField]: e.value,
+              [idField]: valueId,
               ...(field === "mission_name" ? { work_id: null } : {}),
-            })
-          }
-          options={options}
-          placeholder={`เลือก${field}`}
-          className={`w-full ${formErrors[field + "_id"] ? "p-invalid" : ""}`}
+            });
+          }}
+          placeholder={`ค้นหา หรือพิมพ์เพิ่ม`}
+          className={`w-full ${formErrors[idField] ? "p-invalid" : ""}`}
+          forceSelection={false}
         />
       );
     }
@@ -697,7 +760,10 @@ function LookupOPD() {
           }`}
           visible={dialogVisible}
           modal
-          onHide={() => setDialogVisible(false)}
+          onHide={() => {
+            setDialogVisible(false);
+            setMissionMismatch(false);
+          }}
           style={{ width: "50vw" }}
         >
           {formConfig[activeTab].map((cfg) => (
@@ -735,15 +801,34 @@ function LookupOPD() {
                   field="label"
                   forceSelection={false}
                   onChange={(e) => {
+                    setMissionMismatch(false);
+
+                    const valueId =
+                      typeof e.value === "object" ? e.value.id : e.value;
+
+                    if (cfg.field === "mission_id") {
+                      setFormValues({
+                        ...formValues,
+                        mission_id: valueId,
+                        work_id: null,
+                      });
+                      return;
+                    }
+
+                    // normal case
                     setFormValues({
                       ...formValues,
-                      [cfg.field]:
-                        typeof e.value === "object" ? e.value.id : e.value,
+                      [cfg.field]: valueId,
                     });
                   }}
                   placeholder="ค้นหา หรือพิมพ์เพิ่ม"
                   className={`w-full ${
-                    formErrors[cfg.field] ? "p-invalid" : ""
+                    formErrors[cfg.field] ||
+                    (activeTab === "opd" &&
+                      cfg.field === "mission_id" &&
+                      missionMismatch)
+                      ? "p-invalid"
+                      : ""
                   }`}
                 />
               )}
@@ -751,6 +836,17 @@ function LookupOPD() {
               {formErrors[cfg.field] && (
                 <small className="p-error">{formErrors[cfg.field]}</small>
               )}
+              {activeTab === "opd" &&
+                cfg.field === "mission_id" &&
+                missionMismatch && (
+                  <div className="mt-3">
+                    <Message
+                      severity="warn"
+                      text="ชื่อภารกิจไม่ถูกต้อง ได้ปรับเปลี่ยนโดยอ้างอิงจากชื่อกลุ่มงานแล้ว"
+                      className="w-full"
+                    />
+                  </div>
+                )}
             </div>
           ))}
 

@@ -35,6 +35,21 @@ body {
   background-color: oklch(96.2% 0.044 156.743) !important;
 }
 
+.main-kpi-row {
+  background-color: oklch(97.7% 0.013 236.62) !important;
+  font-weight: bold;
+}
+
+.sub-kpi-row {
+  background-color: oklch(98.7% 0.022 95.277) !important;
+  font-weight: bold;
+}
+
+.header-kpi-row {
+  background-color: #3b82f6 !important;
+  color: white;
+}
+
 .p-password .p-icon-field {
   width: 100%;
 }

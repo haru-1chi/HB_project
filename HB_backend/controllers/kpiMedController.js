@@ -464,9 +464,12 @@ exports.getKPIMedData = async (req, res) => {
       SELECT 
         e.*, 
         n.kpi_name AS kpi_label, 
+        n.parent_id,
+        p.kpi_name AS kpi_parent_label,
         d.opd_name
       FROM kpi_med_error e
       LEFT JOIN kpi_name_med n ON e.kpi_id = n.id
+      LEFT JOIN kpi_name_med p ON n.parent_id = p.id
       LEFT JOIN opd_name d ON e.opd_id = d.id
       WHERE 1=1
         ${month ? "AND e.report_date >= ? AND e.report_date < ?" : ""}

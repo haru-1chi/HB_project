@@ -54,6 +54,28 @@ exports.workGroupController = {
       res
     );
   },
+  update: async (req, res) => {
+    try {
+      const items = req.body;
+
+      for (const item of items) {
+        // 1️⃣ ensure mission exists
+        item.mission_id = await ensureParent(
+          "mission_name",
+          "mission_name",
+          item.mission_id
+        );
+      }
+
+      // 2️⃣ update normally
+      return crudFactory("work_name", ["work_name", "mission_id"])
+        .update({ ...req, body: items }, res);
+
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ success: false });
+    }
+  },
   list: async (req, res) => {
     const includeDeleted = req.query.includeDeleted === "true";
 
@@ -113,6 +135,37 @@ exports.opdController = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ success: false, message: "Internal error" });
+    }
+  },
+  update: async (req, res) => {
+    try {
+      const items = req.body;
+
+      for (const item of items) {
+
+        // 1️⃣ mission (insert if needed)
+        item.mission_id = await ensureParent(
+          "mission_name",
+          "mission_name",
+          item.mission_id
+        );
+
+        // 2️⃣ work (insert if needed)
+        item.work_id = await ensureParent(
+          "work_name",
+          "work_name",
+          item.work_id,
+          { mission_id: item.mission_id }  // parent FK
+        );
+      }
+
+      // 3️⃣ update normally
+      return crudFactory("opd_name", ["opd_name", "work_id"])
+        .update({ ...req, body: items }, res);
+
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ success: false });
     }
   },
   list: async (req, res) => {
