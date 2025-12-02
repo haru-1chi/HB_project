@@ -37,6 +37,8 @@ import {
   faXmark,
   faMagnifyingGlass,
   faFileImport,
+  faSquareCaretDown,
+  faSquareCaretUp,
 } from "@fortawesome/free-solid-svg-icons";
 import Footer from "../components/Footer";
 import KpiFormDialog from "../components/KpiFormDialog";
@@ -78,6 +80,8 @@ function KpiMedFormPage() {
   const [selectedKpiForm, setSelectedKpiForm] = useState(null);
   const [reportDateForm, setReportDateForm] = useState(null);
   const [displayMode, setDisplayMode] = useState("byMonth");
+
+  const [expandedKeys, setExpandedKeys] = useState({});
 
   const showToast = useCallback((severity, summary, detail) => {
     toast.current?.show({ severity, summary, detail, life: 3000 });
@@ -145,7 +149,7 @@ function KpiMedFormPage() {
 
         setKpiNames(activeKpi);
         setOPDNames(resOPD.data);
-        console.log(activeKpi);
+        // console.log(activeKpi);
         if (activeKpi.length > 0) {
           setSelectedKpi(activeKpi[0].value);
 
@@ -504,7 +508,33 @@ function KpiMedFormPage() {
 
   const renderActionCell = useCallback(
     (rowNode) => {
-      if (rowNode.children?.length) return null;
+      const isExpanded = !!expandedKeys[rowNode.key];
+
+      if (rowNode.children?.length) {
+        return (
+          <Button
+            icon={
+              <FontAwesomeIcon
+                icon={isExpanded ? faSquareCaretUp : faSquareCaretDown}
+              />
+            }
+            className="p-button-warning p-button-lg"
+            text
+            style={{ padding: "0" }}
+            onClick={() => {
+              setExpandedKeys((prev) => {
+                const newKeys = { ...prev };
+                if (newKeys[rowNode.key]) {
+                  delete newKeys[rowNode.key];
+                } else {
+                  newKeys[rowNode.key] = true;
+                }
+                return newKeys;
+              });
+            }}
+          />
+        );
+      }
 
       return editRowId === rowNode.key ? (
         <div className="flex justify-center gap-2">
@@ -530,7 +560,7 @@ function KpiMedFormPage() {
         />
       );
     },
-    [editRowId, confirmSaveRow, cancelEdit, startEditRow]
+    [editRowId, confirmSaveRow, cancelEdit, startEditRow, expandedKeys]
   );
 
   //for deleted////////////////////////////////////
@@ -588,7 +618,33 @@ function KpiMedFormPage() {
 
   const renderDeleteButton = useCallback(
     (rowNode) => {
-      if (rowNode.children?.length) return null;
+      const isExpanded = !!expandedKeys[rowNode.key];
+      if (rowNode.children?.length) {
+        return (
+          <Button
+            icon={
+              <FontAwesomeIcon
+                icon={isExpanded ? faSquareCaretUp : faSquareCaretDown}
+              />
+            }
+            className="p-button-danger p-button-lg"
+            text
+            style={{ padding: "0" }}
+            onClick={() => {
+              setExpandedKeys((prev) => {
+                const newKeys = { ...prev };
+                if (newKeys[rowNode.key]) {
+                  delete newKeys[rowNode.key];
+                } else {
+                  newKeys[rowNode.key] = true;
+                }
+                return newKeys;
+              });
+            }}
+          />
+        );
+      }
+
       return (
         <Button
           icon={<FontAwesomeIcon icon={faTrash} />}
@@ -598,7 +654,7 @@ function KpiMedFormPage() {
         />
       );
     },
-    [confirmDelete]
+    [confirmDelete, expandedKeys]
   );
 
   const dialogFooterTemplate = (
@@ -701,8 +757,6 @@ function KpiMedFormPage() {
     ),
     [totals]
   );
-
-  const [expandedKeys, setExpandedKeys] = useState({});
 
   // const nodes = useMemo(() => {
   //   const map = new Map();
@@ -841,8 +895,8 @@ function KpiMedFormPage() {
     return Array.from(map.values()).filter((n) => n.parent_id == null);
   }, [kpiData, fields]);
 
-  console.log("kpiData", kpiData);
-  console.log("nodes", nodes);
+  // console.log("kpiData", kpiData);
+  // console.log("nodes", nodes);
   return (
     <div className="Home-page overflow-hidden min-h-dvh flex flex-col justify-between">
       <ScrollTop />

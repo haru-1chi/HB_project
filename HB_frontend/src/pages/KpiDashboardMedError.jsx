@@ -49,15 +49,6 @@ function KpiDashboardMedError() {
   const [sinceDate, setSinceDate] = useState(new Date(now.getFullYear(), 0, 1));
   const [endDate, setEndDate] = useState(now);
 
-  const kpiOptions = useMemo(
-    () =>
-      allKpis.map((k) => ({
-        label: k.kpi_name,
-        value: k.id,
-      })),
-    [allKpis]
-  );
-
   const formatDate = (date) =>
     date
       ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
@@ -95,9 +86,9 @@ function KpiDashboardMedError() {
 
   useEffect(() => {
     fetchChart();
-    console.log("selectedMission", selectedMission);
-    console.log("selectedWork", selectedWork);
-    console.log("selectedOPD", selectedOPD);
+    // console.log("selectedMission", selectedMission);
+    // console.log("selectedWork", selectedWork);
+    // console.log("selectedOPD", selectedOPD);
   }, [fetchChart]);
 
   const fetchStackChart = async () => {
@@ -111,7 +102,7 @@ function KpiDashboardMedError() {
           type: selectedType, // detail or group
         },
       });
-      console.log(endDate);
+      // console.log(endDate);
       setStackData(res.data);
     } catch (err) {
       console.error("❌ Error fetching stacked bar chart:", err);
@@ -221,8 +212,8 @@ function KpiDashboardMedError() {
               ...(activeParent
                 ? [
                     {
-                      label: allKpis.find((k) => k.id === activeParent)
-                        ?.kpi_name,
+                      label: allKpis.find((x) => Number(x.key) === activeParent)
+                        ?.label,
                     },
                   ]
                 : []),

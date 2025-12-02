@@ -80,41 +80,21 @@ function LookupMedError() {
   };
 
   // // ฟังก์ชันแปลงข้อมูลให้เป็น tree structure
-  const transformData = (data) => {
-    const map = new Map();
-    const roots = [];
-
-    // create a map with correct structure
-    data.forEach((item) => {
-      map.set(item.id, {
-        key: String(item.id),
-        data: {
-          id: item.id,
-          kpi_name: item.kpi_name,
-          created_by: item.created_by,
-          created_at: item.created_at,
-        },
-        children: [],
-        isRoot: item.parent_id === null,
-      });
-    });
-
-    // build hierarchy
-    data.forEach((item) => {
-      if (item.parent_id === null) {
-        roots.push(map.get(item.id));
-      } else {
-        const parent = map.get(item.parent_id);
-        if (parent) {
-          parent.children.push(map.get(item.id));
-        }
-      }
-    });
-
-    return roots;
+  const transformData = (nodes) => {
+    return nodes.map((node) => ({
+      key: String(node.id),
+      data: {
+        id: node.id,
+        kpi_name: node.kpi_name,
+        parent_id: node.parent_id,
+      },
+      children:
+        node.children && node.children.length > 0
+          ? transformData(node.children)
+          : [],
+    }));
   };
 
-  // // ใช้ฟังก์ชันแปลงข้อมูล
   const treeData = transformData(allKPIChoices);
   // console.log(treeData);
 
@@ -262,8 +242,8 @@ function LookupMedError() {
   };
 
   const filteredTreeData = searchTerm
-  ? filterTreeData(treeData, searchTerm)
-  : treeData;
+    ? filterTreeData(treeData, searchTerm)
+    : treeData;
 
   const editActionBody = (rowData) =>
     editRowId === rowData.key ? (
@@ -341,9 +321,8 @@ function LookupMedError() {
 
   const kpiNameBody = (rowData) => {
     const currentValue = rowData.data?.kpi_name || "";
-    const isMainKPI = rowData.isRoot; // ✅ true if it's a root node
+    const isMainKPI = rowData.data.parent_id === null; // root node
     const isEditing = editRowId === rowData.key;
-
     if (!isEditing) return <span>{currentValue}</span>;
 
     return (

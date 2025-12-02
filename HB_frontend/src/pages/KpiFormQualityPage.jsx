@@ -776,7 +776,7 @@ function KpiFormQualityPage() {
       support_details: form.supportDetails,
     };
 
-    console.log(payload);
+    // console.log(payload);
     try {
       const res = await axios.put(
         `${API_BASE}/kpi-quality/${editRowId}`,

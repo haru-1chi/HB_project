@@ -99,7 +99,7 @@ function KpiDashboard() {
         target_direction: item.target_direction,
         max_value: item.max_value,
       }));
-      console.log(res);
+      // console.log(res);
       setAllKPIChoices(mapped);
     } catch (err) {
       console.error("Error fetching KPI options:", err);

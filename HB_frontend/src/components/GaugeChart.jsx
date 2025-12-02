@@ -9,7 +9,7 @@ const GaugeChart = ({ value, target, selectedKPI }) => {
   } else {
     target_value = max_value + max_value * 0.5;
   }
-  console.log("max_value", target_value);
+
   const radius = 30; // smaller radius
   const strokeWidth = 12; // smaller bar
   const center = radius + strokeWidth; // center coordinate

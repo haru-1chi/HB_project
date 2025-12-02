@@ -10,6 +10,7 @@ import {
   faChevronRight,
   faMarker,
   faUser,
+  faChartPie,
 } from "@fortawesome/free-solid-svg-icons";
 import { Button } from "primereact/button";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -24,8 +25,8 @@ function SideBarMenu({ collapsed, setCollapsed }) {
 
   return (
     <div
-      // className={`sm:fixed sm:top-0 sm:left-0 sm:h-dvh bg-white flex flex-col transition-all duration-300 pt-5 shadow-md`}
-      className={`sm:fixed sm:top-0 sm:left-0 sm:h-dvh bg-grey-900 flex flex-col transition-all duration-300 pt-5`}
+      className={`sm:fixed sm:top-0 sm:left-0 sm:h-dvh bg-white flex flex-col transition-all duration-300 pt-5 shadow-md`}
+      // className={`sm:fixed sm:top-0 sm:left-0 sm:h-dvh bg-grey-900 flex flex-col transition-all duration-300 pt-5`}
       style={{ width: collapsed ? "4rem" : "18.75rem" }}
     >
       {!collapsed ? (
@@ -107,15 +108,16 @@ function SideBarMenu({ collapsed, setCollapsed }) {
                 "ตัวชี้วัดความเสี่ยง"
               ) : (
                 <div className="text-center">
-                  <FontAwesomeIcon icon={faChartLine} />
+                  <FontAwesomeIcon icon={faChartPie} />
                 </div>
               )}
             </Link>
             {user?.role !== 3 && (
               <>
+                <hr className="text-gray-200" />
                 <Link
                   to="/lookupOPD"
-                  className={`p-3 rounded-lg block mb-3 ${
+                  className={`p-3 rounded-lg block my-3 ${
                     isActive("/lookupOPD")
                       ? "text-white font-bold bg-teal-500"
                       : "text-gray-700 hover:text-teal-500"
@@ -162,9 +164,10 @@ function SideBarMenu({ collapsed, setCollapsed }) {
                     </div>
                   )}
                 </Link>
+                <hr className="text-gray-200" />
                 <Link
                   to="/KpiFormPage"
-                  className={`p-3 rounded-lg block mb-3 ${
+                  className={`p-3 rounded-lg block my-3 ${
                     isActive("/KpiFormPage")
                       ? "text-white font-bold bg-teal-500"
                       : "text-gray-700 hover:text-teal-500"
