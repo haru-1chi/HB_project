@@ -2,7 +2,7 @@ import React from "react";
 
 function Footer() {
   return (
-    <div className="w-full bg-grey-900 border-t-1 border-gray-50 h-16 p-3 px-8 flex justify-between items-center">
+    <div className="w-full bg-white border-t-1 border-gray-50 h-16 p-3 px-8 flex justify-between items-center">
       <p className="m-0 p-0">© 2025 กลุ่มงานเทคโนโลยีสารสนเทศ</p>
 
       <div className="flex">

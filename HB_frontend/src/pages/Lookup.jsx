@@ -33,11 +33,13 @@ function Lookup() {
   const [searchTerm, setSearchTerm] = useState("");
   const [dialogVisible, setDialogVisible] = useState(false);
   const [allKPIChoices, setAllKPIChoices] = useState([]); //rename
+  const [qualityType, setQualityType] = useState([]);
 
   const [formValues, setFormValues] = useState({
     kpi_name: "",
     a_name: "",
     b_name: "",
+    kpi_type: "",
     unit_type: "",
     unit_value: "",
     unit_label: "",
@@ -49,6 +51,7 @@ function Lookup() {
     kpi_name: "",
     a_name: "",
     b_name: "",
+    kpi_type: "",
     unit_type: "",
     unit_value: "",
     unit_label: "",
@@ -79,15 +82,31 @@ function Lookup() {
     }
   }, []);
 
+  const fetchQualityType = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API_BASE}/quality-type`);
+      const options = res.data.map((item) => ({
+        value: item.id,
+        label: item.quality_name,
+      }));
+      setQualityType(options);
+    } catch (err) {
+      showToast("error", "ผิดพลาด", "ไม่สามารถดึงข้อมูลได้");
+      console.error(err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchKPInames();
-  }, [fetchKPInames]);
+    fetchQualityType();
+  }, [fetchKPInames, fetchQualityType]);
 
   const validate = (values) => {
     const errors = {};
     if (!values.kpi_name?.trim()) errors.kpi_name = "กรุณากรอกชื่อตัวชี้วัด";
     if (!values.a_name?.trim()) errors.a_name = "กรุณากรอกชื่อตัวตั้ง";
     if (!values.b_name?.trim()) errors.b_name = "กรุณากรอกชื่อตัวหาร";
+    if (!values.kpi_type) errors.kpi_type = "กรุณากรอกชื่อตัวหาร";
     if (!values.unit_type?.trim()) {
       errors.unit_type = "กรุณาเลือกประเภทหน่วย";
     } else {
@@ -114,6 +133,7 @@ function Lookup() {
   };
 
   const handleAdd = async () => {
+    console.log(formValues);
     const errors = validate(formValues);
     setFormErrors(errors);
     if (Object.keys(errors).length > 0) return;
@@ -128,6 +148,7 @@ function Lookup() {
         kpi_name: "",
         a_name: "",
         b_name: "",
+        kpi_type: "",
         unit_type: "",
         unit_value: "",
         unit_label: "",
@@ -197,6 +218,7 @@ function Lookup() {
       kpi_name: "",
       a_name: "",
       b_name: "",
+      kpi_type: "",
       unit_type: "",
       unit_value: "",
       unit_label: "",
@@ -247,6 +269,7 @@ function Lookup() {
               kpi_name: rowData.kpi_name,
               a_name: rowData.a_name,
               b_name: rowData.b_name,
+              kpi_type: rowData.kpi_type,
               unit_type: rowData.unit_type,
               unit_value: rowData.unit_value,
               unit_label: rowData.unit_label,
@@ -294,6 +317,24 @@ function Lookup() {
             )}
           </div>
         ))}
+        <div className="w-full mb-2">
+          <Dropdown
+            value={editValues.kpi_type}
+            className="w-full"
+            placeholder="เลือกประเภทตัวชี้วัด"
+            options={qualityType}
+            onChange={(e) => {
+              setEditValues({
+                ...editValues,
+                kpi_type: e.value,
+              });
+            }}
+            optionLabel="label"
+          />
+          {formErrors.kpi_type && (
+            <small className="p-error">{formErrors.kpi_type}</small>
+          )}
+        </div>
         <div className="flex mb-2">
           <div className="w-full mr-3">
             <Dropdown
@@ -420,6 +461,9 @@ function Lookup() {
         </p>
         <p>
           <b>ตัวหาร:</b> {rowData.b_name}
+        </p>
+        <p>
+          <b>ประเภทตัวชี้วัด:</b> {rowData.kpi_type_label || "ไม่มี"}
         </p>
         <p>
           <b>หน่วย:</b>{" "}
@@ -559,6 +603,25 @@ function Lookup() {
               )}
             </div>
           ))}
+          <div className="w-full mt-3">
+            <label htmlFor="unit_type">เลือกประเภทตัวชี้วัด</label>
+            <Dropdown
+              value={formValues.kpi_type}
+              className="w-full"
+              placeholder="เลือกประเภทตัวชี้วัด"
+              options={qualityType}
+              onChange={(e) => {
+                setFormValues({
+                  ...formValues,
+                  kpi_type: e.value,
+                });
+              }}
+              optionLabel="label"
+            />
+            {formErrors.kpi_type && (
+              <small className="p-error">{formErrors.kpi_type}</small>
+            )}
+          </div>
           <div className="w-full flex my-3">
             <div className="w-full mr-3">
               <label htmlFor="unit_type">เลือกประเภทหน่วย</label>
@@ -600,6 +663,7 @@ function Lookup() {
                 <small className="p-error">{formErrors.unit_type}</small>
               )}
             </div>
+
             <div className="w-full mr-3">
               <label htmlFor="unit_value">
                 ค่าตัวคูณ (เช่น ต่อ 1,000 หรือ ต่อ 10,000)

@@ -29,7 +29,7 @@ function Card({ count, keyword }) {
   };
 
   return (
-    <div className="bg-grey-900 shadow-md border-1 border-gray-200 h-[100px] md:h-[136px] p-3 md:p-5 rounded-xl flex flex-col justify-between">
+    <div className="bg-white shadow-md border-1 border-gray-200 h-[100px] md:h-[136px] p-3 md:p-5 rounded-xl flex flex-col justify-between">
       <div className="flex justify-between items-center">
         <div
           className={`${iconMap[keyword]?.bgColor} px-2 md:px-5 py-1 md:py-4 rounded-full text-md md:text-3xl text-white mr-2`}

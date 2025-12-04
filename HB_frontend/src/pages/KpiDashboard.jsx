@@ -417,14 +417,20 @@ function KpiDashboard() {
                 className="bg-white shadow-md border-1 border-gray-200 h-[100px] md:h-[136px] p-3 md:p-5 rounded-xl flex flex-col justify-between"
               >
                 <div className="flex items-center justify-between">
-                  <h1 className={`text-5xl font-semibold ${valueColor}`}>
-                    {item.value}
-                    <span
-                      className={unitLabel === 100 ? "text-2xl" : "text-3xl"}
-                    >
-                      {unitLabel}
-                    </span>
-                  </h1>
+                  <div className="flex items-end">
+                    <h1 className={`text-5xl font-semibold ${valueColor}`}>
+                      {item.value}
+                      <span
+                        className={unitLabel === 100 ? "text-2xl" : "text-3xl"}
+                      >
+                        {unitLabel}
+                      </span>
+                    </h1>
+                    <h1 className={`ml-2 mb-1 text-xl ${valueColor}`}>
+                      ({item.raw_value} ราย)
+                    </h1>
+                  </div>
+
                   {getGaugeChart(item.type, item.value)}
                 </div>
                 <p>{getTitle(item.type)}</p>
@@ -438,7 +444,7 @@ function KpiDashboard() {
             selectedChartType === "percent" ? (
               <KPILineChart data={data} unitLabel={unitLabel} />
             ) : (
-              <BarChart data={data} type="kpi" unitLabel={unitLabel}/>
+              <BarChart data={data} type="kpi" unitLabel={unitLabel} />
             )
           ) : (
             <p>ไม่พบข้อมูล...</p>
@@ -489,8 +495,8 @@ function KpiDashboard() {
             pt={{
               header: {
                 style: {
-                  backgroundColor: "oklch(70.4% 0.191 22.216)",
-                  //  backgroundColor: "oklch(93.6% 0.032 17.717)",
+                  // backgroundColor: "oklch(70.4% 0.191 22.216)",
+                  backgroundColor: "oklch(93.6% 0.032 17.717)",
                 },
               },
               toggleableContent: {
@@ -514,7 +520,7 @@ function KpiDashboard() {
             pt={{
               header: {
                 style: {
-                  backgroundColor: "oklch(69.6% 0.17 162.48)",
+                  backgroundColor: "oklch(96.2% 0.044 156.743)",
                 },
               },
               toggleableContent: {
@@ -583,7 +589,7 @@ function KpiDashboard() {
           </Fieldset>
         </div> */}
 
-        <div className="bg-grey-900 p-4 my-7 w-full rounded-xl shadow-md h-auto border-1 border-gray-200">
+        <div className="bg-white p-4 my-7 w-full rounded-xl shadow-md h-auto border-1 border-gray-200">
           <DataTable
             ref={dt}
             header={header}
@@ -592,18 +598,12 @@ function KpiDashboard() {
             footerColumnGroup={footerGroup}
           >
             <Column field="month" header="เดือน-ปี"></Column>
-            <Column
-              field="result_thai"
-              header={`ไทย (${unitLabel})`}
-            ></Column>
+            <Column field="result_thai" header={`ไทย (${unitLabel})`}></Column>
             <Column
               field="result_foreign"
               header={`ต่างชาติ (${unitLabel})`}
             ></Column>
-            <Column
-              field="result_total"
-              header={`รวม (${unitLabel})`}
-            ></Column>
+            <Column field="result_total" header={`รวม (${unitLabel})`}></Column>
             <Column
               header={`แนวโน้ม (${unitLabel})`}
               body={noteBodyTemplate}

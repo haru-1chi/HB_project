@@ -251,7 +251,7 @@ function Profile() {
         <div className="flex items-center mb-5">
           <h5 className="text-2xl font-semibold">บัญชีของฉัน</h5>
         </div>
-        <div className="card w-125 bg-grey-900 p-5 rounded-xl shadow-md">
+        <div className="card w-125 bg-white p-5 rounded-xl shadow-md">
           {user.verify === 0 && (
             <div className="mb-4">
               <Message

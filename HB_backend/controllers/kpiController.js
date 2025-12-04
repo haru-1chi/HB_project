@@ -401,6 +401,7 @@ exports.createKPIName = async (req, res) => {
             item.kpi_name,
             item.a_name ?? null,
             item.b_name ?? null,
+            item.kpi_type ?? null,
             item.unit_type ?? null,
             item.unit_value ?? null,
             item.unit_label ?? null,
@@ -411,7 +412,7 @@ exports.createKPIName = async (req, res) => {
 
         const sql = `
       INSERT INTO kpi_name
-      (kpi_name, a_name, b_name, unit_type, unit_value, unit_label, target_direction, max_value, created_by) 
+      (kpi_name, a_name, b_name, kpi_type, unit_type, unit_value, unit_label, target_direction, max_value, created_by) 
       VALUES ?
     `;
 
@@ -441,7 +442,7 @@ exports.updateKPIName = async (req, res) => {
         }
 
         // Prepare fields for CASE WHEN update
-        const fields = ["kpi_name", "a_name", "b_name", "unit_type", "unit_value", "unit_label", "target_direction", "max_value"];
+        const fields = ["kpi_name", "a_name", "b_name", "kpi_type", "unit_type", "unit_value", "unit_label", "target_direction", "max_value"];
         const cases = {};
         fields.forEach(f => (cases[f] = []));
 
@@ -534,22 +535,24 @@ exports.getKPIName = async (req, res) => {
 
         const query = `
     SELECT 
-      id,
+      k.id,
       CASE 
-        WHEN deleted_at IS NOT NULL THEN CONCAT(kpi_name, ' (ข้อมูลไม่ใช้แล้ว)')
-        ELSE kpi_name
+        WHEN k.deleted_at IS NOT NULL THEN CONCAT(k.kpi_name, ' (ข้อมูลไม่ใช้แล้ว)')
+        ELSE k.kpi_name
       END AS kpi_name,
-      a_name,
-      b_name,
-      unit_type,
-      unit_value,
-      unit_label,
-      target_direction,
-      max_value,
-      deleted_at
-    FROM kpi_name
-    ${includeDeleted ? "" : "WHERE deleted_at IS NULL"}
-    order by deleted_at asc
+      k.a_name,
+      k.b_name,
+      k.kpi_type,
+      q.quality_name as kpi_type_label,
+      k.unit_type,
+      k.unit_value,
+      k.unit_label,
+      k.target_direction,
+      k.max_value,
+      k.deleted_at
+    FROM kpi_name k LEFT JOIN quality_type q ON k.kpi_type = q.id
+    ${includeDeleted ? "" : "WHERE k.deleted_at IS NULL"}
+    order by k.deleted_at asc
   `;
 
         const result = await new Promise((resolve, reject) => {
@@ -570,6 +573,32 @@ exports.getKPIName = async (req, res) => {
     }
 };
 
+
+exports.getQualityType = async (req, res) => {
+    try {
+        const query = `
+    SELECT 
+      *
+    FROM quality_type
+  `;
+
+        const result = await new Promise((resolve, reject) => {
+            db.query(query, (err, rows) => {
+                if (err) reject(err);
+                else resolve(rows);
+            });
+        });
+
+        res.status(200).json(Array.isArray(result) ? result : []);
+    } catch (err) {
+        console.error("❌ Error fetching KPI names:", err);
+        res.status(500).json({
+            success: false,
+            message: "Failed to fetch KPI names",
+            error: err.message,
+        });
+    }
+};
 //dashboard--------------------------------------------------------------------------
 exports.getData = async (req, res) => {
     try {
@@ -793,6 +822,17 @@ exports.dataCurrentMonth = async (req, res) => {
         ROUND(SUM(d.a_value)/NULLIF(SUM(d.b_value),0)*n.unit_value, 2) AS sum_rate,
         ROUND(SUM(CASE WHEN d.type='ไทย' THEN d.a_value ELSE 0 END)/NULLIF(SUM(CASE WHEN d.type='ไทย' THEN d.b_value ELSE 0 END),0)*n.unit_value, 2) AS thai_rate,
         ROUND(SUM(CASE WHEN d.type='ต่างชาติ' THEN d.a_value ELSE 0 END)/NULLIF(SUM(CASE WHEN d.type='ต่างชาติ' THEN d.b_value ELSE 0 END),0)*n.unit_value, 2) AS foreigner_rate,
+    CAST(CONCAT(SUM(d.a_value), '/', SUM(d.b_value)) AS CHAR) AS sum_raw,
+    CAST(CONCAT(
+        SUM(CASE WHEN d.type='ไทย' THEN d.a_value ELSE 0 END),
+        '/',
+        SUM(CASE WHEN d.type='ไทย' THEN d.b_value ELSE 0 END)
+    ) AS CHAR) AS thai_raw,
+    CAST(CONCAT(
+        SUM(CASE WHEN d.type='ต่างชาติ' THEN d.a_value ELSE 0 END),
+        '/',
+        SUM(CASE WHEN d.type='ต่างชาติ' THEN d.b_value ELSE 0 END)
+    ) AS CHAR) AS foreigner_raw,
 				n.max_value
       FROM kpi_data d
 			left JOIN kpi_name n on d.kpi_name = n.id
@@ -808,10 +848,11 @@ exports.dataCurrentMonth = async (req, res) => {
 
         const row = result[0] || {};
         res.json([
-            { type: "sum_rate", value: row.sum_rate || 0, max_value: row.max_value || 0 },
-            { type: "thai_rate", value: row.thai_rate || 0, max_value: row.max_value || 0 },
-            { type: "foreigner_rate", value: row.foreigner_rate || 0, max_value: row.max_value || 0 },
+            { type: "sum_rate", value: row.sum_rate ?? 0, raw_value: row.sum_raw ?? "0/0", max_value: row.max_value ?? 0 },
+            { type: "thai_rate", value: row.thai_rate ?? 0, raw_value: row.thai_raw ?? "0/0", max_value: row.max_value ?? 0 },
+            { type: "foreigner_rate", value: row.foreigner_rate ?? 0, raw_value: row.foreigner_raw ?? "0/0", max_value: row.max_value ?? 0 },
         ]);
+
 
     } catch (error) {
         console.error("Unexpected error:", error);

@@ -21,6 +21,8 @@ router.put('/kpi-name', authAndRole(1, 2), kpiController.updateKPIName);
 router.delete('/kpi-name/:id', authAndRole(1, 2), kpiController.deleteKPIName);
 router.get('/kpi-name', kpiController.getKPIName);
 
+router.get('/quality-type', kpiController.getQualityType);
+
 router.post('/kpi-name-med', authAndRole(1, 2), kpiMedController.createKPINameMed);
 router.put('/kpi-name-med', authAndRole(1, 2), kpiMedController.updateKPINameMed);
 router.get('/kpi-name-med', kpiMedController.getKPIMedName);

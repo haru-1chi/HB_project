@@ -3,17 +3,17 @@ const db = require("../mysql.js");
 const util = require("util");
 const query = util.promisify(db.query).bind(db);
 
-async function ensureParent(table, nameField, idOrName, extraFields = {}) {
+async function ensureParent(table, nameField, idOrName, extraFields = {}, createdBy = "Unknown User") {
   if (!isNaN(idOrName)) return Number(idOrName);
 
-  const fieldNames = [nameField, ...Object.keys(extraFields)];
+  const fieldNames = [nameField, ...Object.keys(extraFields), "created_by"];
   const placeholders = fieldNames.map(() => "?").join(", ");
   const sql = `
     INSERT INTO ${table} (${fieldNames.join(", ")})
     VALUES (${placeholders})
   `;
 
-  const values = [idOrName, ...Object.values(extraFields)];
+  const values = [idOrName, ...Object.values(extraFields), createdBy];
 
   const result = await query(sql, values);
   return result.insertId;
@@ -39,31 +39,33 @@ exports.workGroupController = {
   ...crudFactory("work_name", ["work_name", "mission_id"]),
   create: async (req, res) => {
     const items = req.body;
+    const createdBy = req.user?.name || "Unknown User";
 
     for (const item of items) {
       item.mission_id = await ensureParent(
         "mission_name",
         "mission_name",
-        item.mission_id
+        item.mission_id,
+        {},
+        createdBy
       );
     }
 
-    // call factory normally
-    return crudFactory("work_name", ["work_name", "mission_id"]).create(
-      { ...req, body: items },
-      res
-    );
+    return crudFactory("work_name", ["work_name", "mission_id"])
+      .create({ ...req, body: items }, res);
   },
   update: async (req, res) => {
     try {
       const items = req.body;
-
+      const createdBy = req.user?.name || "Unknown User";
       for (const item of items) {
         // 1️⃣ ensure mission exists
         item.mission_id = await ensureParent(
           "mission_name",
           "mission_name",
-          item.mission_id
+          item.mission_id,
+          {},
+          createdBy
         );
       }
 
@@ -103,13 +105,15 @@ exports.opdController = {
   create: async (req, res) => {
     try {
       const items = req.body;
-
+      const createdBy = req.user?.name || "Unknown User";
       for (const item of items) {
         // 1️⃣ Ensure mission exists / insert if new
         item.mission_id = await ensureParent(
           "mission_name",
           "mission_name",
-          item.mission_id
+          item.mission_id,
+          {},
+          createdBy
         );
 
         // 2️⃣ Ensure work exists / insert if new, with mission_id
@@ -117,13 +121,14 @@ exports.opdController = {
           "work_name",
           "work_name",
           item.work_id,
-          { mission_id: item.mission_id } // 🔥 add parent
+          { mission_id: item.mission_id },
+          createdBy
         );
 
         // 3️⃣ Insert OPD
         await query(
-          `INSERT INTO opd_name (opd_name, work_id) VALUES (?, ?)`,
-          [item.opd_name, item.work_id]
+          `INSERT INTO opd_name (opd_name, work_id, created_by) VALUES (?, ?, ?)`,
+          [item.opd_name, item.work_id, createdBy]
         );
       }
 
@@ -140,6 +145,7 @@ exports.opdController = {
   update: async (req, res) => {
     try {
       const items = req.body;
+      const createdBy = req.user?.name || "Unknown User";
 
       for (const item of items) {
 
@@ -147,7 +153,9 @@ exports.opdController = {
         item.mission_id = await ensureParent(
           "mission_name",
           "mission_name",
-          item.mission_id
+          item.mission_id,
+          {},
+          createdBy
         );
 
         // 2️⃣ work (insert if needed)
@@ -155,7 +163,8 @@ exports.opdController = {
           "work_name",
           "work_name",
           item.work_id,
-          { mission_id: item.mission_id }  // parent FK
+          { mission_id: item.mission_id },
+          createdBy
         );
       }
 
