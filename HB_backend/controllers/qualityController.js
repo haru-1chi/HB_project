@@ -158,7 +158,9 @@ const monthTH = [
 exports.getKPIDataQuality = async (req, res) => {
     try {
         const { kpi_name, type, since, until } = req.query;
-
+        if (!kpi_name) {
+            return res.json([]);
+        }
         let sql = `
             SELECT 
                 d.*,

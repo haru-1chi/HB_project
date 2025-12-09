@@ -64,7 +64,14 @@ function KpiFormQualityPage() {
 
   const [kpiNames, setKpiNames] = useState([]);
   const [kpiNamesActive, setKpiNamesActive] = useState([]);
+  const [kpiNamesGroup, setKpiNamesGroup] = useState([]);
+
   const [selectedKpi, setSelectedKpi] = useState(null);
+  const [selectedType, setSelectedType] = useState(() => {
+    return localStorage.getItem("kpi_filter_type_quality") || "all";
+  });
+  const [qualityType, setQualityType] = useState([]);
+
   const [kpiData, setKpiData] = useState([]);
   const [duplicatePairs, setDuplicatePairs] = useState([]);
 
@@ -101,7 +108,19 @@ function KpiFormQualityPage() {
     updateField("bName", selectedKPIObj.b_name || "");
   }, [selectedKPIObj]);
 
-  const resetForm = () => setForm(initialForm);
+  const resetForm = () => {
+    setForm({
+      selectedKpiQuality: selectedKpi, // ← always reset to main KPI
+      aName: "",
+      bName: "",
+      aValue: "",
+      bValue: "",
+      reportDate: null,
+      selectedType: null,
+      issueDetails: "",
+      supportDetails: "",
+    });
+  };
 
   // const [selectedKpiQuality, setSelectedKpiQuality] = useState(null);
   // const [aName, setAName] = useState("");
@@ -170,38 +189,95 @@ function KpiFormQualityPage() {
   }, [logout, showToast, navigate]);
 
   useEffect(() => {
-    const fetchKpiNames = async () => {
+    const loadInitialData = async () => {
       try {
-        const res = await axios.get(`${API_BASE}/kpi-name`, {
-          params: { includeDeleted: true },
-        });
-        const options = res.data.map((item) => ({
+        const [groupRes, flatRes, typeRes] = await Promise.all([
+          axios.get(`${API_BASE}/kpi-name-group`, {
+            params: { includeDeleted: true },
+          }),
+          axios.get(`${API_BASE}/kpi-name`, {
+            params: { includeDeleted: true },
+          }),
+          axios.get(`${API_BASE}/quality-type`),
+        ]);
+
+        // GROUPED LIST (for forms)
+        const grouped = groupRes.data.map((group) => ({
+          label: group.label, // your group name
+          items: group.items.map((item) => ({
+            kpi_name: item.kpi_name,
+            value: item.id, // MUST exist for Dropdown value matching
+            a_name: item.a_name,
+            b_name: item.b_name,
+            kpi_type: item.kpi_type,
+            deleted: item.deleted_at !== null,
+          })),
+        }));
+
+        setKpiNamesGroup(grouped);
+
+        // FLAT LIST (for filtering)
+        const flatOptions = flatRes.data.map((item) => ({
           label: item.kpi_name,
           value: item.id,
           a_name: item.a_name,
           b_name: item.b_name,
           deleted: item.deleted_at !== null,
+          kpi_type: item.kpi_type,
         }));
-        setKpiNames(options);
 
-        const optionsActive = options.filter((item) => !item.deleted);
-        setKpiNamesActive(optionsActive);
-        // console.log(kpiNamesActive);
-        if (options.length > 0) {
-          const firstKpi = options[0].value;
+        const activeFlat = flatOptions.filter((i) => !i.deleted);
+        setKpiNames(flatOptions);
+        setKpiNamesActive(activeFlat);
+
+        // QUALITY TYPE
+        const typeOptions = typeRes.data.map((t) => ({
+          label: t.quality_name,
+          value: String(t.id),
+        }));
+        setQualityType(typeOptions);
+
+        // INITIAL KPI SELECTION
+        const firstKpi = activeFlat[0]?.value ?? null;
+        if (firstKpi) {
           setSelectedKpi(firstKpi);
           fetchKpiData(firstKpi);
         }
       } catch (err) {
-        showToast(
-          "error",
-          "ผิดพลาด",
-          err.message || "โหลดชื่อตัวชี้วัดล้มเหลว"
-        );
+        showToast("error", "ผิดพลาด", err.message || "โหลดข้อมูลล้มเหลว");
       }
     };
-    fetchKpiNames();
+
+    loadInitialData();
   }, [showToast]);
+
+  // ------------------------------
+  // 2. Filter KPI by selectedType
+  // ------------------------------
+  const filteredKpiNames = useMemo(() => {
+    if (!selectedType || selectedType === "all") return kpiNamesActive;
+
+    // ensure safe matching
+    return kpiNamesActive.filter(
+      (k) => String(k.kpi_type) === String(selectedType)
+    );
+  }, [selectedType, kpiNamesActive]);
+
+  // ------------------------------
+  // 3. Auto-select first KPI after filter
+  // ------------------------------
+  useEffect(() => {
+    if (filteredKpiNames.length > 0) {
+      const first = filteredKpiNames[0].value;
+      if (first !== selectedKpi) {
+        setSelectedKpi(first);
+        fetchKpiData(first);
+      }
+    } else {
+      setSelectedKpi(null);
+      setKpiData([]); // clear UI
+    }
+  }, [filteredKpiNames]);
 
   useEffect(() => {
     if (!selectedKpi) return;
@@ -798,23 +874,55 @@ function KpiFormQualityPage() {
   };
 
   const openAddDialog = () => {
-    resetForm();
     setIsEditMode(false);
     setDialogQualityVisible(true);
+
+    const selected = kpiNamesActive.find((k) => k.value === selectedKpi);
+
+    setForm({
+      selectedKpiQuality: selectedKpi,
+      aName: selected?.a_name || "",
+      bName: selected?.b_name || "",
+      aValue: "",
+      bValue: "",
+      reportDate: null,
+      selectedType: null,
+      issueDetails: "",
+      supportDetails: "",
+    });
   };
 
   const header = (
     <div className="p-2 flex items-end justify-between">
-      <Dropdown
-        value={selectedKpi}
-        options={kpiNames}
-        onChange={handleKpiChange}
-        optionLabel="label"
-        placeholder="เลือก KPI"
-        className="mr-5"
-        filter
-        filterDelay={400}
-      />
+      <div className="flex gap-3">
+        <Dropdown
+          placeholder="เลือกประเภทตัวชี้วัด"
+          value={selectedType}
+          options={[
+            { label: "ทั้งหมด", value: "all" },
+            ...qualityType.map((t) => ({
+              label: t.label,
+              value: String(t.value),
+            })),
+          ]}
+          onChange={(e) => {
+            const val = String(e.value);
+            setSelectedType(val);
+            localStorage.setItem("kpi_filter_type_quality", val);
+          }}
+          optionLabel="label"
+        />
+
+        <Dropdown
+          value={selectedKpi}
+          options={filteredKpiNames}
+          onChange={handleKpiChange}
+          placeholder="เลือก KPI"
+          className="mr-5"
+          filter
+          filterDelay={400}
+        />
+      </div>
 
       <div className="flex gap-5">
         <div className="flex items-center">
@@ -861,7 +969,9 @@ function KpiFormQualityPage() {
         className={`flex-1 transition-all duration-300 p-4 sm:p-8 pt-5 overflow-auto`}
       >
         <div className="flex justify-between items-center mb-3">
-          <h5 className="text-2xl font-semibold">จัดการข้อมูลตัวชี้วัด</h5>
+          <h5 className="text-2xl font-semibold">
+            จัดการข้อมูลตัวชี้วัดคุณภาพ
+          </h5>
           <div className="flex justify-between gap-3">
             {/* <Button
               label="+ เพิ่มข้อมูลตัวชี้วัด"
@@ -1086,9 +1196,11 @@ function KpiFormQualityPage() {
           ) : (
             <Dropdown
               value={form.selectedKpiQuality}
-              options={kpiNamesActive}
+              options={kpiNamesGroup}
               onChange={(e) => updateField("selectedKpiQuality", e.value)}
-              optionLabel="label"
+              optionLabel="kpi_name"
+              optionGroupLabel="label"
+              optionGroupChildren="items"
               placeholder="เลือกตัวชี้วัด"
               className="mr-5 w-full"
               filter

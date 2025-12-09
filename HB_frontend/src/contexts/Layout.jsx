@@ -17,7 +17,7 @@ function Layout() {
       <div
         className="transition-all duration-300"
         style={{
-          marginLeft: user ? (collapsed ? "4rem" : "18.75rem") : 0,
+          marginLeft: user ? (collapsed ? "5rem" : "19.25rem") : 0,
         }}
       >
         <Outlet context={user ? { collapsed } : {}} />

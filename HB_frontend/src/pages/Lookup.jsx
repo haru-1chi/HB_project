@@ -31,6 +31,10 @@ function Lookup() {
     import.meta.env.VITE_REACT_APP_API || "http://localhost:3000/api";
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedType, setSelectedType] = useState(() => {
+    return localStorage.getItem("kpi_filter_type") || "all";
+  });
+
   const [dialogVisible, setDialogVisible] = useState(false);
   const [allKPIChoices, setAllKPIChoices] = useState([]); //rename
   const [qualityType, setQualityType] = useState([]);
@@ -101,6 +105,32 @@ function Lookup() {
     fetchQualityType();
   }, [fetchKPInames, fetchQualityType]);
 
+  const handleReorder = async (e) => {
+    // ทำการเรียงใหม่ตามตำแหน่งใน Drag
+    const newList = e.value.map((item, index) => ({
+      ...item,
+      order_sort: index + 1, // ให้ order ใหม่ 1,2,3,...
+    }));
+
+    setAllKPIChoices(newList); // อัปเดต UI ทันที
+
+    try {
+      await axios.put(
+        `${API_BASE}/kpi-name/reorder`,
+        {
+          items: newList.map((i) => ({ id: i.id, order_sort: i.order_sort })),
+        },
+        {
+          headers: { token },
+        }
+      );
+      showToast("success", "สำเร็จ", "บันทึกลำดับใหม่แล้ว");
+    } catch (err) {
+      showToast("error", "ผิดพลาด", "ไม่สามารถบันทึกลำดับใหม่ได้");
+      console.error(err);
+    }
+  };
+
   const validate = (values) => {
     const errors = {};
     if (!values.kpi_name?.trim()) errors.kpi_name = "กรุณากรอกชื่อตัวชี้วัด";
@@ -133,7 +163,6 @@ function Lookup() {
   };
 
   const handleAdd = async () => {
-    console.log(formValues);
     const errors = validate(formValues);
     setFormErrors(errors);
     if (Object.keys(errors).length > 0) return;
@@ -230,12 +259,17 @@ function Lookup() {
 
   const filteredList = allKPIChoices.filter((item) => {
     const term = searchTerm.toLowerCase();
-    return (
-      item.kpi_name?.toLowerCase().includes(term) ||
-      item.a_name?.toLowerCase().includes(term) ||
-      item.b_name?.toLowerCase().includes(term) ||
-      item.max_value?.toLowerCase().includes(term)
-    );
+
+    const matchesSearch =
+      (item.kpi_name || "").toLowerCase().includes(term) ||
+      (item.a_name || "").toLowerCase().includes(term) ||
+      (item.b_name || "").toLowerCase().includes(term) ||
+      String(item.max_value || "").includes(term);
+
+    const matchesType =
+      selectedType === "all" || String(item.kpi_type) === selectedType;
+
+    return matchesSearch && matchesType;
   });
 
   const editActionBody = (rowData) =>
@@ -485,16 +519,36 @@ function Lookup() {
 
   const header = (
     <div className="flex items-end justify-between">
-      <IconField iconPosition="left">
-        <InputIcon>
-          <FontAwesomeIcon icon={faMagnifyingGlass} />
-        </InputIcon>
-        <InputText
-          placeholder="ค้นหา"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+      <div className="flex gap-5">
+        <Dropdown
+          placeholder="เลือกประเภทตัวชี้วัด"
+          value={selectedType}
+          options={[
+            { label: "ทั้งหมด", value: "all" },
+            ...qualityType.map((t) => ({
+              label: t.label,
+              value: String(t.value),
+            })),
+          ]}
+          onChange={(e) => {
+            const val = String(e.value);
+            setSelectedType(val);
+            localStorage.setItem("kpi_filter_type", val);
+          }}
+          optionLabel="label"
         />
-      </IconField>
+        <IconField iconPosition="left">
+          <InputIcon>
+            <FontAwesomeIcon icon={faMagnifyingGlass} />
+          </InputIcon>
+          <InputText
+            placeholder="ค้นหา"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </IconField>
+      </div>
+
       <Button
         label="+ เพิ่มข้อมูล"
         onClick={() => setDialogVisible(true)}
@@ -538,6 +592,8 @@ function Lookup() {
           <DataTable
             header={header}
             value={filteredList}
+            reorderableRows
+            onRowReorder={handleReorder}
             tableStyle={{ minWidth: "50rem" }}
             emptyMessage="ไม่พบข้อมูล"
             paginator
@@ -545,11 +601,12 @@ function Lookup() {
             rowsPerPageOptions={[10, 25, 50]}
             showGridlines
           >
+            <Column rowReorder style={{ width: "3rem" }} />
             <Column
               field="id"
               header="ลำดับ"
               style={{ width: "5%" }}
-              body={(rowData) => allKPIChoices.indexOf(rowData) + 1}
+              body={(rowData) => filteredList.indexOf(rowData) + 1}
               align="center"
               sortable
             />

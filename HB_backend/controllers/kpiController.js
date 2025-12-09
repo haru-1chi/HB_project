@@ -324,7 +324,8 @@ exports.deleteKPIData = async (req, res) => {
 
 exports.getKPIData = async (req, res) => {
     const { kpi_name, search, sinceDate, endDate } = req.query;
-
+    const kpiId = Number(kpi_name);
+    if (!kpiId) return res.json([]);
     try {
         let query = `
             SELECT d.*, n.kpi_name AS kpi_label, n.a_name, n.b_name
@@ -397,24 +398,35 @@ exports.createKPIName = async (req, res) => {
             return res.status(400).json({ success: false, message: "Data must be a non-empty array" });
         }
 
-        const values = dataArray.map((item) => [
-            item.kpi_name,
-            item.a_name ?? null,
-            item.b_name ?? null,
-            item.kpi_type ?? null,
-            item.unit_type ?? null,
-            item.unit_value ?? null,
-            item.unit_label ?? null,
-            item.target_direction ?? null,
-            item.max_value ?? null,
-            userName,
-        ]);
+        const maxOrder = await queryAsync(
+            "SELECT COALESCE(MAX(order_sort), 0) AS maxOrder FROM kpi_name"
+        ).then(res => res[0].maxOrder);
+
+        let nextOrder = maxOrder;
+
+
+        const values = dataArray.map((item) => {
+            nextOrder++;
+            return [
+                item.kpi_name,
+                item.a_name ?? null,
+                item.b_name ?? null,
+                item.kpi_type ?? null,
+                item.unit_type ?? null,
+                item.unit_value ?? null,
+                item.unit_label ?? null,
+                item.target_direction ?? null,
+                item.max_value ?? null,
+                nextOrder,
+                userName,
+            ];
+        });
 
         const sql = `
-      INSERT INTO kpi_name
-      (kpi_name, a_name, b_name, kpi_type, unit_type, unit_value, unit_label, target_direction, max_value, created_by) 
-      VALUES ?
-    `;
+            INSERT INTO kpi_name
+            (kpi_name, a_name, b_name, kpi_type, unit_type, unit_value, unit_label, target_direction, max_value, order_sort, created_by)
+            VALUES ?
+        `;
 
         const result = await queryAsync(sql, [values]);
 
@@ -532,6 +544,13 @@ exports.deleteKPIName = async (req, res) => {
 exports.getKPIName = async (req, res) => {
     try {
         const includeDeleted = req.query.includeDeleted === "true";
+        const type = req.query.type;
+
+        let conditions = [];
+        if (!includeDeleted) conditions.push("k.deleted_at IS NULL");
+        if (type) conditions.push("k.kpi_type = " + Number(type));
+
+        const where = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
 
         const query = `
     SELECT 
@@ -549,10 +568,12 @@ exports.getKPIName = async (req, res) => {
       k.unit_label,
       k.target_direction,
       k.max_value,
-      k.deleted_at
-    FROM kpi_name k LEFT JOIN quality_type q ON k.kpi_type = q.id
-    ${includeDeleted ? "" : "WHERE k.deleted_at IS NULL"}
-    order by k.deleted_at asc
+      k.deleted_at,
+      k.order_sort
+    FROM kpi_name k
+    LEFT JOIN quality_type q ON k.kpi_type = q.id
+          ${where}
+    order by k.order_sort asc
   `;
 
         const result = await new Promise((resolve, reject) => {
@@ -573,6 +594,126 @@ exports.getKPIName = async (req, res) => {
     }
 };
 
+exports.getKPINameGroup = async (req, res) => {
+    try {
+        const includeDeleted = req.query.includeDeleted === "true";
+        const type = req.query.type;
+
+        let conditions = [];
+        if (!includeDeleted) conditions.push("k.deleted_at IS NULL");
+        if (type) conditions.push("k.kpi_type = " + Number(type));
+
+        const where =
+            conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
+
+        const query = `
+      SELECT 
+        k.id,
+        k.kpi_name,
+        k.a_name,
+        k.b_name,
+        k.kpi_type,
+        q.quality_name AS kpi_type_label,
+        k.unit_type,
+        k.unit_value,
+        k.unit_label,
+        k.target_direction,
+        k.max_value,
+        k.deleted_at,
+        k.order_sort
+      FROM kpi_name k
+      LEFT JOIN quality_type q ON k.kpi_type = q.id
+      ${where}
+      ORDER BY k.kpi_type, k.order_sort ASC
+    `;
+
+        const rows = await new Promise((resolve, reject) => {
+            db.query(query, (err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+            });
+        });
+
+        // ✔ Group by kpi_type
+        const result = [];
+
+        rows.forEach((item) => {
+            let group = result.find((g) => g.kpi_type === item.kpi_type);
+
+            if (!group) {
+                group = {
+                    label: item.kpi_type_label ?? 'ตัวชี้วัดยังไม่ได้จัดหมวดหมู่',
+                    kpi_type: item.kpi_type,
+                    items: [],
+                };
+                result.push(group);
+            }
+
+            group.items.push(item);
+        });
+
+        res.status(200).json(result);
+    } catch (err) {
+        console.error("❌ Error fetching KPI names:", err);
+        res.status(500).json({
+            success: false,
+            message: "Failed to fetch KPI names",
+            error: err.message,
+        });
+    }
+};
+
+
+exports.reorderKPIName = async (req, res) => {
+    const items = req.body.items;
+    const userName = req.user?.name || "Unknown User";
+
+    try {
+        if (!Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Items must be a non-empty array"
+            });
+        }
+
+        // Create CASE WHEN for order_sort
+        const orderCases = [];
+        const ids = [];
+
+        items.forEach(item => {
+            ids.push(item.id);
+            orderCases.push(`WHEN ${item.id} THEN ${db.escape(item.order_sort)}`);
+        });
+
+        const sql = `
+            UPDATE kpi_name
+            SET 
+                order_sort = CASE id
+                    ${orderCases.join(" ")}
+                END,
+                updated_by = ${db.escape(userName)},
+                updated_at = NOW()
+            WHERE id IN (${ids.join(",")});
+        `;
+
+        await new Promise((resolve, reject) => {
+            db.query(sql, (err, result) => (err ? reject(err) : resolve(result)));
+        });
+
+        res.json({
+            success: true,
+            message: `Updated order of ${items.length} record(s) successfully`
+        });
+
+    } catch (error) {
+        console.error("❌ Error updating order_sort:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to reorder KPI names",
+            error: error.message
+        });
+    }
+};
 
 exports.getQualityType = async (req, res) => {
     try {
@@ -607,6 +748,10 @@ exports.getData = async (req, res) => {
         const chart = req.query.chart?.trim() || "percent";
         const since = req.query.since;
         const until = req.query.until;
+
+        if (!kpi_name) {
+            return res.json([]);
+        }
 
         // Build WHERE clause dynamically
         const whereClause = [];
@@ -721,7 +866,7 @@ ORDER BY
 
 exports.getDetail = async (req, res) => {
     try {
-        const kpi_name = req.query.kpi_name || "1";
+        const kpi_name = req.query.kpi_name?.trim();
         const since = req.query.since || "2025-01-01";
         const until = req.query.until || "2025-12-31";
 
@@ -809,7 +954,7 @@ exports.getDetail = async (req, res) => {
 
 exports.dataCurrentMonth = async (req, res) => {
     try {
-        const kpi_name = req.query.kpi_name?.trim() || "1";
+        const kpi_name = req.query.kpi_name?.trim();
         const since = req.query.since;
         const until = req.query.until;
 

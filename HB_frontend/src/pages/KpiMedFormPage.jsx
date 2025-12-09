@@ -846,6 +846,7 @@ function KpiMedFormPage() {
         // 3.1 -> push opd เข้า sub-kpi
         current.children.push({
           key: `opd-${row.id}`,
+          rowType: "opd",
           data: row,
         });
 
@@ -880,10 +881,14 @@ function KpiMedFormPage() {
         const parent = map.get(row.parent_id);
 
         // 3.3 -> แปะ sub KPI เข้า main KPI
-        parent.children.push({
-          key: `sub-${row.kpi_id}`,
-          ...current,
-        });
+        if (!parent.children.some((c) => c.key === `sub-${row.kpi_id}`)) {
+          parent.children.push({
+            key: `sub-${row.kpi_id}`,
+            rowType: "sub",
+            data: { ...current.data }, // clone
+            children: current.children, // safe: structured
+          });
+        }
 
         // 3.4 -> รวมยอด sub KPI → main KPI
         fields.concat("total").forEach((f) => {

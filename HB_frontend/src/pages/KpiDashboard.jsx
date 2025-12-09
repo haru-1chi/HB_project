@@ -21,6 +21,7 @@ import {
   faLessThanEqual,
 } from "@fortawesome/free-solid-svg-icons";
 import Footer from "../components/Footer";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   formatDateForSQL,
   formatMonthYear,
@@ -33,6 +34,9 @@ function KpiDashboard() {
   const API_BASE =
     import.meta.env.VITE_REACT_APP_API || "http://localhost:3000/api";
   const dt = useRef(null);
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const type = searchParams.get("type");
 
   const now = new Date();
   const [sinceDate, setSinceDate] = useState(new Date(now.getFullYear(), 0, 1));
@@ -75,7 +79,7 @@ function KpiDashboard() {
     (item) => item.value === selectedKPIName
   );
 
-  const selectedKPINameLabel = selectedKPI?.label || 100;
+  const selectedKPINameLabel = selectedKPI?.label || "";
 
   const selectedTypeLabel =
     selectedOptions.find((item) => item.value === selectedTypeOptions)?.label ||
@@ -86,37 +90,49 @@ function KpiDashboard() {
     exportToExcel(detail, selectedKPINameLabel, selectedTypeLabel, sortedData);
   };
 
-  const fetchKPInames = useCallback(async () => {
-    //reanme fetchKpiOptions
-    try {
-      const res = await axios.get(`${API_BASE}/kpi-name`);
-      const mapped = res.data.map((item) => ({
-        label: item.kpi_name,
-        value: item.id.toString(),
-        unit_type: item.unit_type,
-        unit_value: item.unit_value,
-        unit_label: item.unit_label,
-        target_direction: item.target_direction,
-        max_value: item.max_value,
-      }));
-      // console.log(res);
-      setAllKPIChoices(mapped);
-    } catch (err) {
-      console.error("Error fetching KPI options:", err);
-      setError("เกิดข้อผิดพลาดในการโหลดข้อมูล");
-      //เอา toast มาใส่
-    }
-  }, [API_BASE]);
+  useEffect(() => {
+    const fetchKPInames = async () => {
+      try {
+        const res = await axios.get(`${API_BASE}/kpi-name`, {
+          params: { type },
+        });
+        const mapped = res.data.map((item) => ({
+          label: item.kpi_name,
+          value: item.id.toString(),
+          unit_type: item.unit_type,
+          unit_value: item.unit_value,
+          unit_label: item.unit_label,
+          target_direction: item.target_direction,
+          max_value: item.max_value,
+        }));
+
+        setAllKPIChoices(mapped);
+
+        if (mapped.length > 0) {
+          setSelectedKPIName(mapped[0].value);
+        } else {
+          setSelectedKPIName("");
+        }
+      } catch (err) {
+        console.error(err);
+        setError("เกิดข้อผิดพลาดในการโหลดข้อมูล");
+      }
+    };
+
+    fetchKPInames();
+  }, [API_BASE, type, setError]);
 
   // ✅ Build query params once
   const getQueryParams = useCallback(() => {
-    return new URLSearchParams({
-      kpi_name: selectedKPIName,
-      type: selectedTypeOptions,
-      chart: selectedChartType,
-      since: formatDateForSQL(sinceDate),
-      until: formatDateForSQL(endDate, true),
-    }).toString();
+    const params = new URLSearchParams();
+
+    if (selectedKPIName) params.append("kpi_name", selectedKPIName);
+    if (selectedTypeOptions) params.append("type", selectedTypeOptions);
+    if (selectedChartType) params.append("chart", selectedChartType);
+    if (sinceDate) params.append("since", formatDateForSQL(sinceDate));
+    if (endDate) params.append("until", formatDateForSQL(endDate, true));
+
+    return params.toString();
   }, [
     selectedKPIName,
     selectedTypeOptions,
@@ -124,6 +140,7 @@ function KpiDashboard() {
     sinceDate,
     endDate,
   ]);
+  
   const fetchDashboardData = useCallback(async () => {
     setLoading(true);
     try {
@@ -147,9 +164,8 @@ function KpiDashboard() {
   }, [API_BASE, getQueryParams]);
 
   useEffect(() => {
-    fetchKPInames();
     fetchDashboardData();
-  }, [fetchKPInames, fetchDashboardData]);
+  }, [fetchDashboardData]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -251,7 +267,7 @@ function KpiDashboard() {
   };
 
   const getGaugeChart = (type, value) => {
-    if (!type || type === "null") return null;
+    if (!type || type === "null" || !selectedKPI) return null;
     // Make sure the value is a number (assuming value is numeric already)
     const percentage = Number(value); // Ensure value is treated as a number
 
@@ -354,6 +370,7 @@ function KpiDashboard() {
                 value={selectedKPIName}
                 onChange={(e) => setSelectedKPIName(e.value)}
                 options={allKPIChoices}
+                placeholder="ตัวชี้วัด"
                 optionLabel="label"
                 checkmark
                 className="mr-5"

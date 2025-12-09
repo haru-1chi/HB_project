@@ -20,6 +20,8 @@ router.post('/kpi-name', authAndRole(1, 2), kpiController.createKPIName);
 router.put('/kpi-name', authAndRole(1, 2), kpiController.updateKPIName);
 router.delete('/kpi-name/:id', authAndRole(1, 2), kpiController.deleteKPIName);
 router.get('/kpi-name', kpiController.getKPIName);
+router.put("/kpi-name/reorder", authAndRole(1, 2), kpiController.reorderKPIName);
+router.get('/kpi-name-group', kpiController.getKPINameGroup);
 
 router.get('/quality-type', kpiController.getQualityType);
 

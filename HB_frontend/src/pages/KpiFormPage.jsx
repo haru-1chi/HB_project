@@ -128,13 +128,17 @@ function KpiFormPage() {
         const res = await axios.get(`${API_BASE}/kpi-name`, {
           params: { includeDeleted: true },
         });
-        const options = res.data.map((item) => ({
+
+        const filtered = res.data.filter((item) => item.kpi_type === 2);
+
+        const options = filtered.map((item) => ({
           label: item.kpi_name,
           value: item.id,
           a_name: item.a_name,
           b_name: item.b_name,
           deleted: item.deleted_at !== null,
         }));
+        
         setKpiNames(options);
 
         const optionsActive = options.filter((item) => !item.deleted);

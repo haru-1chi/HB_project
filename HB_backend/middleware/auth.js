@@ -26,7 +26,7 @@ exports.authAndRole = (...allowedRoles) => {
 
       // Find user from DB
       const sql = `
-        SELECT u.id, u.username, u.name, u.verify, u.role, r.role_name
+        SELECT u.id, u.username, u.name, u.verify, u.role, r.role_name, u.assign
         FROM user u
         LEFT JOIN role r ON u.role = r.id
         WHERE u.username = ?
