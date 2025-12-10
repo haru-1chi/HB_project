@@ -167,7 +167,7 @@ function SideBarMenu({ collapsed, setCollapsed }) {
             {user?.role !== 3 && (
               <>
                 <hr className="text-gray-200 mb-3" />
-                {!collapsed && <p className="p-3 text-gray-400">หลังบ้าน</p>}
+                {!collapsed && <p className="text-sm p-3 text-gray-400">หลังบ้าน</p>}
                 {[1, 2, 3].includes(user?.assign) && (
                   <Link
                     to="/lookup"
@@ -225,7 +225,7 @@ function SideBarMenu({ collapsed, setCollapsed }) {
 
                 <hr className="text-gray-200 mb-3" />
                 {!collapsed && (
-                  <p className="p-3 text-gray-400">จัดการข้อมูล</p>
+                  <p className="text-sm p-3 text-gray-400">จัดการข้อมูล</p>
                 )}
                 {[1, 2].includes(user?.assign) && (
                   <Link

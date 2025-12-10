@@ -396,6 +396,7 @@ function KpiMedFormPage() {
 
           showToast("success", "สำเร็จ", "อัพเดตข้อมูลเรียบร้อยแล้ว");
           cancelEdit();
+          fetchKpiData(normalizeDate(sinceDate));
         } catch (err) {
           const isConflict = err.response?.status === 409;
           showToast(
@@ -410,6 +411,7 @@ function KpiMedFormPage() {
               type: previousValues.type,
               isInvalid: true,
             }));
+
             fetchKpiData(selectedKpi);
           }
         }
@@ -428,7 +430,7 @@ function KpiMedFormPage() {
   ]);
 
   const renderInputCell = useCallback(
-    (field, width) => (rowNode) => {
+    (field) => (rowNode) => {
       const isChild = !!rowNode.data.opd_name; // row จาก DB เท่านั้นที่แก้ได้
       if (!isChild) return rowNode.data[field];
 
@@ -436,7 +438,7 @@ function KpiMedFormPage() {
 
       return (
         <InputText
-          style={{ width }}
+        className="w-full"
           value={editRowData[field] ?? ""}
           onChange={(e) => {
             const value = e.target.value;
@@ -880,20 +882,18 @@ function KpiMedFormPage() {
 
         const parent = map.get(row.parent_id);
 
-        // 3.3 -> แปะ sub KPI เข้า main KPI
+        fields.concat("total").forEach((f) => {
+          parent.data[f] += parseInt(row[f]) || 0;
+        });
+
         if (!parent.children.some((c) => c.key === `sub-${row.kpi_id}`)) {
           parent.children.push({
             key: `sub-${row.kpi_id}`,
             rowType: "sub",
-            data: { ...current.data }, // clone
-            children: current.children, // safe: structured
+            data: current.data,
+            children: current.children,
           });
         }
-
-        // 3.4 -> รวมยอด sub KPI → main KPI
-        fields.concat("total").forEach((f) => {
-          parent.data[f] += current.data[f];
-        });
       }
     });
 
@@ -952,55 +952,55 @@ function KpiMedFormPage() {
             <Column
               field="A"
               header="A"
-              body={renderInputCell("A", "80px")}
+              body={renderInputCell("A")}
               headerClassName="header-kpi-row"
             />
             <Column
               field="B"
               header="B"
-              body={renderInputCell("B", "80px")}
+              body={renderInputCell("B")}
               headerClassName="header-kpi-row"
             />
             <Column
               field="C"
               header="C"
-              body={renderInputCell("C", "80px")}
+              body={renderInputCell("C")}
               headerClassName="header-kpi-row"
             />
             <Column
               field="D"
               header="D"
-              body={renderInputCell("D", "80px")}
+              body={renderInputCell("D")}
               headerClassName="header-kpi-row"
             />
             <Column
               field="E"
               header="E"
-              body={renderInputCell("E", "80px")}
+              body={renderInputCell("E")}
               headerClassName="header-kpi-row"
             />
             <Column
               field="F"
               header="F"
-              body={renderInputCell("F", "80px")}
+              body={renderInputCell("F")}
               headerClassName="header-kpi-row"
             />
             <Column
               field="G"
               header="G"
-              body={renderInputCell("G", "80px")}
+              body={renderInputCell("G")}
               headerClassName="header-kpi-row"
             />
             <Column
               field="H"
               header="H"
-              body={renderInputCell("H", "80px")}
+              body={renderInputCell("H")}
               headerClassName="header-kpi-row"
             />
             <Column
               field="I"
               header="I"
-              body={renderInputCell("I", "80px")}
+              body={renderInputCell("I")}
               headerClassName="header-kpi-row"
             />
             <Column

@@ -106,28 +106,31 @@ function Lookup() {
   }, [fetchKPInames, fetchQualityType]);
 
   const handleReorder = async (e) => {
-    // ทำการเรียงใหม่ตามตำแหน่งใน Drag
-    const newList = e.value.map((item, index) => ({
-      ...item,
-      order_sort: index + 1, // ให้ order ใหม่ 1,2,3,...
+    const reorderedFiltered = e.value;
+
+    const newOrders = reorderedFiltered.map((item, index) => ({
+      id: item.id,
+      order_sort: index + 1,
     }));
 
-    setAllKPIChoices(newList); // อัปเดต UI ทันที
+    const updatedAll = allKPIChoices.map((item) => {
+      const found = newOrders.find((x) => x.id === item.id);
+      return found ? { ...item, order_sort: found.order_sort } : item;
+    });
+
+    updatedAll.sort((a, b) => a.order_sort - b.order_sort);
+
+    setAllKPIChoices(updatedAll);
 
     try {
       await axios.put(
         `${API_BASE}/kpi-name/reorder`,
-        {
-          items: newList.map((i) => ({ id: i.id, order_sort: i.order_sort })),
-        },
-        {
-          headers: { token },
-        }
+        { items: newOrders },
+        { headers: { token } }
       );
       showToast("success", "สำเร็จ", "บันทึกลำดับใหม่แล้ว");
     } catch (err) {
-      showToast("error", "ผิดพลาด", "ไม่สามารถบันทึกลำดับใหม่ได้");
-      console.error(err);
+      showToast("error", "ผิดพลาด", "ไม่สามารถบันทึกได้");
     }
   };
 
@@ -606,7 +609,7 @@ function Lookup() {
               field="id"
               header="ลำดับ"
               style={{ width: "5%" }}
-              body={(rowData) => filteredList.indexOf(rowData) + 1}
+              body={(rowData, { rowIndex }) => rowIndex + 1}
               align="center"
               sortable
             />

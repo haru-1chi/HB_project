@@ -86,9 +86,6 @@ function KpiDashboardMedError() {
 
   useEffect(() => {
     fetchChart();
-    // console.log("selectedMission", selectedMission);
-    // console.log("selectedWork", selectedWork);
-    // console.log("selectedOPD", selectedOPD);
   }, [fetchChart]);
 
   const fetchStackChart = async () => {
@@ -96,7 +93,9 @@ function KpiDashboardMedError() {
       const res = await axios.get(`${API_BASE}/kpi-data-med/stack`, {
         params: {
           kpi_id: selectedKPI,
-          opd_id: selectedOPD,
+          mission_id: selectedMission === "all" ? null : selectedMission,
+          work_id: selectedWork === "all" ? null : selectedWork,
+          opd_id: selectedOPD === "all" ? null : selectedOPD,
           sinceDate: formatDate(sinceDate),
           endDate: endDate,
           type: selectedType, // detail or group
@@ -185,8 +184,18 @@ function KpiDashboardMedError() {
   useEffect(() => {
     if (pickerMode !== "year") return;
     if (!selectedKPI) return;
+
     fetchStackChart();
-  }, [pickerMode, selectedKPI, selectedOPD, sinceDate, endDate, selectedType]);
+  }, [
+    pickerMode,
+    selectedKPI,
+    selectedMission,
+    selectedWork,
+    selectedOPD,
+    sinceDate,
+    endDate,
+    selectedType,
+  ]);
 
   const isAllZero = (obj) =>
     !obj || Object.values(obj).every((v) => Number(v) === 0);
@@ -394,7 +403,7 @@ function KpiDashboardMedError() {
         </div>
         {pickerMode === "year" &&
           (stackData?.length > 0 ? (
-            <div className="p-4 my-7 w-full rounded-xl shadow-md h-auto border-1 border-gray-200">
+            <div className="bg-white p-4 my-7 w-full rounded-xl shadow-md h-auto border-1 border-gray-200">
               <BarChart data={stackData} type="stack" dataType={selectedType} />
             </div>
           ) : (
@@ -404,7 +413,7 @@ function KpiDashboardMedError() {
         {pickerMode === "month" && (
           <div>
             {loading && <p className="text-center">Loading...</p>}
-
+            {currentCharts?.length === 0 && <p>ไม่พบข้อมูล...</p>}
             {!activeParent && currentCharts?.length > 0 && (
               <div className="grid grid-cols-3 gap-5">
                 {currentCharts

@@ -295,29 +295,25 @@ exports.deleteKPIData = async (req, res) => {
             return res.status(400).json({ success: false, message: "Invalid ID format" });
         }
 
+        // build delete SQL
         const sql = `DELETE FROM kpi_data WHERE id IN (${safeIds.map(() => "?").join(",")})`;
 
-        await queryAsync("START TRANSACTION");
+        // run delete
         const result = await queryAsync(sql, safeIds);
 
         if (result.affectedRows === 0) {
-            await queryAsync("ROLLBACK");
             return res.status(404).json({ success: false, message: "No data found for provided IDs" });
         }
 
-        await queryAsync("COMMIT");
-
-        res.json({
+        return res.json({
             success: true,
-            message: `✅ ${result.affectedRows} record(s) deleted successfully`,
-            deletedCount: result.affectedRows,
+            message: `Deleted ${result.affectedRows} record(s)`,
+            deletedCount: result.affectedRows
         });
+
     } catch (err) {
-        console.error("❌ Delete error:", err);
-        try {
-            await queryAsync("ROLLBACK");
-        } catch (_) { }
-        res.status(500).json({ success: false, message: "Database error" });
+        console.error("Delete error:", err);
+        return res.status(500).json({ success: false, message: "Database error" });
     }
 };
 

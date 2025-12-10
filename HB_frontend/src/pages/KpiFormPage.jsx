@@ -38,8 +38,6 @@ import axiosInstance, { setAuthErrorInterceptor } from "../utils/axiosInstance";
 
 import { handleFileUpload } from "../utils/importUtils";
 function KpiFormPage() {
-  const [value, setValue] = useState("");
-
   const API_BASE =
     import.meta.env.VITE_REACT_APP_API || "http://localhost:3000/api";
   const { logout } = useAuth();
@@ -138,7 +136,7 @@ function KpiFormPage() {
           b_name: item.b_name,
           deleted: item.deleted_at !== null,
         }));
-        
+
         setKpiNames(options);
 
         const optionsActive = options.filter((item) => !item.deleted);
@@ -647,7 +645,7 @@ function KpiFormPage() {
         });
 
         setKpiData((prev) => prev.filter((row) => row.id !== id));
-
+        // await fetchKpiData(selectedKpi);
         showToast("success", "สำเร็จ", "ลบข้อมูลเรียบร้อยแล้ว");
       } catch (err) {
         console.error("Delete failed:", err);

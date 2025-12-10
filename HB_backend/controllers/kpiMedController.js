@@ -789,18 +789,52 @@ exports.getKPIMedPie = async (req, res) => {
 
 exports.getKPIMedStack = async (req, res) => {
     try {
-        const { sinceDate, endDate, kpi_id, opd_id, type } = req.query;
+        const { sinceDate, endDate, kpi_id, opd_id, work_id, mission_id, type } = req.query;
         const kpiId = Number(kpi_id);
-        const mode = (type || "detail").trim();   // "detail" or "group"
+        const mode = (type || "detail").trim();
 
         if (!kpiId) {
             return res.status(400).json({ error: "Missing or invalid KPI ID" });
         }
 
-        /**
-         * 1️⃣ Fetch leaf/sub KPIs using a recursive CTE
-         *    (Use SELECT id only once; avoid building large IN (...) strings)
-         */
+        // ================================================================
+        // 1️⃣ Determine OPDs to filter (SAME LOGIC AS getKPIMedPie)
+        // ================================================================
+        let opdList = [];
+
+        if (opd_id) {
+            opdList = [opd_id];
+        }
+        else if (work_id) {
+            const rows = await query(
+                `SELECT id FROM opd_name WHERE work_id = ? AND deleted_at IS NULL`,
+                [work_id]
+            );
+            opdList = rows.map(r => r.id);
+        }
+        else if (mission_id) {
+            const rows = await query(`
+                SELECT o.id
+                FROM opd_name o
+                JOIN work_name w ON o.work_id = w.id
+                WHERE w.mission_id = ? AND o.deleted_at IS NULL
+            `, [mission_id]);
+            opdList = rows.map(r => r.id);
+        }
+        else {
+            const rows = await query(
+                `SELECT id FROM opd_name WHERE deleted_at IS NULL`
+            );
+            opdList = rows.map(r => r.id);
+        }
+
+        if ((work_id || mission_id) && opdList.length === 0) {
+            return res.json([]); // ไม่มี OPD ให้ query เลย → return empty
+        }
+
+        // ================================================================
+        // 2️⃣ Fetch recursive KPI tree (unchanged logic)
+        // ================================================================
         const kpiRows = await query(
             `
             WITH RECURSIVE kpi_tree AS (
@@ -823,19 +857,20 @@ exports.getKPIMedStack = async (req, res) => {
 
         const targetKpiIds = kpiRows.map(r => r.id);
         if (targetKpiIds.length === 0) {
-            return res.status(200).json([]); // nothing to query
+            return res.status(200).json([]);
         }
 
-        /**
-         * 2️⃣ Build WHERE with fewer string operations and clean param push
-         */
+        // ================================================================
+        // 3️⃣ Build WHERE conditions
+        // ================================================================
         const params = [];
         const whereParts = [];
 
-        // Always present
+        // KPI list
         whereParts.push(`kpi_id IN (${targetKpiIds.map(() => '?').join(',')})`);
         params.push(...targetKpiIds);
 
+        // Date filters
         if (sinceDate) {
             whereParts.push(`report_date >= DATE_FORMAT(?, '%Y-%m-01')`);
             params.push(sinceDate);
@@ -846,17 +881,17 @@ exports.getKPIMedStack = async (req, res) => {
             params.push(endDate);
         }
 
-        if (opd_id) {
-            whereParts.push(`opd_id = ?`);
-            params.push(opd_id);
+        // OPD filter (NEW FEATURE)
+        if (opdList.length > 0) {
+            whereParts.push(`opd_id IN (${opdList.map(() => '?').join(',')})`);
+            params.push(...opdList);
         }
 
         const whereSQL = `WHERE ${whereParts.join(" AND ")}`;
 
-        /**
-         * 3️⃣ Dynamic SELECT using prebuilt strings
-         *    (avoids repeating sums in main query)
-         */
+        // ================================================================
+        // 4️⃣ Build SELECT fields
+        // ================================================================
         const SELECT_FIELDS =
             mode === "group"
                 ? `
@@ -871,11 +906,9 @@ exports.getKPIMedStack = async (req, res) => {
                     SUM(G) AS G, SUM(H) AS H, SUM(I) AS I
                   `;
 
-        /**
-         * 4️⃣ Query
-         *    → Use DATE(report_date) grouping only once
-         *    → Avoid computing DATE_FORMAT 3x
-         */
+        // ================================================================
+        // 5️⃣ Query SQL
+        // ================================================================
         const queryStr = `
             SELECT
                 ${SELECT_FIELDS},
@@ -889,9 +922,13 @@ exports.getKPIMedStack = async (req, res) => {
 
         const rows = await query(queryStr, params);
 
-        /**
-         * 5️⃣ Output formatting
-         */
+        if (rows.length === 0) {
+            return res.status(200).json([]);
+        }
+
+        // ================================================================
+        // 6️⃣ Format Output
+        // ================================================================
         const response = rows.map(r =>
             mode === "group"
                 ? {
@@ -905,15 +942,10 @@ exports.getKPIMedStack = async (req, res) => {
                 : {
                     month: r.month_display,
                     month_key: r.month_key,
-                    A: r.A || 0,
-                    B: r.B || 0,
-                    C: r.C || 0,
-                    D: r.D || 0,
-                    E: r.E || 0,
-                    F: r.F || 0,
-                    G: r.G || 0,
-                    H: r.H || 0,
-                    I: r.I || 0,
+                    A: r.A || 0, B: r.B || 0,
+                    C: r.C || 0, D: r.D || 0,
+                    E: r.E || 0, F: r.F || 0,
+                    G: r.G || 0, H: r.H || 0, I: r.I || 0
                 }
         );
 
