@@ -1,7 +1,5 @@
 const jwt = require("jsonwebtoken");
-const db = require("../mysql.js");
-const util = require("util");
-const query = util.promisify(db.query).bind(db);
+const pool = require("../mysql.js");
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key";
 
 exports.authAndRole = (...allowedRoles) => {
@@ -11,7 +9,7 @@ exports.authAndRole = (...allowedRoles) => {
       if (!token)
         return res.status(401).json({ message: "กรุณาแนบ token มากับ header" });
 
-      // ✅ 1. Verify JWT once (fast fail if invalid or expired)
+      // ตรวจสอบ token
       let decoded;
       try {
         decoded = jwt.verify(token, JWT_SECRET);
@@ -24,7 +22,7 @@ exports.authAndRole = (...allowedRoles) => {
         });
       }
 
-      // Find user from DB
+      // 🔥 ใช้ mysql2/promise แบบถูกต้อง
       const sql = `
         SELECT u.id, u.username, u.name, u.verify, u.role, r.role_name, u.assign
         FROM user u
@@ -32,13 +30,13 @@ exports.authAndRole = (...allowedRoles) => {
         WHERE u.username = ?
         LIMIT 1
       `;
-      const result = await query(sql, [decoded.username]);
-      const user = result.length ? result[0] : null;
+      const [result] = await pool.query(sql, [decoded.username]);
 
-      if (!user) {
+      if (!result.length) {
         return res.status(404).json({ message: "ไม่พบผู้ใช้งานนี้ในระบบ" });
       }
 
+      const user = result[0];
       req.user = user;
 
       if (allowedRoles.length && !allowedRoles.includes(user.role)) {

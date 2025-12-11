@@ -1,13 +1,4 @@
 const db = require('../mysql.js');
-const util = require("util");
-
-const query = util.promisify(db.query).bind(db);
-const queryAsync = (sql, params = []) =>
-    new Promise((resolve, reject) => {
-        db.query(sql, params, (err, results) =>
-            err ? reject(err) : resolve(results)
-        );
-    });
 
 exports.createKPIDataQuality = async (req, res) => {
     const {
@@ -30,11 +21,10 @@ exports.createKPIDataQuality = async (req, res) => {
         }
 
         const sql = `
-    INSERT INTO kpi_data 
-    (kpi_name, a_value, b_value, issue_details, support_details, report_date, type, created_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-`;
-
+            INSERT INTO kpi_data 
+            (kpi_name, a_value, b_value, issue_details, support_details, report_date, type, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `;
 
         const values = [
             kpi_id,
@@ -47,7 +37,7 @@ exports.createKPIDataQuality = async (req, res) => {
             userName
         ];
 
-        const result = await queryAsync(sql, values);
+        const [result] = await db.query(sql, values);
 
         res.json({
             success: true,
@@ -122,7 +112,7 @@ exports.updateKPIDataQuality = async (req, res) => {
             id
         ];
 
-        const result = await queryAsync(sql, values);
+        const [result] = await db.query(sql, values);
 
         if (result.affectedRows === 0) {
             return res.status(404).json({
@@ -195,10 +185,9 @@ exports.getKPIDataQuality = async (req, res) => {
 
         sql += ` ORDER BY d.report_date ASC`;
 
-        const result = await query(sql, params);
+        const [rows] = await db.query(sql, params);
 
-        // 🔥 Format TH date here
-        const formatted = (Array.isArray(result) ? result : []).map((r) => {
+        const formatted = (Array.isArray(rows) ? rows : []).map((r) => {
             const d = new Date(r.report_date);
             const month = monthTH[d.getMonth()];
             const year = (d.getFullYear()).toString().slice(-2);
@@ -233,7 +222,7 @@ exports.deleteKPIDataQuality = async (req, res) => {
             WHERE id = ?
         `;
 
-        const result = await queryAsync(sql, [id]);
+        const [result] = await db.query(sql, [id]);
 
         if (result.affectedRows === 0) {
             return res.status(404).json({

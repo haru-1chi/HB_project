@@ -1,7 +1,7 @@
 const db = require('../mysql.js'); // ⬅️ Import MySQL connection
-const util = require("util");
+// const util = require("util");
 
-const query = util.promisify(db.query).bind(db);
+// const query = util.promisify(db.query).bind(db);
 
 exports.createKPINameMed = async (req, res) => {
     const dataArray = Array.isArray(req.body) ? req.body : [req.body];
@@ -20,20 +20,22 @@ exports.createKPINameMed = async (req, res) => {
 
         for (const item of dataArray) {
             const { mainKPI, subKPIs = [] } = item;
-            const [existing] = await query(
+
+            // 🔹 mysql2/promise
+            const [existing] = await db.query(
                 `SELECT id FROM kpi_name_med WHERE kpi_name = ? AND parent_id IS NULL LIMIT 1`,
                 [mainKPI]
             );
 
             let mainId;
 
-            if (existing) {
-                mainId = existing.id;
+            if (existing.length > 0) {
+                mainId = existing[0].id;
                 reusedCount++;
             } else {
-                const mainResult = await query(
+                const [mainResult] = await db.query(
                     `INSERT INTO kpi_name_med (kpi_name, parent_id, created_by)
-           VALUES (?, NULL, ?)`,
+                     VALUES (?, NULL, ?)`,
                     [mainKPI, userName]
                 );
                 mainId = mainResult.insertId;
@@ -41,19 +43,19 @@ exports.createKPINameMed = async (req, res) => {
             }
 
             for (const sub of subKPIs) {
-                const [subExists] = await query(
+                const [subExists] = await db.query(
                     `SELECT id FROM kpi_name_med WHERE kpi_name = ? AND parent_id = ? LIMIT 1`,
                     [sub, mainId]
                 );
 
-                if (!subExists) {
+                if (subExists.length === 0) {
                     values.push([sub, mainId, userName]);
                 }
             }
         }
 
         if (values.length > 0) {
-            await query(
+            await db.query(
                 `INSERT INTO kpi_name_med (kpi_name, parent_id, created_by) VALUES ?`,
                 [values]
             );
@@ -83,13 +85,13 @@ exports.updateKPINameMed = async (req, res) => {
 
     try {
         // 1️⃣ Update main KPI name
-        await query(
-            `UPDATE kpi_name_med SET kpi_name = ?, updated_by = NOW() WHERE id = ?`,
-            [mainKPI, id]
+        await db.query(
+            `UPDATE kpi_name_med SET kpi_name = ?, updated_by = ? WHERE id = ?`,
+            [mainKPI, userName, id]
         );
 
         // 2️⃣ Get existing subKPIs for this main KPI
-        const existingSubs = await query(
+        const [existingSubs] = await db.query(
             `SELECT kpi_name FROM kpi_name_med WHERE parent_id = ?`,
             [id]
         );
@@ -103,7 +105,7 @@ exports.updateKPINameMed = async (req, res) => {
 
         if (newSubs.length > 0) {
             const values = newSubs.map(sub => [sub, id, userName]);
-            await query(
+            await db.query(
                 `INSERT INTO kpi_name_med (kpi_name, parent_id, created_by) VALUES ?`,
                 [values]
             );
@@ -132,12 +134,12 @@ exports.deleteKPINameMed = async (req, res) => {
 
     try {
         // 1️⃣ Soft delete main KPI and its sub-KPIs
-        const result = await query(
+        const [result] = await db.query(
             `
-      UPDATE kpi_name_med
-      SET deleted_at = NOW()
-      WHERE (id = ? OR parent_id = ?) AND deleted_at IS NULL
-    `,
+            UPDATE kpi_name_med
+            SET deleted_at = NOW()
+            WHERE (id = ? OR parent_id = ?) AND deleted_at IS NULL
+            `,
             [id, id]
         );
 
@@ -190,31 +192,26 @@ exports.getKPIMedName = async (req, res) => {
         const includeDeleted = req.query.includeDeleted === "true";
 
         const sql = `
-      SELECT id, kpi_name, parent_id
-      FROM kpi_name_med
-      ${includeDeleted ? "" : "WHERE deleted_at IS NULL"}
-    `;
+            SELECT id, kpi_name, parent_id
+            FROM kpi_name_med
+            ${includeDeleted ? "" : "WHERE deleted_at IS NULL"}
+        `;
 
-        const rows = await query(sql);
+        const [rows] = await db.query(sql);
 
-        // No data → return empty list
         if (!rows || rows.length === 0) {
             return res.status(200).json([]);
         }
 
-        // Single pass mapping
         const lookup = new Map();
         const roots = [];
 
-        // Initialize lookup with node objects
         for (const row of rows) {
             lookup.set(row.id, { ...row, children: [] });
         }
 
-        // Build the tree in one loop
         for (const row of rows) {
             const node = lookup.get(row.id);
-
             if (row.parent_id) {
                 const parent = lookup.get(row.parent_id);
                 if (parent) parent.children.push(node);
@@ -224,7 +221,6 @@ exports.getKPIMedName = async (req, res) => {
         }
 
         return res.status(200).json(roots);
-
     } catch (err) {
         console.error("❌ Error fetching KPI names:", err);
         return res.status(500).json({
@@ -241,7 +237,7 @@ exports.createKPIMedError = async (req, res) => {
     try {
         const dataArray = req.body;
 
-        // 🚨 Validate input early
+        // Validate input
         if (!Array.isArray(dataArray) || dataArray.length === 0) {
             return res.status(400).json({
                 success: false,
@@ -251,40 +247,32 @@ exports.createKPIMedError = async (req, res) => {
 
         const createdBy = req.user?.name || "Unknown User";
 
-        // 🔥 1. Pre-allocate array for speed (better than .map)
-        const values = new Array(dataArray.length);
+        const values = dataArray.map(item => [
+            item.kpi_id,
+            item.opd_id,
+            item.A ?? 0,
+            item.B ?? 0,
+            item.C ?? 0,
+            item.D ?? 0,
+            item.E ?? 0,
+            item.F ?? 0,
+            item.G ?? 0,
+            item.H ?? 0,
+            item.I ?? 0,
+            item.report_date,
+            createdBy,
+        ]);
 
-        for (let i = 0; i < dataArray.length; i++) {
-            const item = dataArray[i];
-
-            values[i] = [
-                item.kpi_id,
-                item.opd_id,
-                item.A ?? 0,
-                item.B ?? 0,
-                item.C ?? 0,
-                item.D ?? 0,
-                item.E ?? 0,
-                item.F ?? 0,
-                item.G ?? 0,
-                item.H ?? 0,
-                item.I ?? 0,
-                item.report_date,
-                createdBy,   // added
-            ];
-        }
-
-        // 🔥 2. Move column list & placeholders OUT of template literal formatting
         const sql = `
-      INSERT INTO kpi_med_error (
-        kpi_id, opd_id,
-        A, B, C, D, E, F, G, H, I,
-        report_date,
-        created_by
-      ) VALUES ?
-    `;
+            INSERT INTO kpi_med_error (
+                kpi_id, opd_id,
+                A, B, C, D, E, F, G, H, I,
+                report_date,
+                created_by
+            ) VALUES ?
+        `;
 
-        const result = await query(sql, [values]);
+        const [result] = await db.query(sql, [values]);
 
         return res.status(201).json({
             success: true,
@@ -338,7 +326,6 @@ exports.updateKPIMedError = async (req, res) => {
             }
         }
 
-        // If no fields to update (unlikely but possible)
         if (setParts.length === 0) {
             return res.status(400).json({
                 success: false,
@@ -349,19 +336,18 @@ exports.updateKPIMedError = async (req, res) => {
         // Add metadata
         setParts.push("updated_by = ?");
         params.push(updatedBy);
-
         setParts.push("updated_at = NOW()");
 
-        // Add WHERE id = ?
+        // Add WHERE clause
         params.push(data.id);
 
         const sql = `
-      UPDATE kpi_med_error
-      SET ${setParts.join(", ")}
-      WHERE id = ?
-    `;
+            UPDATE kpi_med_error
+            SET ${setParts.join(", ")}
+            WHERE id = ?
+        `;
 
-        const result = await query(sql, params);
+        const [result] = await db.query(sql, params);
 
         if (result.affectedRows === 0) {
             return res.status(404).json({
@@ -405,7 +391,7 @@ exports.deleteKPIMedError = async (req, res) => {
             });
         }
 
-        // 🔥 2. Convert & filter IDs (FAST, no double mapping)
+        // 🔥 2. Convert & filter IDs
         const safeIds = [];
         const seen = new Set();
 
@@ -424,15 +410,15 @@ exports.deleteKPIMedError = async (req, res) => {
             });
         }
 
-        // 🔥 3. Use static placeholder strategy (no dynamic string concat)
+        // 🔥 3. Use static placeholder strategy
         const placeholders = new Array(safeIds.length).fill("?").join(",");
 
         const sql = `
-      DELETE FROM kpi_med_error
-      WHERE id IN (${placeholders})
-    `;
+            DELETE FROM kpi_med_error
+            WHERE id IN (${placeholders})
+        `;
 
-        const result = await query(sql, safeIds);
+        const [result] = await db.query(sql, safeIds);
 
         if (result.affectedRows === 0) {
             return res.status(404).json({
@@ -461,25 +447,24 @@ exports.getKPIMedData = async (req, res) => {
     try {
         const month = req.query.month?.trim(); // expected format: "YYYY-MM"
         const sql = `
-      SELECT 
-        e.*, 
-        n.kpi_name AS kpi_label, 
-        n.parent_id,
-        p.kpi_name AS kpi_parent_label,
-        d.opd_name
-      FROM kpi_med_error e
-      LEFT JOIN kpi_name_med n ON e.kpi_id = n.id
-      LEFT JOIN kpi_name_med p ON n.parent_id = p.id
-      LEFT JOIN opd_name d ON e.opd_id = d.id
-      WHERE 1=1
-        ${month ? "AND e.report_date >= ? AND e.report_date < ?" : ""}
-      ORDER BY e.report_date ASC
-    `;
+            SELECT 
+                e.*, 
+                n.kpi_name AS kpi_label, 
+                n.parent_id,
+                p.kpi_name AS kpi_parent_label,
+                d.opd_name
+            FROM kpi_med_error e
+            LEFT JOIN kpi_name_med n ON e.kpi_id = n.id
+            LEFT JOIN kpi_name_med p ON n.parent_id = p.id
+            LEFT JOIN opd_name d ON e.opd_id = d.id
+            WHERE 1=1
+                ${month ? "AND e.report_date >= ? AND e.report_date < ?" : ""}
+            ORDER BY e.report_date ASC
+        `;
 
         const params = [];
 
         if (month) {
-            // ✅ Calculate start and end of the month
             const startDate = `${month}`;
             const [year, mon] = month.split("-");
             const nextMonth = (Number(mon) === 12)
@@ -489,7 +474,7 @@ exports.getKPIMedData = async (req, res) => {
             params.push(startDate, nextMonth);
         }
 
-        const results = await query(sql, params);
+        const [results] = await db.query(sql, params);
         res.status(200).json(results || []);
 
     } catch (err) {
@@ -636,43 +621,33 @@ exports.getKPIMedPie = async (req, res) => {
         // ===============================
         let opdList = [];
 
-        // 1) opd_id → ใช้เลย
         if (opd_id) {
             opdList = [opd_id];
-        }
-
-        // 2) work_id → โหลด opd ทั้งหมดของ work นั้น
-        else if (work_id) {
-            const rows = await query(
+        } else if (work_id) {
+            const [rows] = await db.query(
                 `SELECT id FROM opd_name WHERE work_id = ? AND deleted_at IS NULL`,
                 [work_id]
             );
             opdList = rows.map(r => r.id);
-        }
-
-        // 3) mission_id → โหลด opd ทั้งหมดของ mission นั้น
-        else if (mission_id) {
-            const rows = await query(`
-        SELECT o.id
-        FROM opd_name o
-        JOIN work_name w ON o.work_id = w.id
-        WHERE w.mission_id = ? AND o.deleted_at IS NULL
-    `, [mission_id]);
+        } else if (mission_id) {
+            const [rows] = await db.query(
+                `SELECT o.id
+                 FROM opd_name o
+                 JOIN work_name w ON o.work_id = w.id
+                 WHERE w.mission_id = ? AND o.deleted_at IS NULL`,
+                [mission_id]
+            );
             opdList = rows.map(r => r.id);
-        }
-
-        // 4) ถ้าไม่เลือกอะไรเลย (all) → โหลด ALL opd
-        else {
-            const rows = await query(
+        } else {
+            const [rows] = await db.query(
                 `SELECT id FROM opd_name WHERE deleted_at IS NULL`
             );
             opdList = rows.map(r => r.id);
         }
-        if ((work_id || mission_id) && opdList.length === 0) {
-            return res.json([]);
-        }
 
-        // Format WHERE conditions only once
+        if ((work_id || mission_id) && opdList.length === 0) return res.json([]);
+
+        // Format WHERE conditions
         const conditions = [];
         const params = [];
 
@@ -691,43 +666,36 @@ exports.getKPIMedPie = async (req, res) => {
 
         const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
-        // 1️⃣ Load all KPI names (parent + child)
-        const allKpis = await query(`
-      SELECT id, kpi_name, parent_id
-      FROM kpi_name_med
-      WHERE deleted_at IS NULL
-    `);
-
+        // 1️⃣ Load all KPI names
+        const [allKpis] = await db.query(`
+            SELECT id, kpi_name, parent_id
+            FROM kpi_name_med
+            WHERE deleted_at IS NULL
+        `);
         if (!allKpis.length) return res.json([]);
 
-        // 2️⃣ Load all KPI SUM values (single query)
+        // 2️⃣ Load all KPI SUM values
         const sumSql = `
-      SELECT 
-        kpi_id,
-        ${detailFields.map(f => `SUM(${f}) AS ${f}`).join(", ")}
-      FROM kpi_med_error
-      ${whereClause}
-      GROUP BY kpi_id
-    `;
+            SELECT 
+                kpi_id,
+                ${detailFields.map(f => `SUM(${f}) AS ${f}`).join(", ")}
+            FROM kpi_med_error
+            ${whereClause}
+            GROUP BY kpi_id
+        `;
+        const [sumData] = await db.query(sumSql, params);
 
-        const sumData = await query(sumSql, params);
-
-        // Convert into a lookup table
         const sumLookup = new Map();
-        for (const row of sumData) {
-            sumLookup.set(row.kpi_id, row);
-        }
+        for (const row of sumData) sumLookup.set(row.kpi_id, row);
 
-        // 3️⃣ Turn raw SUM rows into mapped values (group or detail)
+        // 3️⃣ Map raw SUM rows
         const mapFields = (row) => {
             if (!row) return {};
-
             if (mode === "detail") {
                 const result = {};
                 for (const f of detailFields) result[f] = row[f] ?? 0;
                 return result;
             }
-
             return {
                 AB: (row.A ?? 0) + (row.B ?? 0),
                 CD: (row.C ?? 0) + (row.D ?? 0),
@@ -736,7 +704,7 @@ exports.getKPIMedPie = async (req, res) => {
             };
         };
 
-        // 4️⃣ Build lookup for all KPI nodes
+        // 4️⃣ Build KPI tree
         const lookup = new Map();
         for (const kpi of allKpis) {
             lookup.set(kpi.id, {
@@ -746,7 +714,6 @@ exports.getKPIMedPie = async (req, res) => {
             });
         }
 
-        // 5️⃣ Build tree in memory
         const parents = [];
         for (const kpi of lookup.values()) {
             if (kpi.parent_id) {
@@ -757,23 +724,19 @@ exports.getKPIMedPie = async (req, res) => {
             }
         }
 
-        // 6️⃣ Aggregate children values upward
+        // 5️⃣ Aggregate children upward
         const addChildSum = (parent) => {
             for (const child of parent.children) {
                 addChildSum(child);
-
                 for (const key in child.data) {
                     parent.data[key] = (parent.data[key] ?? 0) + (child.data[key] ?? 0);
                 }
             }
         };
-
         for (const p of parents) addChildSum(p);
 
-        // 7️⃣ Filter out parents that have all 0 values (including children)
-        const filtered = parents.filter((p) => {
-            return Object.values(p.data).some(v => v !== 0);
-        });
+        // 6️⃣ Filter out empty parents
+        const filtered = parents.filter(p => Object.values(p.data).some(v => v !== 0));
 
         return res.json(filtered);
 
@@ -797,45 +760,37 @@ exports.getKPIMedStack = async (req, res) => {
             return res.status(400).json({ error: "Missing or invalid KPI ID" });
         }
 
-        // ================================================================
-        // 1️⃣ Determine OPDs to filter (SAME LOGIC AS getKPIMedPie)
-        // ================================================================
+        // 1️⃣ Determine OPDs to filter
         let opdList = [];
 
         if (opd_id) {
             opdList = [opd_id];
-        }
-        else if (work_id) {
-            const rows = await query(
+        } else if (work_id) {
+            const [rows] = await db.query(
                 `SELECT id FROM opd_name WHERE work_id = ? AND deleted_at IS NULL`,
                 [work_id]
             );
             opdList = rows.map(r => r.id);
-        }
-        else if (mission_id) {
-            const rows = await query(`
-                SELECT o.id
-                FROM opd_name o
-                JOIN work_name w ON o.work_id = w.id
-                WHERE w.mission_id = ? AND o.deleted_at IS NULL
-            `, [mission_id]);
+        } else if (mission_id) {
+            const [rows] = await db.query(
+                `SELECT o.id
+                 FROM opd_name o
+                 JOIN work_name w ON o.work_id = w.id
+                 WHERE w.mission_id = ? AND o.deleted_at IS NULL`,
+                [mission_id]
+            );
             opdList = rows.map(r => r.id);
-        }
-        else {
-            const rows = await query(
+        } else {
+            const [rows] = await db.query(
                 `SELECT id FROM opd_name WHERE deleted_at IS NULL`
             );
             opdList = rows.map(r => r.id);
         }
 
-        if ((work_id || mission_id) && opdList.length === 0) {
-            return res.json([]); // ไม่มี OPD ให้ query เลย → return empty
-        }
+        if ((work_id || mission_id) && opdList.length === 0) return res.json([]);
 
-        // ================================================================
-        // 2️⃣ Fetch recursive KPI tree (unchanged logic)
-        // ================================================================
-        const kpiRows = await query(
+        // 2️⃣ Fetch recursive KPI tree
+        const [kpiRows] = await db.query(
             `
             WITH RECURSIVE kpi_tree AS (
                 SELECT id, parent_id
@@ -856,32 +811,23 @@ exports.getKPIMedStack = async (req, res) => {
         );
 
         const targetKpiIds = kpiRows.map(r => r.id);
-        if (targetKpiIds.length === 0) {
-            return res.status(200).json([]);
-        }
+        if (targetKpiIds.length === 0) return res.status(200).json([]);
 
-        // ================================================================
         // 3️⃣ Build WHERE conditions
-        // ================================================================
         const params = [];
         const whereParts = [];
 
-        // KPI list
         whereParts.push(`kpi_id IN (${targetKpiIds.map(() => '?').join(',')})`);
         params.push(...targetKpiIds);
 
-        // Date filters
         if (sinceDate) {
             whereParts.push(`report_date >= DATE_FORMAT(?, '%Y-%m-01')`);
             params.push(sinceDate);
         }
-
         if (endDate) {
             whereParts.push(`report_date <= LAST_DAY(DATE_FORMAT(?, '%Y-%m-01'))`);
             params.push(endDate);
         }
-
-        // OPD filter (NEW FEATURE)
         if (opdList.length > 0) {
             whereParts.push(`opd_id IN (${opdList.map(() => '?').join(',')})`);
             params.push(...opdList);
@@ -889,9 +835,7 @@ exports.getKPIMedStack = async (req, res) => {
 
         const whereSQL = `WHERE ${whereParts.join(" AND ")}`;
 
-        // ================================================================
         // 4️⃣ Build SELECT fields
-        // ================================================================
         const SELECT_FIELDS =
             mode === "group"
                 ? `
@@ -906,9 +850,7 @@ exports.getKPIMedStack = async (req, res) => {
                     SUM(G) AS G, SUM(H) AS H, SUM(I) AS I
                   `;
 
-        // ================================================================
         // 5️⃣ Query SQL
-        // ================================================================
         const queryStr = `
             SELECT
                 ${SELECT_FIELDS},
@@ -920,15 +862,11 @@ exports.getKPIMedStack = async (req, res) => {
             ORDER BY month_key;
         `;
 
-        const rows = await query(queryStr, params);
+        const [rows] = await db.query(queryStr, params);
 
-        if (rows.length === 0) {
-            return res.status(200).json([]);
-        }
+        if (rows.length === 0) return res.status(200).json([]);
 
-        // ================================================================
         // 6️⃣ Format Output
-        // ================================================================
         const response = rows.map(r =>
             mode === "group"
                 ? {

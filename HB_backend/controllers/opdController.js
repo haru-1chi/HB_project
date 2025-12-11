@@ -1,7 +1,5 @@
 const crudFactory = require("../utils/crudFactory");
 const db = require("../mysql.js");
-const util = require("util");
-const query = util.promisify(db.query).bind(db);
 
 async function ensureParent(table, nameField, idOrName, extraFields = {}, createdBy = "Unknown User") {
   if (!isNaN(idOrName)) return Number(idOrName);
@@ -12,10 +10,9 @@ async function ensureParent(table, nameField, idOrName, extraFields = {}, create
     INSERT INTO ${table} (${fieldNames.join(", ")})
     VALUES (${placeholders})
   `;
-
   const values = [idOrName, ...Object.values(extraFields), createdBy];
 
-  const result = await query(sql, values);
+  const [result] = await db.query(sql, values);
   return result.insertId;
 }
 
@@ -23,43 +20,35 @@ exports.missionGroupController = {
   ...crudFactory("mission_name", ["mission_name"]),
 
   list: async (req, res) => {
-    const includeDeleted = req.query.includeDeleted === "true";
-    const sql = `
-      SELECT id, mission_name, deleted_at
-      FROM mission_name
-      ${includeDeleted ? "" : "WHERE deleted_at IS NULL"}
-      ORDER BY mission_name ASC
-    `;
-    const rows = await query(sql);
-    res.json(rows);
+    try {
+      const includeDeleted = req.query.includeDeleted === "true";
+      const sql = `
+        SELECT id, mission_name, deleted_at
+        FROM mission_name
+        ${includeDeleted ? "" : "WHERE deleted_at IS NULL"}
+        ORDER BY mission_name ASC
+      `;
+      const [rows] = await db.query(sql);
+      res.json(rows);
+    } catch (err) {
+      console.error("❌ Error fetching mission list:", err);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch mission list",
+        error: err.message,
+      });
+    }
   }
 };
 
 exports.workGroupController = {
   ...crudFactory("work_name", ["work_name", "mission_id"]),
   create: async (req, res) => {
-    const items = req.body;
-    const createdBy = req.user?.name || "Unknown User";
-
-    for (const item of items) {
-      item.mission_id = await ensureParent(
-        "mission_name",
-        "mission_name",
-        item.mission_id,
-        {},
-        createdBy
-      );
-    }
-
-    return crudFactory("work_name", ["work_name", "mission_id"])
-      .create({ ...req, body: items }, res);
-  },
-  update: async (req, res) => {
     try {
-      const items = req.body;
+      const items = Array.isArray(req.body) ? req.body : [req.body];
       const createdBy = req.user?.name || "Unknown User";
+
       for (const item of items) {
-        // 1️⃣ ensure mission exists
         item.mission_id = await ensureParent(
           "mission_name",
           "mission_name",
@@ -69,33 +58,61 @@ exports.workGroupController = {
         );
       }
 
-      // 2️⃣ update normally
+      // ใช้ crudFactory create
+      return crudFactory("work_name", ["work_name", "mission_id"])
+        .create({ ...req, body: items }, res);
+
+    } catch (err) {
+      console.error("❌ Error creating work group:", err);
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  },
+  update: async (req, res) => {
+    try {
+      const items = Array.isArray(req.body) ? req.body : [req.body];
+      const createdBy = req.user?.name || "Unknown User";
+      for (const item of items) {
+        // ensure mission exists
+        item.mission_id = await ensureParent(
+          "mission_name",
+          "mission_name",
+          item.mission_id,
+          {},
+          createdBy
+        );
+      }
+
       return crudFactory("work_name", ["work_name", "mission_id"])
         .update({ ...req, body: items }, res);
 
     } catch (err) {
-      console.error(err);
-      return res.status(500).json({ success: false });
+      console.error("❌ Error updating work group:", err);
+      return res.status(500).json({ success: false, message: err.message });
     }
   },
   list: async (req, res) => {
-    const includeDeleted = req.query.includeDeleted === "true";
+    try {
+      const includeDeleted = req.query.includeDeleted === "true";
+      const sql = `
+        SELECT 
+          w.id,
+          w.mission_id,
+          w.work_name,
+          m.mission_name,
+          w.deleted_at
+        FROM work_name w
+        LEFT JOIN mission_name m ON w.mission_id = m.id
+        ${includeDeleted ? "" : "WHERE w.deleted_at IS NULL"}
+        ORDER BY m.mission_name, w.work_name
+      `;
 
-    const sql = `
-      SELECT 
-        w.id,
-        w.mission_id,
-        w.work_name,
-        m.mission_name,
-        w.deleted_at
-      FROM work_name w
-      LEFT JOIN mission_name m ON w.mission_id = m.id
-      ${includeDeleted ? "" : "WHERE w.deleted_at IS NULL"}
-      ORDER BY m.mission_name, w.work_name
-    `;
+      const [rows] = await db.query(sql);
+      res.json(rows);
 
-    const rows = await query(sql);
-    res.json(rows);
+    } catch (err) {
+      console.error("❌ Error fetching work group list:", err);
+      res.status(500).json({ success: false, message: err.message });
+    }
   }
 };
 
@@ -104,7 +121,7 @@ exports.opdController = {
   ...crudFactory("opd_name", ["opd_name", "work_id"]),
   create: async (req, res) => {
     try {
-      const items = req.body;
+      const items = Array.isArray(req.body) ? req.body : [req.body];
       const createdBy = req.user?.name || "Unknown User";
       for (const item of items) {
         // 1️⃣ Ensure mission exists / insert if new
@@ -116,7 +133,7 @@ exports.opdController = {
           createdBy
         );
 
-        // 2️⃣ Ensure work exists / insert if new, with mission_id
+        // 2️⃣ Ensure work exists / insert if new, linked to mission
         item.work_id = await ensureParent(
           "work_name",
           "work_name",
@@ -126,7 +143,7 @@ exports.opdController = {
         );
 
         // 3️⃣ Insert OPD
-        await query(
+        await db.query(
           `INSERT INTO opd_name (opd_name, work_id, created_by) VALUES (?, ?, ?)`,
           [item.opd_name, item.work_id, createdBy]
         );
@@ -134,22 +151,21 @@ exports.opdController = {
 
       return res.json({
         success: true,
-        message: "OPD created successfully"
+        message: "OPD created successfully",
       });
 
-    } catch (error) {
-      console.error(error);
-      return res.status(500).json({ success: false, message: "Internal error" });
+    } catch (err) {
+      console.error("❌ Error creating OPD:", err);
+      return res.status(500).json({ success: false, message: err.message });
     }
   },
   update: async (req, res) => {
     try {
-      const items = req.body;
+      const items = Array.isArray(req.body) ? req.body : [req.body];
       const createdBy = req.user?.name || "Unknown User";
 
       for (const item of items) {
-
-        // 1️⃣ mission (insert if needed)
+        // mission (insert if needed)
         item.mission_id = await ensureParent(
           "mission_name",
           "mission_name",
@@ -158,7 +174,7 @@ exports.opdController = {
           createdBy
         );
 
-        // 2️⃣ work (insert if needed)
+        // work (insert if needed)
         item.work_id = await ensureParent(
           "work_name",
           "work_name",
@@ -168,36 +184,41 @@ exports.opdController = {
         );
       }
 
-      // 3️⃣ update normally
+      // update normally via crudFactory
       return crudFactory("opd_name", ["opd_name", "work_id"])
         .update({ ...req, body: items }, res);
 
     } catch (err) {
-      console.error(err);
-      return res.status(500).json({ success: false });
+      console.error("❌ Error updating OPD:", err);
+      return res.status(500).json({ success: false, message: err.message });
     }
   },
   list: async (req, res) => {
-    const includeDeleted = req.query.includeDeleted === "true";
+    try {
+      const includeDeleted = req.query.includeDeleted === "true";
+      const sql = `
+        SELECT 
+          o.id,
+          w.mission_id,
+          o.work_id,
+          o.opd_name,
+          w.work_name,
+          m.mission_name,
+          o.deleted_at
+        FROM opd_name o
+        LEFT JOIN work_name w ON o.work_id = w.id
+        LEFT JOIN mission_name m ON w.mission_id = m.id
+        ${includeDeleted ? "" : "WHERE o.deleted_at IS NULL"}
+        ORDER BY m.mission_name, w.work_name, o.opd_name
+      `;
 
-    const sql = `
-      SELECT 
-        o.id,
-        w.mission_id,
-        o.work_id,
-        o.opd_name,
-        w.work_name,
-        m.mission_name,
-        o.deleted_at
-      FROM opd_name o
-      LEFT JOIN work_name w ON o.work_id = w.id
-      LEFT JOIN mission_name m ON w.mission_id = m.id
-      ${includeDeleted ? "" : "WHERE o.deleted_at IS NULL"}
-      ORDER BY m.mission_name, w.work_name, o.opd_name
-    `;
+      const [rows] = await db.query(sql);
+      res.json(rows);
 
-    const rows = await query(sql);
-    res.json(rows);
+    } catch (err) {
+      console.error("❌ Error fetching OPD list:", err);
+      return res.status(500).json({ success: false, message: err.message });
+    }
   }
 };
 
@@ -213,7 +234,7 @@ exports.getWorkOPDGroup = async (req, res) => {
       ORDER BY w.work_name, o.opd_name
     `;
 
-    const rows = await query(sql);
+    const [rows] = await db.query(sql);
 
     // Group by Work
     const result = [];
@@ -240,6 +261,7 @@ exports.getWorkOPDGroup = async (req, res) => {
 
     res.json(result);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("❌ Error fetching Work-OPD group:", err);
+    res.status(500).json({ success: false, message: err.message });
   }
 };

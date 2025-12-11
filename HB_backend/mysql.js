@@ -1,25 +1,27 @@
 // mysql.js
-require('dotenv').config();
-const mysql = require('mysql'); //แก้เป็น mysql2
+require("dotenv").config();
+const mysql = require("mysql2/promise"); //แก้เป็น mysql2
 
 const pool = mysql.createPool({
-  connectionLimit: 10,
   host: process.env.CONNECTSQL,
   user: process.env.USERSQL,
   password: process.env.PASSWORDSQL,
   database: process.env.DBSQL,
+  waitForConnections: true,
+  connectionLimit: 10,
   timezone: "+07:00",     // ✅ match Thailand timezone
-  dateStrings: true, 
+  dateStrings: true,
 });
 
 // Test connection at startup
-pool.getConnection((err, connection) => {
-  if (err) {
-    console.error("❌ MySQL connection error:", err);
-  } else {
+(async () => {
+  try {
+    const conn = await pool.getConnection();
     console.log("✅ Connected to MySQL database");
-    connection.release(); // release back to pool
+    conn.release();
+  } catch (err) {
+    console.error("❌ MySQL connection error:", err);
   }
-});
+})();
 
 module.exports = pool;

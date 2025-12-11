@@ -1,9 +1,9 @@
 const bcrypt = require('bcrypt');
 const db = require('../mysql.js');
 const jwt = require('jsonwebtoken');
-const util = require('util');
+// const util = require('util');
 
-const query = util.promisify(db.query).bind(db);
+// const query = util.promisify(db.query).bind(db);
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key";
 
@@ -12,13 +12,20 @@ exports.login = async (req, res) => {
     const { username, password } = req.body;
 
     if (!username || !password) {
-      return res.status(400).json({ message: "username and password is required" });
+      return res
+        .status(400)
+        .json({ message: "username and password is required" });
     }
 
-    const results = await query('SELECT * FROM user WHERE username = ? LIMIT 1', [username]);
+    const [results] = await db.query(
+      "SELECT * FROM user WHERE username = ? LIMIT 1",
+      [username]
+    );
 
     if (results.length === 0) {
-      return res.status(404).json({ message: "ไม่พบผู้ใช้งานนี้ในระบบ" });
+      return res
+        .status(404)
+        .json({ message: "ไม่พบผู้ใช้งานนี้ในระบบ" });
     }
 
     const user = results[0];
@@ -28,12 +35,16 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: "รหัสผ่านไม่ถูกต้อง" });
     }
 
-    const token = jwt.sign({ username: user.username }, JWT_SECRET, { expiresIn: '12h' });
+    const token = jwt.sign(
+      { username: user.username, id: user.id },
+      JWT_SECRET,
+      { expiresIn: "12h" }
+    );
 
     delete user.password;
 
     return res.status(200).json({
-      message: "เข้าสู่ระบบสําเร็จ",
+      message: "เข้าสู่ระบบสำเร็จ",
       status: true,
       data: user,
       token,
@@ -41,7 +52,9 @@ exports.login = async (req, res) => {
 
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: "มีบางอย่างผิดพลาด โปรดลองอีกครั้ง" });
+    return res
+      .status(500)
+      .json({ message: "มีบางอย่างผิดพลาด โปรดลองอีกครั้ง" });
   }
 };
 
@@ -49,10 +62,15 @@ exports.createUser = async (req, res) => {
   try {
     const { role } = req.body;
     if (!role) {
-      return res.status(400).json({ message: "กรุณาระบุสิทธิ์การใช้งาน (role)" });
+      return res.status(400).json({
+        message: "กรุณาระบุสิทธิ์การใช้งาน (role)",
+      });
     }
 
-    const results = await query("SELECT id FROM user ORDER BY id DESC LIMIT 1");
+    const [results] = await db.query(
+      "SELECT id FROM user ORDER BY id DESC LIMIT 1"
+    );
+
     const latest = results.length ? results[0] : null;
 
     const nextNum = String((latest?.id || 0) + 1).padStart(2, "0");
@@ -61,7 +79,7 @@ exports.createUser = async (req, res) => {
     const rawPassword = newUsername;
     const hashedPassword = await bcrypt.hash(rawPassword, 10);
 
-    await query(
+    await db.query(
       `INSERT INTO user (username, password, name, verify, role)
        VALUES (?, ?, ?, 0, ?)`,
       [newUsername, hashedPassword, "", role]
@@ -80,7 +98,9 @@ exports.createUser = async (req, res) => {
     });
   } catch (error) {
     console.error("createUser error:", error);
-    return res.status(500).json({ message: "เกิดข้อผิดพลาดภายในระบบ" });
+    return res.status(500).json({
+      message: "เกิดข้อผิดพลาดภายในระบบ",
+    });
   }
 };
 
@@ -95,11 +115,13 @@ exports.createAccount = async (req, res) => {
       return res.status(400).json({ message: "กรุณาระบุชื่อ" });
     }
 
-    if (password.length < 8) {
-      return res.status(400).json({ message: "รหัสผ่านใหม่ต้องมีอย่างน้อย 8 ตัวอักษร" });
+    if (password && password.length < 8) {
+      return res.status(400).json({
+        message: "รหัสผ่านใหม่ต้องมีอย่างน้อย 8 ตัวอักษร",
+      });
     }
 
-    const existingResult = await query(
+    const [existingResult] = await db.query(
       "SELECT id, username, password, role FROM user WHERE username = ? LIMIT 1",
       [username]
     );
@@ -113,7 +135,7 @@ exports.createAccount = async (req, res) => {
     const updatedName = name.trim();
 
     if (updatedUsername !== username) {
-      const dupResult = await query(
+      const [dupResult] = await db.query(
         "SELECT 1 FROM user WHERE username = ? LIMIT 1",
         [updatedUsername]
       );
@@ -130,7 +152,7 @@ exports.createAccount = async (req, res) => {
       hashedPassword = await bcrypt.hash(password, 10);
     }
 
-    const updateResult = await query(
+    const [updateResult] = await db.query(
       `
       UPDATE user
       SET username = ?, password = ?, name = ?, verify = 1, updated_at = NOW()
@@ -146,13 +168,13 @@ exports.createAccount = async (req, res) => {
     const newToken =
       updatedUsername !== username
         ? jwt.sign(
-          { username: updatedUsername },
+          { username: updatedUsername, id: existingUser.id },
           JWT_SECRET,
           { expiresIn: "12h" }
         )
         : null;
 
-    res.status(200).json({
+    return res.status(200).json({
       message: "อัปเดตข้อมูลผู้ใช้สำเร็จ",
       data: {
         username: updatedUsername,
@@ -164,7 +186,7 @@ exports.createAccount = async (req, res) => {
     });
   } catch (err) {
     console.error("updateAccount error:", err);
-    res.status(500).json({ message: "เกิดข้อผิดพลาดภายในระบบ" });
+    return res.status(500).json({ message: "เกิดข้อผิดพลาดภายในระบบ" });
   }
 };
 
@@ -177,7 +199,7 @@ exports.updateUser = async (req, res) => {
       return res.status(400).json({ message: "กรุณาระบุ username" });
     }
 
-    const userResult = await query(
+    const [userResult] = await db.query(
       "SELECT id, username, name, role FROM user WHERE username = ? LIMIT 1",
       [username]
     );
@@ -203,12 +225,14 @@ exports.updateUser = async (req, res) => {
       });
     }
 
-    const conflictResult = await query(
-      `SELECT username, name 
-       FROM user 
-       WHERE (username = ? OR name = ?) 
-         AND username != ? 
-       LIMIT 1`,
+    const [conflictResult] = await db.query(
+      `
+      SELECT username, name
+      FROM user
+      WHERE (username = ? OR name = ?)
+        AND username != ?
+      LIMIT 1
+      `,
       [updatedUsername, updatedName, user.username]
     );
     const conflict = conflictResult.length ? conflictResult[0] : null;
@@ -222,10 +246,12 @@ exports.updateUser = async (req, res) => {
       }
     }
 
-    const updateResult = await query(
-      `UPDATE user 
-       SET username = ?, name = ?, role = ?, updated_at = NOW() 
-       WHERE id = ?`,
+    const [updateResult] = await db.query(
+      `
+      UPDATE user
+      SET username = ?, name = ?, role = ?, updated_at = NOW()
+      WHERE id = ?
+      `,
       [updatedUsername, updatedName, updatedRole, user.id]
     );
 
@@ -233,11 +259,14 @@ exports.updateUser = async (req, res) => {
       return res.status(500).json({ message: "อัปเดตข้อมูลไม่สำเร็จ" });
     }
 
-    const token = updatedUsername !== user.username
-      ? jwt.sign({ username: updatedUsername }, JWT_SECRET, { expiresIn: "12h" })
-      : null;
+    const token =
+      updatedUsername !== user.username
+        ? jwt.sign({ username: updatedUsername, id: user.id }, JWT_SECRET, {
+          expiresIn: "12h",
+        })
+        : null;
 
-    res.status(200).json({
+    return res.status(200).json({
       message: "อัปเดตข้อมูลผู้ใช้สำเร็จ",
       data: {
         username: updatedUsername,
@@ -248,7 +277,7 @@ exports.updateUser = async (req, res) => {
     });
   } catch (err) {
     console.error("updateUser error:", err);
-    res.status(500).json({ message: "เกิดข้อผิดพลาดภายในระบบ" });
+    return res.status(500).json({ message: "เกิดข้อผิดพลาดภายในระบบ" });
   }
 };
 
@@ -269,7 +298,7 @@ exports.updatePassword = async (req, res) => {
       return res.status(400).json({ message: "รหัสผ่านใหม่ต้องมีอย่างน้อย 8 ตัวอักษร" });
     }
 
-    const userResult = await query(
+    const [userResult] = await db.query(
       "SELECT id, password FROM user WHERE username = ? LIMIT 1",
       [username]
     );
@@ -289,7 +318,7 @@ exports.updatePassword = async (req, res) => {
     }
 
     const hashedNew = await bcrypt.hash(new_password, 10);
-    const updateResult = await query(
+    const [updateResult] = await db.query(
       "UPDATE user SET password = ?, updated_at = NOW() WHERE id = ?",
       [hashedNew, user.id]
     );
@@ -298,10 +327,10 @@ exports.updatePassword = async (req, res) => {
       return res.status(500).json({ message: "เปลี่ยนรหัสผ่านไม่สำเร็จ" });
     }
 
-    res.status(200).json({ message: "เปลี่ยนรหัสผ่านสำเร็จ" });
+    return res.status(200).json({ message: "เปลี่ยนรหัสผ่านสำเร็จ" });
   } catch (err) {
     console.error("updatePassword error:", err);
-    res.status(500).json({ message: "เกิดข้อผิดพลาดภายในระบบ" });
+    return res.status(500).json({ message: "เกิดข้อผิดพลาดภายในระบบ" });
   }
 };
 
@@ -309,8 +338,7 @@ exports.resetPassword = async (req, res) => {
   try {
     const { username } = req.body;
 
-    // ✅ Verify admin permission (role = 1)
-    const currentUser = req.user; // from authAndRole middleware
+    const currentUser = req.user;
     if (!currentUser || currentUser.role !== 1) {
       return res.status(403).json({ message: "คุณไม่มีสิทธิ์รีเซ็ตรหัสผ่านผู้ใช้" });
     }
@@ -319,32 +347,30 @@ exports.resetPassword = async (req, res) => {
       return res.status(400).json({ message: "กรุณาระบุชื่อผู้ใช้ (username)" });
     }
 
-    // ✅ Check if target user exists
-    const [user] = await query(
+    const [rows] = await pool.query(
       "SELECT id, username FROM user WHERE username = ? LIMIT 1",
       [username]
     );
 
+    const user = rows[0];
     if (!user) {
       return res.status(404).json({ message: "ไม่พบผู้ใช้ในระบบ" });
     }
 
-    // ✅ Default password = same as username
     const defaultPassword = user.username;
     const hashedPassword = await bcrypt.hash(defaultPassword, 10);
 
-    // ✅ Update password
-    const result = await query(
+    const [updateResult] = await pool.query(
       "UPDATE user SET password = ?, updated_at = NOW() WHERE id = ?",
       [hashedPassword, user.id]
     );
 
-    if (!result.affectedRows) {
+    if (updateResult.affectedRows === 0) {
       return res.status(500).json({ message: "รีเซ็ตรหัสผ่านไม่สำเร็จ" });
     }
 
-    res.status(200).json({
-      message: `รีเซ็ตรหัสผ่านสำเร็จ (รหัสผ่านใหม่คือ '${defaultPassword}')`,
+    return res.status(200).json({
+      message: `รีเซ็ตรหัสผ่านสำเร็จ (password ใหม่คือ '${defaultPassword}')`,
       data: {
         username: user.username,
         default_password: defaultPassword
@@ -352,21 +378,23 @@ exports.resetPassword = async (req, res) => {
     });
   } catch (err) {
     console.error("resetPassword error:", err);
-    res.status(500).json({ message: "เกิดข้อผิดพลาดภายในระบบ" });
+    return res.status(500).json({ message: "เกิดข้อผิดพลาดภายในระบบ" });
   }
 };
 
 exports.getMe = (req, res) => {
-  if (!req.user) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
   try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
     return res.status(200).json({
       status: true,
-      data: req.user   // already without password
+      data: user,
     });
   } catch (err) {
+    console.error("getMe error:", err);
     return res.status(500).json({ message: "มีบางอย่างผิดพลาด โปรดลองอีกครั้ง" });
   }
 };
