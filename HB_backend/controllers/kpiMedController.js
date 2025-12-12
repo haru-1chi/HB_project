@@ -1,7 +1,4 @@
 const db = require('../mysql.js'); // ⬅️ Import MySQL connection
-// const util = require("util");
-
-// const query = util.promisify(db.query).bind(db);
 
 exports.createKPINameMed = async (req, res) => {
     const dataArray = Array.isArray(req.body) ? req.body : [req.body];
@@ -21,7 +18,6 @@ exports.createKPINameMed = async (req, res) => {
         for (const item of dataArray) {
             const { mainKPI, subKPIs = [] } = item;
 
-            // 🔹 mysql2/promise
             const [existing] = await db.query(
                 `SELECT id FROM kpi_name_med WHERE kpi_name = ? AND parent_id IS NULL LIMIT 1`,
                 [mainKPI]
@@ -446,7 +442,9 @@ exports.deleteKPIMedError = async (req, res) => {
 exports.getKPIMedData = async (req, res) => {
     try {
         const month = req.query.month?.trim(); // expected format: "YYYY-MM"
-        const sql = `
+        const search = req.query.search?.trim();
+
+        let sql = `
             SELECT 
                 e.*, 
                 n.kpi_name AS kpi_label, 
@@ -458,31 +456,39 @@ exports.getKPIMedData = async (req, res) => {
             LEFT JOIN kpi_name_med p ON n.parent_id = p.id
             LEFT JOIN opd_name d ON e.opd_id = d.id
             WHERE 1=1
-                ${month ? "AND e.report_date >= ? AND e.report_date < ?" : ""}
-            ORDER BY e.report_date ASC
         `;
 
         const params = [];
 
         if (month) {
-            const startDate = `${month}`;
             const [year, mon] = month.split("-");
             const nextMonth = (Number(mon) === 12)
                 ? `${Number(year) + 1}-01-01`
                 : `${year}-${String(Number(mon) + 1).padStart(2, "0")}-01`;
 
-            params.push(startDate, nextMonth);
+            sql += " AND e.report_date >= ? AND e.report_date < ?";
+            params.push(`${month}-01`, nextMonth);
         }
 
+        if (search) {
+            sql += `
+                AND (
+                    n.kpi_name LIKE ? OR
+                    p.kpi_name LIKE ? OR
+                    d.opd_name LIKE ?
+                )
+            `;
+            const like = `%${search}%`;
+            params.push(like, like, like);
+        }
+        sql += " ORDER BY e.report_date ASC";
+
         const [results] = await db.query(sql, params);
-        res.status(200).json(results || []);
+        res.json(results || []);
 
     } catch (err) {
         console.error("❌ Error fetching KPI MED data:", err);
-        res.status(500).json({
-            error: "Error fetching KPI MED data",
-            message: err.message,
-        });
+        res.status(500).json({ message: err.message });
     }
 };
 

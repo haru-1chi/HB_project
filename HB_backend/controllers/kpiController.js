@@ -441,7 +441,9 @@ exports.getKPIData = async (req, res) => {
           d.a_value LIKE ? OR
           d.b_value LIKE ? OR
           d.type LIKE ? OR
-          d.report_date LIKE ?
+          d.report_date LIKE ? OR
+          d.issue_details LIKE ? OR
+          d.support_details LIKE ?
         )
       `;
 
@@ -449,7 +451,9 @@ exports.getKPIData = async (req, res) => {
                 `%${search}%`,
                 `%${search}%`,
                 `%${search}%`,
-                `%${formattedSearch}%`
+                `%${formattedSearch}%`,
+                `%${search}%`,
+                `%${search}%`,
             );
         }
 

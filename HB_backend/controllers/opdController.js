@@ -22,13 +22,28 @@ exports.missionGroupController = {
   list: async (req, res) => {
     try {
       const includeDeleted = req.query.includeDeleted === "true";
-      const sql = `
-        SELECT id, mission_name, deleted_at
-        FROM mission_name
-        ${includeDeleted ? "" : "WHERE deleted_at IS NULL"}
-        ORDER BY mission_name ASC
-      `;
-      const [rows] = await db.query(sql);
+      const search = req.query.search;
+
+      let sql = `
+      SELECT id, mission_name, deleted_at
+      FROM mission_name
+      WHERE 1=1
+    `;
+
+      const params = [];
+
+      if (!includeDeleted) {
+        sql += ` AND deleted_at IS NULL`;
+      }
+
+      if (search) {
+        sql += ` AND mission_name LIKE ?`;
+        params.push(`%${search}%`);
+      }
+
+      sql += ` ORDER BY mission_name ASC`;
+
+      const [rows] = await db.query(sql, params);
       res.json(rows);
     } catch (err) {
       console.error("❌ Error fetching mission list:", err);
@@ -93,20 +108,37 @@ exports.workGroupController = {
   list: async (req, res) => {
     try {
       const includeDeleted = req.query.includeDeleted === "true";
-      const sql = `
-        SELECT 
-          w.id,
-          w.mission_id,
-          w.work_name,
-          m.mission_name,
-          w.deleted_at
-        FROM work_name w
-        LEFT JOIN mission_name m ON w.mission_id = m.id
-        ${includeDeleted ? "" : "WHERE w.deleted_at IS NULL"}
-        ORDER BY m.mission_name, w.work_name
-      `;
+      const search = req.query.search || "";
 
-      const [rows] = await db.query(sql);
+      let sql = `
+      SELECT 
+        w.id,
+        w.mission_id,
+        w.work_name,
+        m.mission_name,
+        w.deleted_at
+      FROM work_name w
+      LEFT JOIN mission_name m ON w.mission_id = m.id
+      WHERE 1 = 1
+    `;
+
+      const params = [];
+
+      if (!includeDeleted) {
+        sql += " AND w.deleted_at IS NULL";
+      }
+
+      if (search) {
+        sql += ` AND (
+        w.work_name LIKE ?
+        OR m.mission_name LIKE ?
+      )`;
+        params.push(`%${search}%`, `%${search}%`);
+      }
+
+      sql += " ORDER BY m.mission_name ASC, w.work_name ASC";
+
+      const [rows] = await db.query(sql, params);
       res.json(rows);
 
     } catch (err) {
@@ -196,28 +228,66 @@ exports.opdController = {
   list: async (req, res) => {
     try {
       const includeDeleted = req.query.includeDeleted === "true";
-      const sql = `
-        SELECT 
-          o.id,
-          w.mission_id,
-          o.work_id,
-          o.opd_name,
-          w.work_name,
-          m.mission_name,
-          o.deleted_at
-        FROM opd_name o
-        LEFT JOIN work_name w ON o.work_id = w.id
-        LEFT JOIN mission_name m ON w.mission_id = m.id
-        ${includeDeleted ? "" : "WHERE o.deleted_at IS NULL"}
-        ORDER BY m.mission_name, w.work_name, o.opd_name
-      `;
+      const search = req.query.search || "";
+      const missionId = req.query.mission_id;
+      const workId = req.query.work_id;
 
-      const [rows] = await db.query(sql);
+      let sql = `
+      SELECT 
+        o.id,
+        w.mission_id,
+        o.work_id,
+        o.opd_name,
+        w.work_name,
+        m.mission_name,
+        o.deleted_at
+      FROM opd_name o
+      LEFT JOIN work_name w ON o.work_id = w.id
+      LEFT JOIN mission_name m ON w.mission_id = m.id
+      WHERE 1 = 1
+    `;
+
+      const params = [];
+
+      if (!includeDeleted) {
+        sql += " AND o.deleted_at IS NULL";
+      }
+
+      if (missionId) {
+        sql += " AND w.mission_id = ?";
+        params.push(missionId);
+      }
+
+      if (workId) {
+        sql += " AND o.work_id = ?";
+        params.push(workId);
+      }
+
+      // 🔍 Search across OPD + Work + Mission
+      if (search) {
+        sql += `
+        AND (
+          o.opd_name LIKE ?
+          OR w.work_name LIKE ?
+          OR m.mission_name LIKE ?
+        )
+      `;
+        params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+      }
+
+      sql += `
+      ORDER BY
+        m.mission_name,
+        w.work_name,
+        o.opd_name
+    `;
+
+      const [rows] = await db.query(sql, params);
       res.json(rows);
 
     } catch (err) {
       console.error("❌ Error fetching OPD list:", err);
-      return res.status(500).json({ success: false, message: err.message });
+      res.status(500).json({ success: false, message: err.message });
     }
   }
 };

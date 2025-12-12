@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
+import { debounce } from "lodash";
 import { Button } from "primereact/button";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
@@ -129,18 +130,24 @@ function LookupOPD() {
     }));
   };
 
-  const fetchMissions = useCallback(async () => {
-    const res = await axios.get(`${API_BASE}/mission-name`);
+  const fetchMissions = useCallback(async (search = "") => {
+    const res = await axios.get(`${API_BASE}/mission-name`, {
+      params: { search },
+    });
     setMissionList(res.data);
   }, []);
 
-  const fetchWorks = useCallback(async () => {
-    const res = await axios.get(`${API_BASE}/work-name`);
+  const fetchWorks = useCallback(async (search = "") => {
+    const res = await axios.get(`${API_BASE}/work-name`, {
+      params: { search },
+    });
     setWorkList(res.data);
   }, []);
 
-  const fetchOPDs = useCallback(async () => {
-    const res = await axios.get(`${API_BASE}/opd-name`);
+  const fetchOPDs = useCallback(async (search = "") => {
+    const res = await axios.get(`${API_BASE}/opd-name`, {
+      params: { search },
+    });
     setOpdList(res.data);
   }, []);
 
@@ -149,6 +156,23 @@ function LookupOPD() {
     fetchWorks();
     fetchOPDs();
   }, []);
+
+  useEffect(() => {
+    const run = debounce(() => {
+      if (activeTab === "mission") fetchMissions(searchTerm);
+      if (activeTab === "work") fetchWorks(searchTerm);
+      if (activeTab === "opd") fetchOPDs(searchTerm);
+    }, 400);
+
+    run();
+    return () => run.cancel();
+  }, [searchTerm, activeTab, fetchMissions, fetchWorks, fetchOPDs]);
+
+  useEffect(() => {
+    if (activeTab === "mission") fetchMissions("");
+    if (activeTab === "work") fetchWorks("");
+    if (activeTab === "opd") fetchOPDs("");
+  }, [activeTab, fetchMissions, fetchWorks, fetchOPDs]);
 
   const validate = (values) => {
     const errors = {};
@@ -457,7 +481,6 @@ function LookupOPD() {
               ...(field === "mission_name" ? { work_id: null } : {}),
             });
           }}
-          placeholder={`ค้นหา หรือพิมพ์เพิ่ม`}
           className={`w-full ${formErrors[idField] ? "p-invalid" : ""}`}
           forceSelection={false}
         />
@@ -522,10 +545,11 @@ function LookupOPD() {
             onTabChange={(e) => {
               setActiveIndex(e.index);
 
-              // update activeTab based on selected tab
               if (e.index === 0) setActiveTab("opd");
               if (e.index === 1) setActiveTab("mission");
               if (e.index === 2) setActiveTab("work");
+
+              setSearchTerm(""); 
             }}
           >
             <TabPanel header="ชื่อหน่วยงาน">
@@ -821,7 +845,6 @@ function LookupOPD() {
                       [cfg.field]: valueId,
                     });
                   }}
-                  placeholder="ค้นหา หรือพิมพ์เพิ่ม"
                   className={`w-full ${
                     formErrors[cfg.field] ||
                     (activeTab === "opd" &&

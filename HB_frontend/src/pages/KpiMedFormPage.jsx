@@ -89,18 +89,17 @@ function KpiMedFormPage() {
 
   // 🟢 Fetch KPI data (your KPI detail endpoint)
   const fetchKpiData = useCallback(
-    async (month) => {
+    async (month, search = "") => {
       if (!month) return;
 
       setLoading(true);
       try {
         const res = await axios.get(`${API_BASE}/kpi-data-med`, {
-          params: { month },
+          params: { month, search },
         });
         setKpiData(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
         showToast("error", "ผิดพลาด", err.message || "โหลดข้อมูลไม่สำเร็จ");
-        console.error("❌ Error fetching KPI MED data:", err);
       } finally {
         setLoading(false);
       }
@@ -157,7 +156,7 @@ function KpiMedFormPage() {
           const today = new Date();
           const yyyy = today.getFullYear();
           const mm = String(today.getMonth() + 1).padStart(2, "0");
-          fetchKpiData(`${yyyy}-${mm}-01`);
+          fetchKpiData(`${yyyy}-${mm}`);
         }
       } catch (err) {
         showToast(
@@ -172,36 +171,21 @@ function KpiMedFormPage() {
     fetchNames();
   }, [API_BASE, fetchKpiData, showToast]);
 
-  // const fetchKpiData = useCallback(
-  //   async (kpiId, search = "") => {
-  //     if (!kpiId) return;
-
-  //     setLoading(true);
-  //     try {
-  //       const res = await axios.get(`${API_BASE}/kpi-data-med`, {
-  //         params: { kpi_id: kpiId, search },
-  //       });
-  //       setKpiData(Array.isArray(res.data) ? res.data : []);
-  //     } catch (err) {
-  //       showToast("error", "ผิดพลาด", err.message || "โหลดข้อมูลไม่สำเร็จ");
-  //       console.error("❌ Error fetching KPI MED data:", err);
-  //     } finally {
-  //       setLoading(false);
-  //     }
-  //   },
-  //   [showToast]
-  // );
-
   // 🟢 Auto refetch on search
-  // useEffect(() => {
-  //   if (!selectedKpi) return;
-  //   const debounced = debounce(
-  //     () => fetchKpiData(selectedKpi, searchTerm),
-  //     500
-  //   );
-  //   debounced();
-  //   return () => debounced.cancel();
-  // }, [searchTerm, selectedKpi, fetchKpiData]);
+  useEffect(() => {
+    if (!sinceDate) return;
+
+    const yyyy = sinceDate.getFullYear();
+    const mm = String(sinceDate.getMonth() + 1).padStart(2, "0");
+    const monthString = `${yyyy}-${mm}`;
+
+    const run = debounce(() => {
+      fetchKpiData(monthString, searchTerm);
+    }, 400);
+
+    run();
+    return () => run.cancel();
+  }, [sinceDate, searchTerm, fetchKpiData]);
 
   //*สำหรับ filter header
   const handleMonthChange = (date) => {
@@ -209,14 +193,8 @@ function KpiMedFormPage() {
     if (!date) return;
     const yyyy = date.getFullYear();
     const mm = String(date.getMonth() + 1).padStart(2, "0");
-    const monthString = `${yyyy}-${mm}-01`;
+    const monthString = `${yyyy}-${mm}`;
     fetchKpiData(monthString);
-  };
-
-  const handleKpiChange = (e) => {
-    setSelectedKpi(e.value);
-    fetchKpiData();
-    // fetchKpiData(e.value, searchTerm);
   };
   //*สำหรับ filter header
 
@@ -438,7 +416,7 @@ function KpiMedFormPage() {
 
       return (
         <InputText
-        className="w-full"
+          className="w-full"
           value={editRowData[field] ?? ""}
           onChange={(e) => {
             const value = e.target.value;
@@ -652,7 +630,7 @@ function KpiMedFormPage() {
           icon={<FontAwesomeIcon icon={faTrash} />}
           severity="danger"
           rounded
-          onClick={() => confirmDelete(rowNode.key)}
+          onClick={() => confirmDelete(rowNode.data.id)}
         />
       );
     },
@@ -666,42 +644,26 @@ function KpiMedFormPage() {
   );
 
   const header = (
-    <div className="flex items-end justify-start">
-      {/* <Dropdown
-        value={displayMode}
-        options={[
-          { label: "เลือกดูตามเดือน", value: "byMonth" },
-          { label: "เลือกดูตามตัวชี้วัด", value: "byKpi" },
-        ]}
-        onChange={(e) => setDisplayMode(e.value)}
-        optionLabel="label"
-        placeholder="เลือกรูปแบบการแสดงข้อมูล"
-        className="mr-5"
-      /> */}
+    <div className="flex justify-between items-end">
+      <Calendar
+        value={sinceDate}
+        onChange={(e) => handleMonthChange(e.value)}
+        view="month"
+        dateFormat="mm/yy"
+        placeholder="เดือน/ปี"
+        showIcon
+      />
 
-      {displayMode === "byMonth" && (
-        <Calendar
-          value={sinceDate}
-          onChange={(e) => handleMonthChange(e.value)}
-          view="month"
-          dateFormat="mm/yy"
-          placeholder="เดือน/ปี"
-          showIcon
+      <IconField iconPosition="left">
+        <InputIcon>
+          <FontAwesomeIcon icon={faMagnifyingGlass} />
+        </InputIcon>
+        <InputText
+          placeholder="ค้นหา"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
         />
-      )}
-
-      {displayMode === "byKpi" && (
-        <Dropdown
-          value={selectedKpi}
-          options={kpiNames}
-          onChange={handleKpiChange}
-          optionLabel="label"
-          placeholder="เลือก KPI"
-          className="mr-5"
-          filter
-          filterDelay={400}
-        />
-      )}
+      </IconField>
     </div>
   );
 
@@ -760,44 +722,6 @@ function KpiMedFormPage() {
     [totals]
   );
 
-  // const nodes = useMemo(() => {
-  //   const map = new Map();
-
-  //   kpiData.forEach((row) => {
-  //     if (!map.has(row.kpi_id)) {
-  //       map.set(row.kpi_id, {
-  //         key: row.kpi_id,
-  //         data: {
-  //           kpi_label: row.kpi_label,
-  //           A: 0,
-  //           B: 0,
-  //           C: 0,
-  //           D: 0,
-  //           E: 0,
-  //           F: 0,
-  //           G: 0,
-  //           H: 0,
-  //           I: 0,
-  //           total: 0,
-  //         },
-  //         children: [],
-  //       });
-  //     }
-
-  //     const parent = map.get(row.kpi_id);
-
-  //     parent.children.push({
-  //       key: row.id,
-  //       data: { ...row, opd_name: row.opd_name },
-  //     });
-
-  //     fields.concat("total").forEach((f) => {
-  //       parent.data[f] += parseInt(row[f]) || 0;
-  //     });
-  //   });
-
-  //   return Array.from(map.values());
-  // }, [kpiData, fields]);
   const nodes = useMemo(() => {
     const map = new Map();
 

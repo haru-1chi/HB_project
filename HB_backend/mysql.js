@@ -11,6 +11,7 @@ const pool = mysql.createPool({
   connectionLimit: 10,
   timezone: "+07:00",     // ✅ match Thailand timezone
   dateStrings: true,
+  decimalNumbers: true
 });
 
 // Test connection at startup
